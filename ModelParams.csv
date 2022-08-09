@@ -1,0 +1,17 @@
+Name,LoadCapacity,RiderWeight,Rider,Crr,Efficiency(rel to walking):n,unloadVel
+Bike&Cart,575,83,1,0.008,5.00,4.3
+Hand Cart,575,83,0,0.008,1.00,1.2
+Wheelbarrow,374,83,0,0.008,1.00,1.2
+Hand Truck,360,83,0,0.008,1.00,1.2
+Cycle Rickshaw,124.5,83,1,0.008,5.00,4.3
+Shopping Trolley,195,83,0,0.008,1.00,1.2
+Rolling Container,157.5,83,0,0.002,1.00,1.2
+Bicycle,53,83,1,0.008,5.00,4.3
+Rickshaw,124.5,83,1,0.008,1.00,1.2
+Stretcher,83,83,0,0,1.00,1.2
+Wheelchair,83,83,0,0.008,1.00,1.2
+Skateboard,20,83,1,0.008,2.5,4.02
+Roller skates,20,83,1,0.008,2.5,3.58
+Scooter,17,83,1,0.008,2.5,4.02
+Baby Carriage,20,83,0,0.008,1.00,1.2
+Luggage,20,83,0,0.008,1.00,1.2
