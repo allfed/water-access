@@ -8,6 +8,7 @@ dependencies:
   - pandas=1.4.3
   - matplotlib=3.5.2
   - geopandas=0.11.1
+  - ipykernel 
   - pip
   - pip:
     - tqdm==4.62.3
