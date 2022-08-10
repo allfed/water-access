@@ -8,7 +8,7 @@ with open("ModelParams.csv") as csv_file:
     param_df = pd.read_csv("ModelParams.csv") 
 
 #### variables (changeable)
-s_deg=0         # slope in degrees
+s_deg=20         # slope in degrees
 m1=83           # mass of rider/person
 P_t=75          #power output of person (steady state average)
 F_max = 300     # maximum force exertion for pushing up a hill for a short amount of time
@@ -97,14 +97,16 @@ distance_achievable = (v_avg*t_secs)/1000 #kms
 #### Plotting
 i=0
 fig, ax = plt.subplots(figsize=(20, 10))
-
 for HPVname in param_df.Name:
-    ax.plot(load_matrix[i], v_avg[i], label=HPVname)  # Plot some data on the axes.
+    ax.plot(load_matrix[i], v_avg[i]*load_matrix[i], label=HPVname)  # Plot some data on the axes.
     i += 1
 plt.xlabel('Load [kg]')
 plt.ylabel('Velocity [m/s]')
 plt.title("Simple Plot")
 plt.legend();
+
+
+
 
 filename_output = 'velocity_slope' + str(s_deg)
 fig.savefig(filename_output, transparent=False, dpi=80, bbox_inches="tight")

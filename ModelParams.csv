@@ -1,5 +1,4 @@
 Name,LoadCapacity,AverageSpeedWithoutLoad,Drive,GroundContact,Pilot,Crr,Efficiency
-Bike & Cart,575,4.3,2,1,1,0.008,3
 Cycle Rickshaw,293,4.3,2,1,1,0.008,3
 Bicycle,136,4.3,2,1,1,0.008,3
 Skateboard,123,4.0,1,1,1,0.008,2
