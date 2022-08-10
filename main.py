@@ -52,7 +52,9 @@ m_walk_carry = m1 + m_HPV_loaded_weight #* (np.array(param_df.GroundContact).res
 ## Constants from polynomial equation analysis
 C = ((m_walk_carry)*g/pi)*(3*g*L/2)**(1/2)
 D = pi**2/(6*g*L)
-B = m_HPV_loaded_weight*g*np.cos(np.arctan(s))*Crr + m_HPV_loaded_weight * np.cos(np.arctan(s)) 
+B1 = m_HPV_loaded_weight*g*np.cos(np.arctan(s))*Crr # rolling resistance component
+B2 = m_HPV_loaded_weight * np.sin(np.arctan(s))  # slope component
+B = B1 + B2
 
 v_load = (-B + np.sqrt(B**2+(2*C*D*P_t)/n))/(C*D/n); #loaded velocity
 
@@ -72,7 +74,7 @@ distance_achievable = (v_avg*t_secs)/1000 #kms
 
 
 i=0
-fig, ax = plt.subplots(figsize=(20, 10), layout='constrained')
+fig, ax = plt.subplots(figsize=(20, 10))
 
 for HPVname in param_df.Name:
     ax.plot(load_matrix[i], v_avg[i], label=HPVname)  # Plot some data on the axes.
