@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
+import pickle
 
 class AnnotatedCursor(Cursor):
     """
@@ -259,45 +260,23 @@ class AnnotatedCursor(Cursor):
         if self.useblit:
             super()._update()
 
+def load_matrix_creator(max_load_HPV,minimumViableLoad,res):
+    # res = resoltuion, also used as a flag to set minimum/maxmum sinle load scearios
 
-def walkmodel(param_df,s_deg,m1,P_t,F_max,L,minimumViableLoad,t_hours,res,single):
+    if res == 1:  # if res =1 , calculate for max load of HPV
+        load_matrix = np.zeros((len(max_load_HPV),res))    # initilaise numpy matrix
+        load_matrix = max_load_HPV
+    elif res == 0: # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
+        load_matrix = np.zeros((len(max_load_HPV),1))    # initilaise numpy matrix
+        load_matrix = load_matrix+minimumViableLoad
+    elif res > 1:
+        load_matrix = np.zeros((len(max_load_HPV),res))    # initilaise numpy matrix
 
-    #### constants
-    g=9.81
-    pi = 3.1416
-
-    #### Data Accounting
-    s = (s_deg/360)*(2*pi) #converts s in to radians
-    n_hpv = len(param_df.Name)
-    n = np.array(param_df.Efficiency).reshape((n_hpv,1))
-    Crr = np.array(param_df.Crr).reshape((n_hpv,1))
-    v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv,1))
-    max_load_HPV = np.array(param_df.LoadCapacity).reshape((n_hpv,1))
-    m_HPV_only = param_df.LoadCapacity*0.05;                    # assume 5# of load is the wight of HPV
-
-    if s != 0:  #requires check to avoid divide by zero
-        max_pushable_weight = F_max/(np.sin(s)*g)
-    else:
-        max_pushable_weight = 10000 #some large number, (weight will be determined by HPV loading, not limited by hill)
-
-    #### Weight limits
-    # Calculate weight limits for hills. There are some heavy loads which humans will not be able to push up certain hills
-    # Note that this is for average slopes etc. This will be innacurate (i.e one VERY hilly section could render the whole thing impossible, this isn't accounted for here)
-
-    i=0
-    for  HPV_weight in m_HPV_only:
-        if max_load_HPV[i]+HPV_weight>max_pushable_weight:
-            max_load_HPV[i] = max_pushable_weight-HPV_weight
-        i+=1
-
-
-    if single == 0:  #check if calaculting a range of weights, or only the max weight
         #### Create linear space of weights
         # creates a vector for each of the HPVs, an equal number of elements spaced 
         # evenly between the minimum viable load and the maximum load for that HPV
-        load_matrix = np.zeros((len(param_df.LoadCapacity),res))    # initilaise numpy matrix
         i=0                                                         # initliase index
-        for maxval in np.nditer(max_load_HPV):
+        for maxval in np.nditer(max_load_HPV): # iterate through numpy array
             minval = minimumViableLoad
             load_vector =   np.linspace(start = minval,             # define linear space of weights
                             stop =maxval,                           # define maximum value for linear space
@@ -308,12 +287,48 @@ def walkmodel(param_df,s_deg,m1,P_t,F_max,L,minimumViableLoad,t_hours,res,single
             load_matrix[i:] = load_vector                           # place the vector in to a matrix
             i += 1                                                  # increment index
     else:
+        print('Error: unexpected loading resolution, setting default')
         load_matrix = max_load_HPV
 
+    return load_matrix
+
+def max_safe_load(m_HPV_only,LoadCapacity,F_max,s,g):
+
+
+    max_load_HPV = LoadCapacity  
+    #### Weight limits
+    # Calculate weight limits for hills. There are some heavy loads which humans will not be able to push up certain hills
+    # Note that this is for average slopes etc. This will be innacurate (i.e one VERY hilly section could render the whole thing impossible, this isn't accounted for here)
+    if s != 0:  #requires check to avoid divide by zero
+        max_pushable_weight = F_max/(np.sin(s)*g)
+        i=0
+        for  HPV_weight in m_HPV_only:
+            if max_load_HPV[i]+HPV_weight>max_pushable_weight:
+                max_load_HPV[i] = max_pushable_weight-HPV_weight
+            i+=1
+    
+    return max_load_HPV
+
+
+def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
+
+    #### constants
+    g=9.81
+    pi = 3.1416
+ 
+    n_hpv = len(param_df.Name)
+    n = np.array(param_df.Efficiency).reshape((n_hpv,1))
+    Crr = np.array(param_df.Crr).reshape((n_hpv,1))
+    v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv,1))
+    LoadCapacity = np.array(param_df.LoadCapacity).reshape((n_hpv,1))
+    m_HPV_only = param_df.LoadCapacity*0.05;                    # assume 5# of load is the wight of HPV
+
+    max_load_HPV = max_safe_load(m_HPV_only,LoadCapacity,F_max,s,g) # function to calaculate the max saffe loads due to hill
+    load_matrix = load_matrix_creator(max_load_HPV,minimumViableLoad,res)
 
     #### Derivations of further mass variables
-    vecnp = np.array(m1*param_df.Pilot + m_HPV_only).reshape((n_hpv,1)) # create vector with extra weights to add
-    m_HPV_load_pilot = load_matrix + vecnp # weight of the HPV plus the rider (if any) plus the load
+    m_HPV_pilot = np.array(m1*param_df.Pilot + m_HPV_only).reshape((n_hpv,1)) # create vector with extra weights to add
+    m_HPV_load_pilot = load_matrix + m_HPV_pilot # weight of the HPV plus the rider (if any) plus the load
     m_walk_carry = m1 + m_HPV_load_pilot * (np.array(param_df.GroundContact).reshape((n_hpv,1))-1)*-1 # negative 1 is to make the wheeled = 0 and the walking = 1
     m_HPV_load = load_matrix + np.array(m_HPV_only).reshape((n_hpv,1)) 
     # weight of the mass being 'walked', i.e the wieght of the human plus anything they are carrying (not pushing or riding)
@@ -331,21 +346,12 @@ def walkmodel(param_df,s_deg,m1,P_t,F_max,L,minimumViableLoad,t_hours,res,single
     # if loaded speed is greater than unloaded avg speed, make equal to avg unloaded speed
     i=0
     for maxval in v_no_load:
-        indeces = v_load[i]>maxval
-        v_load[i,indeces]=maxval
-        i+=1
+        indeces = v_load[i]>maxval; v_load[i,indeces]=maxval ; i+=1
 
     # calcualte average speed, half of the trip is loaded, and half is unloaded
     v_avg = (v_load+v_no_load)/2; #average velocity for a round trip
 
-    #### Forces and Power
-    F_push_hill = np.sin(s)*m_HPV_load*g # force required to push uphill (approx)
-
-    #### Distance
-    t_secs=t_hours*60*60
-    distance_achievable = (v_avg*t_secs)/1000 #kms
-
-    return distance_achievable , v_avg , load_matrix
+    return v_avg , load_matrix
 
 #### Start Script
 with open("ModelParams.csv") as csv_file:
@@ -363,17 +369,21 @@ t_hours=8       # number of hours to gather water
 
 ## plot options
 load_plot = 1
-slope_plot = 1
+slope_plot = 0
 
 ## Options
-single_load = 1    # 1= single load, or 0 = linspace of loads
+single_load = 0    # 1= single load, or 0 = linspace of loads
 single_slope = 0    # 1= single slope, or 0 = linspace of slopes
 if single_load + single_slope > 1:
     print('Sorry, can only investigate either Slope OR Loading at once')
-load_res = 50        # resolution (how many datapoints for linear space)
+load_res = 0        # resolution (how many datapoints for linear space)
 slope_start = 0
 slope_end = 20
 slope_res = 30
+
+#### constants
+g=9.81
+pi = 3.1416
 
 if single_slope == 0:
     slope_vector =   np.linspace(start = slope_start,             # define linear space of weights
@@ -388,21 +398,34 @@ if single_slope == 0:
     v_avg_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
     load_vector_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
 
-
     for slope in slope_vector:
-        distance_achievable , v_avg , load_matrix = walkmodel(param_df,slope,m1,P_t,F_max,L,minimumViableLoad,t_hours,load_res,single_load)
-        d_var_matrix[i] = distance_achievable.reshape(len(param_df.Name))
+        s =  (slope/360)*(2*pi)
+        v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
         v_avg_matrix[i] = v_avg.reshape(len(param_df.Name))
         load_vector_matrix[i] = load_matrix.reshape(len(param_df.Name))
         i+=1
 else:
-    distance_achievable , v_avg , load_matrix = walkmodel(param_df,s_deg,m1,P_t,F_max,L,minimumViableLoad,t_hours,load_res,single_load)
+    s = (s_deg/360)*(2*pi) #converts s in to radians
+    v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
 
     
 velocitykgs=v_avg_matrix*load_vector_matrix
 
-np.savetxt("velocitykgs.csv", velocitykgs, delimiter=",")
 
+# #### Forces and Power
+# F_push_hill = np.sin(s)*m_HPV_load*g # force required to push uphill (approx)
+
+#### Distance
+t_secs=t_hours*60*60
+distance_achievable = (v_avg*t_secs)/1000 #kms
+
+# np.savetxt("velocitykgs.csv", velocitykgs, delimiter=",")
+
+
+# # open a file, where you ant to store the data
+# file = open('outputvals.pkl', 'wb')
+# pickle.dump([v_avg_matrix, load_vector_matrix, slope_vector] , file)
+# file.close()
 
 if slope_plot == 1:
     i=0
@@ -434,17 +457,40 @@ if slope_plot == 1:
 
 elif load_plot ==1:
     i=0
-#   # Load Graph Sensitivity
+# #   # Load Graph Sensitivity
+#     fig, ax = plt.subplots(figsize=(20, 10))
+#     for HPVname in param_df.Name:
+#         ax.plot(load_matrix[i], v_avg[i]*load_matrix[i], label=HPVname)  # Plot some data on the axes.
+#         i += 1
+#     plt.xlabel('Load [kg]')
+#     plt.ylabel('Velocity Kgs [m/s]')
+#     plt.title("Simple Plot")
+#     plt.legend();
+
+#   # Slope Graph Sensitivity
     fig, ax = plt.subplots(figsize=(20, 10))
     for HPVname in param_df.Name:
-        ax.plot(load_matrix[i], v_avg[i]*load_matrix[i], label=HPVname)  # Plot some data on the axes.
+        
+        x = slope_vector
+        y = v_avg_matrix[:,i]
+        line, = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
         i += 1
-    plt.xlabel('Load [kg]')
-    plt.ylabel('Velocity Kgs [m/s]')
-    plt.title("Simple Plot")
+    plt.xlabel('Slope [deg ˚]')
+    plt.ylabel('Velocity [m/s]')
+    plt.title("Velocity as a function of Slope Plot with constant load")
     plt.legend();
 
 
+    cursor = AnnotatedCursor(
+        line=line,
+        numberformat="{0:.2f}\n{1:.2f}",
+        dataaxis='x', offset=[10, 10],
+        textprops={'color': 'blue', 'fontweight': 'bold'},
+        ax=ax,
+        useblit=True,
+        color='red', linewidth=2)
+
+    plt.show()
 
 
 
