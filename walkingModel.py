@@ -309,7 +309,6 @@ def max_safe_load(m_HPV_only,LoadCapacity,F_max,s,g):
     
     return max_load_HPV
 
-
 def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
 
     #### constants
@@ -359,11 +358,11 @@ with open("ModelParams.csv") as csv_file:
     param_df = pd.read_csv("ModelParams.csv") 
 
 #### variables (changeable)
-s_deg = 0        # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
+s_deg = 0       # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
 m1=83           # mass of rider/person
-P_t=75          #power output of person (steady state average)
+P_t=75          # power output of person (steady state average)
 F_max = 300     # maximum force exertion for pushing up a hill for a short amount of time
-L=1             #leg length
+L=1             # leg length
 minimumViableLoad = 15 # in kg, the minimum useful load for such a trip
 t_hours=8       # number of hours to gather water
 
@@ -377,23 +376,17 @@ single_slope = 0    # 1= single slope, or 0 = linspace of slopes
 if single_load + single_slope > 1:
     print('Sorry, can only investigate either Slope OR Loading at once')
 load_res = 0        # resolution (how many datapoints for linear space)
-slope_start = 0
-slope_end = 20
-slope_res = 30
+slope_start = 0     # slope min
+slope_end = 20      # slope max
+slope_res = 30      # resolution (how many datapoints for linear space)
 
 #### constants
 g=9.81
 pi = 3.1416
 
 if single_slope == 0:
-    slope_vector =   np.linspace(start = slope_start,             # define linear space of weights
-                            stop =slope_end,                           # define maximum value for linear space
-                            num = slope_res,                              # how many data points?
-                            endpoint = True,
-                            retstep = False,
-                            dtype = None)
     i=0
-
+    slope_vector =   np.linspace(start = slope_start, stop =slope_end, num = slope_res)     
     d_var_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
     v_avg_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
     load_vector_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
@@ -420,7 +413,6 @@ t_secs=t_hours*60*60
 distance_achievable = (v_avg*t_secs)/1000 #kms
 
 # np.savetxt("velocitykgs.csv", velocitykgs, delimiter=",")
-
 
 # # open a file, where you ant to store the data
 # file = open('outputvals.pkl', 'wb')
