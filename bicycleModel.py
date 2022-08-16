@@ -259,29 +259,24 @@ class AnnotatedCursor(Cursor):
         if self.useblit:
             super()._update()
 
-def linspace_creator(max_value_array,min_value,res):
-    # creates a linsapce numpy array from the given inputs
-    # max_value needs to be a numpy array (even if it is a 1x1)
-    # min value is to be an int or float
-    # resolution to be an int
-    # returns
+def load_matrix_creator(max_load_HPV,minimumViableLoad,res):
     # res = resoltuion, also used as a flag to set minimum/maxmum sinle load scearios
 
     if res == 1:  # if res =1 , calculate for max load of HPV
-        load_matrix = np.zeros((len(max_value_array),res))    # initilaise numpy matrix
-        load_matrix = max_value_array
+        load_matrix = np.zeros((len(max_load_HPV),res))    # initilaise numpy matrix
+        load_matrix = max_load_HPV
     elif res == 0: # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
-        load_matrix = np.zeros((len(max_value_array),1)) + min_value  # initilaise numpy matrix
-        load_matrix = load_matrix
+        load_matrix = np.zeros((len(max_load_HPV),1))    # initilaise numpy matrix
+        load_matrix = load_matrix+minimumViableLoad
     elif res > 1:
-        load_matrix = np.zeros((len(max_value_array),res))    # initilaise numpy matrix
+        load_matrix = np.zeros((len(max_load_HPV),res))    # initilaise numpy matrix
 
         #### Create linear space of weights
         # creates a vector for each of the HPVs, an equal number of elements spaced 
         # evenly between the minimum viable load and the maximum load for that HPV
         i=0                                                         # initliase index
-        for maxval in np.nditer(max_value_array): # iterate through numpy array
-            minval = min_value
+        for maxval in np.nditer(max_load_HPV): # iterate through numpy array
+            minval = minimumViableLoad
             load_vector =   np.linspace(start = minval,             # define linear space of weights
                             stop =maxval,                           # define maximum value for linear space
                             num = res,                              # how many data points?
@@ -292,38 +287,35 @@ def linspace_creator(max_value_array,min_value,res):
             i += 1                                                  # increment index
     else:
         print('Error: unexpected loading resolution, setting default')
-        load_matrix = max_value_array
+        load_matrix = max_load_HPV
 
     return load_matrix
 
 def max_safe_load(m_HPV_only,LoadCapacity,F_max,s,g):
-    max_load_HPV = LoadCapacity  
 
+
+    max_load_HPV = LoadCapacity  
     #### Weight limits
     # Calculate weight limits for hills. There are some heavy loads which humans will not be able to push up certain hills
     # Note that this is for average slopes etc. This will be innacurate (i.e one VERY hilly section could render the whole thing impossible, this isn't accounted for here)
     if s != 0:  #requires check to avoid divide by zero
         max_pushable_weight = F_max/(np.sin(s)*g)
         i=0
-        if    m_HPV_only.size > 1: # can't iterate if there is only a float (not an array)
-            for  HPV_weight in m_HPV_only:
-                if max_load_HPV[i]+HPV_weight>max_pushable_weight:
-                    max_load_HPV[i] = max_pushable_weight-HPV_weight
-                i+=1
-        else:
-            max_load_HPV = max_pushable_weight-m_HPV_only
-            
-
+        for  HPV_weight in m_HPV_only:
+            if max_load_HPV[i]+HPV_weight>max_pushable_weight:
+                max_load_HPV[i] = max_pushable_weight-HPV_weight
+            i+=1
     
     return max_load_HPV
 
-def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
+def bikeModel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
 
     #### constants
     g=9.81
     pi = 3.1416
+    bike_location = 2
  
-    n_hpv = param_df.Pilot.size # number of HPVs (by taking the pilot value as it is alwways a simple int [more complex data types get cnfusing wwhen the dataframe nly has 1 row])
+    n_hpv = len(param_df.Name)
     n = np.array(param_df.Efficiency).reshape((n_hpv,1))
     Crr = np.array(param_df.Crr).reshape((n_hpv,1))
     v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv,1))
@@ -331,7 +323,10 @@ def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
     m_HPV_only = param_df.LoadCapacity*0.05;                    # assume 5# of load is the wight of HPV
 
     max_load_HPV = max_safe_load(m_HPV_only,LoadCapacity,F_max,s,g) # function to calaculate the max saffe loads due to hill
-    load_matrix = linspace_creator(max_load_HPV,minimumViableLoad,res)
+    load_matrix = load_matrix_creator(max_load_HPV[bike_location],minimumViableLoad,res)
+    load_matrix = load_matrix_creator(max_load_HPV[bike_location],minimumViableLoad,res)
+
+
 
     #### Derivations of further mass variables
     m_HPV_pilot = np.array(m1*param_df.Pilot + m_HPV_only).reshape((n_hpv,1)) # create vector with extra weights to add
@@ -363,7 +358,7 @@ def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
 #### Start Script
 with open("data/ModelParams.csv") as csv_file:
     # read the csv file
-    allHPV_param_df = pd.read_csv("data/ModelParams.csv") 
+    param_df = pd.read_csv("data/ModelParams.csv") 
 
 #### variables (changeable)
 s_deg = 0       # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
@@ -374,16 +369,21 @@ L=1             # leg length
 minimumViableLoad = 15 # in kg, the minimum useful load for such a trip
 t_hours=8       # number of hours to gather water
 
+
+
+
+
+
 ## plot options
 load_plot = 1
 slope_plot = 0
 
 ## Options
 single_load = 0    # 1= single load, or 0 = linspace of loads
-single_slope = 0    # 1= single slope, or 0 = linspace of slopes
+single_slope = 1    # 1= single slope, or 0 = linspace of slopes
 if single_load + single_slope > 1:
     print('Sorry, can only investigate either Slope OR Loading at once')
-load_res = 0        #  0 = min load, 1 = max load, >1 = linear space between min and max
+load_res = 0        # resolution (how many datapoints for linear space)
 slope_start = 0     # slope min
 slope_end = 20      # slope max
 slope_res = 30      # resolution (how many datapoints for linear space)
@@ -392,29 +392,23 @@ slope_res = 30      # resolution (how many datapoints for linear space)
 g=9.81
 pi = 3.1416
 
-# selectHPVs you're interested in
-# param_df = allHPV_param_df.iloc[1]
-param_df = allHPV_param_df
-n_hpv = param_df.Pilot.size
-# create slope vector
-slope_vector = linspace_creator(np.array([slope_end]),slope_start,slope_res)
-slope_vector = slope_vector.reshape(slope_vector.size,1)
-# initialise output matrices (rows are slope, coolumns are HPV type)
-v_avg_matrix        = np.zeros((slope_vector.size,n_hpv))
-load_vector_matrix  = np.zeros((slope_vector.size,n_hpv))
+### Main call of the functions for either single or many sllope options
+if single_slope == 0:
+    i=0
+    slope_vector =   np.linspace(start = slope_start, stop =slope_end, num = slope_res)     
+    d_var_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
+    v_avg_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
+    load_vector_matrix = np.zeros((len(slope_vector),len(param_df.Name)))
 
-
-
-i=0
-for slope in slope_vector:
-    s =  (slope/360)*(2*pi)
-    v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
-    v_avg_matrix[i] = v_avg.reshape(n_hpv)
-    load_vector_matrix[i] = load_matrix.reshape(n_hpv)
-    i+=1
-
-
-
+    for slope in slope_vector:
+        s =  (slope/360)*(2*pi)
+        v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
+        v_avg_matrix[i] = v_avg.reshape(len(param_df.Name))
+        load_vector_matrix[i] = load_matrix.reshape(len(param_df.Name))
+        i+=1
+else:
+    s = (s_deg/360)*(2*pi) #converts s in to radians
+    v_avg , load_matrix = bikeModel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
 
 # calculation of velocity kgs
 velocitykgs=v_avg_matrix*load_vector_matrix
@@ -463,6 +457,15 @@ if slope_plot == 1:
 
 elif load_plot ==1:
     i=0
+# #   # Load Graph Sensitivity
+#     fig, ax = plt.subplots(figsize=(20, 10))
+#     for HPVname in param_df.Name:
+#         ax.plot(load_matrix[i], v_avg[i]*load_matrix[i], label=HPVname)  # Plot some data on the axes.
+#         i += 1
+#     plt.xlabel('Load [kg]')
+#     plt.ylabel('Velocity Kgs [m/s]')
+#     plt.title("Simple Plot")
+#     plt.legend();
 
 #   # Slope Graph Sensitivity
     fig, ax = plt.subplots(figsize=(20, 10))
@@ -489,4 +492,25 @@ elif load_plot ==1:
 
     plt.show()
 
+
+
+
+
+
+    # #### Plotting
+    # i=0
+    # fig = plt.figure(), #ax = plt.subplots(figsize=(20, 10))
+    # ax = fig.add_subplot(projection='3d')
+    # for HPVname in param_df.Name:
+    #     # ax.plot(load_vector_matrix[0:10,i], v_avg_matrix[0:10,i], label=HPVname)  # Plot some data on the axes.
+    #     ax.scatter(load_vector_matrix[:,i], v_avg_matrix[:,i], slope_vector,  label=HPVname)
+        
+    #     i += 1
+    # plt.xlabel('Load [kg]')
+    # plt.ylabel('Velocity [m/s]')
+    # plt.title("Simple Plot")
+    # plt.legend();
+
+    # filename_output = 'velocity_slope' + str(s_deg)
+    # fig.savefig(filename_output, transparent=False, dpi=80, bbox_inches="tight")
 
