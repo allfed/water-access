@@ -379,14 +379,10 @@ load_plot = 1
 slope_plot = 0
 
 ## Options
-single_load = 0    # 1= single load, or 0 = linspace of loads
-single_slope = 0    # 1= single slope, or 0 = linspace of slopes
-if single_load + single_slope > 1:
-    print('Sorry, can only investigate either Slope OR Loading at once')
-load_res = 0        #  0 = min load, 1 = max load, >1 = linear space between min and max
+load_res = 10        #  0 = min load, 1 = max load, >1 = linear space between min and max
+slope_res = 0      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
 slope_start = 0     # slope min
 slope_end = 20      # slope max
-slope_res = 30      # resolution (how many datapoints for linear space)
 
 #### constants
 g=9.81
@@ -409,8 +405,8 @@ i=0
 for slope in slope_vector:
     s =  (slope/360)*(2*pi)
     v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
-    v_avg_matrix[i] = v_avg.reshape(n_hpv)
-    load_vector_matrix[i] = load_matrix.reshape(n_hpv)
+    v_avg_matrix[i] = v_avg.reshape(n_hpv,load_res) # THIS CURRENTLY ERRORS OUT AS IT ONLY EXPECTS A SINGLE VALUE BACK FOR EACH HPV, BUT WITH LOAD_RES >1 THIS ISN'T THE CASE
+    load_vector_matrix[i] = load_matrix.reshape(n_hpv,load_res)
     i+=1
 ####### END MAIN LOOP ########
 
