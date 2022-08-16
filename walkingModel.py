@@ -404,7 +404,7 @@ v_avg_matrix        = np.zeros((slope_vector.size,n_hpv))
 load_vector_matrix  = np.zeros((slope_vector.size,n_hpv))
 
 
-
+####### MAIN LOOP ########
 i=0
 for slope in slope_vector:
     s =  (slope/360)*(2*pi)
@@ -412,6 +412,7 @@ for slope in slope_vector:
     v_avg_matrix[i] = v_avg.reshape(n_hpv)
     load_vector_matrix[i] = load_matrix.reshape(n_hpv)
     i+=1
+####### END MAIN LOOP ########
 
 
 
