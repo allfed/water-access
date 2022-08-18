@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator
 from matplotlib.widgets import Cursor
 
 class AnnotatedCursor(Cursor):
@@ -355,15 +357,16 @@ def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
     for maxval in v_no_load:
         indeces = v_load[i]>maxval; v_load[i,indeces]=maxval ; i+=1
 
-    # calcualte average speed, half of the trip is loaded, and half is unloaded
-    v_avg = (v_load+v_no_load)/2; #average velocity for a round trip
-
-    return v_avg , load_matrix
+    return v_load , load_matrix
 
 #### Start Script
 with open("data/ModelParams.csv") as csv_file:
     # read the csv file
     allHPV_param_df = pd.read_csv("data/ModelParams.csv") 
+
+
+# selectHPVs you're interested in
+param_df = allHPV_param_df.iloc[:]
 
 #### variables (changeable)
 s_deg = 0       # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
@@ -375,12 +378,13 @@ minimumViableLoad = 15 # in kg, the minimum useful load for such a trip
 t_hours=8       # number of hours to gather water
 
 ## plot options
-load_plot = 1
+load_plot = 0
 slope_plot = 0
+surf_plot = 1
 
 ## Options
-load_res = 10        #  0 = min load, 1 = max load, >1 = linear space between min and max
-slope_res = 0      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
+load_res = 3        #  0 = min load, 1 = max load, >1 = linear space between min and max
+slope_res = 4      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
 slope_start = 0     # slope min
 slope_end = 20      # slope max
 
@@ -388,47 +392,49 @@ slope_end = 20      # slope max
 g=9.81
 pi = 3.1416
 
-# selectHPVs you're interested in
-# param_df = allHPV_param_df.iloc[1]
-param_df = allHPV_param_df
-n_hpv = param_df.Pilot.size
 # create slope vector
 slope_vector = linspace_creator(np.array([slope_end]),slope_start,slope_res)
-slope_vector = slope_vector.reshape(slope_vector.size,1)
-# initialise output matrices (rows are slope, coolumns are HPV type)
-v_avg_matrix        = np.zeros((slope_vector.size,n_hpv))
-load_vector_matrix  = np.zeros((slope_vector.size,n_hpv))
-
-
+slope_vector = slope_vector.reshape(1,slope_vector.size)
+# initilise and createoutput 3d matrices (dims: 0 = HPV, 1 = Slope, 2 = load)
+n_hpv = param_df.Pilot.size
+if load_res <= 1:
+    n_load_scenes = 1
+else:
+    n_load_scenes = load_res
+v_load_matrix3d     = np.zeros((n_hpv,slope_vector.size,n_load_scenes))
+load_matrix3d       = np.zeros((n_hpv,slope_vector.size,n_load_scenes))
+slope_matrix3d      = np.repeat(slope_vector, n_hpv, axis=0)
+slope_matrix3d      = np.repeat(slope_matrix3d[:,:,np.newaxis], n_load_scenes, axis=2)
+slope_matrix3drads  = (slope_matrix3d/360)*(2*pi)
 ####### MAIN LOOP ########
 i=0
-for slope in slope_vector:
+for slope in slope_vector.reshape(slope_vector.size,1):
     s =  (slope/360)*(2*pi)
-    v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
-    v_avg_matrix[i] = v_avg.reshape(n_hpv,load_res) # THIS CURRENTLY ERRORS OUT AS IT ONLY EXPECTS A SINGLE VALUE BACK FOR EACH HPV, BUT WITH LOAD_RES >1 THIS ISN'T THE CASE
-    load_vector_matrix[i] = load_matrix.reshape(n_hpv,load_res)
+    v_load , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
+    v_load_matrix3d[:,i,:] = v_load.reshape(n_hpv,load_res)
+    load_matrix3d[:,i,:] = load_matrix.reshape(n_hpv,load_res)
     i+=1
 ####### END MAIN LOOP ########
 
-
-
+#### Velocities
+v_no_load = np.array(param_df.AverageSpeedWithoutLoad)[:,np.newaxis,np.newaxis] #unloaded speed from csv file
+# calcualte average speed, half of the trip is loaded, and half is unloaded
+v_avg_matrix3d = (v_load_matrix3d+v_no_load)/2; #average velocity for a round trip
 
 # calculation of velocity kgs
-velocitykgs=v_avg_matrix*load_vector_matrix
-
-# #### Forces and Power
-# F_push_hill = np.sin(s)*m_HPV_load*g # force required to push uphill (approx)
+velocitykgs=v_avg_matrix3d*load_matrix3d
 
 #### Distance
 t_secs=t_hours*60*60
-distance_achievable = (v_avg*t_secs)/1000 #kms
+distance_achievable = (v_avg_matrix3d*t_secs)/1000 #kms
 
-# np.savetxt("velocitykgs.csv", velocitykgs, delimiter=",")
+## Power
+m_t = load_matrix3d + m1  #estimate for now withot HV weight
+Ps = v_load_matrix3d*m_t*g*np.sin(np.arctan(slope_matrix3drads))
+Ps = Ps/np.array(param_df.Efficiency)[:,np.newaxis,np.newaxis]
 
-# # open a file, where you ant to store the data
-# file = open('outputvals.pkl', 'wb')
-# pickle.dump([v_avg_matrix, load_vector_matrix, slope_vector] , file)
-# file.close()
+Pr = v_avg_matrix3d*m_t*g*cos(atan(slope_matrix3d)).*np.array(param_df.Crr)[:,np.newaxis,np.newaxis]/np.array(param_df.Efficiency)[:,np.newaxis,np.newaxis]
+Pw = 1/2.*C*D.*v_load.^2./n
 
 if slope_plot == 1:
     i=0
@@ -438,7 +444,7 @@ if slope_plot == 1:
     for HPVname in param_df.Name:
         
         x = slope_vector
-        y = v_avg_matrix[:,i]*load_vector_matrix[:,i]
+        y = v_avg_matrix3d[:,i]*load_matrix3d[:,i]
         line, = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
         i += 1
     plt.xlabel('Slope [deg ˚]')
@@ -466,7 +472,7 @@ elif load_plot ==1:
     for HPVname in param_df.Name:
         
         x = slope_vector
-        y = v_avg_matrix[:,i]
+        y = v_avg_matrix3d[:,i]
         line, = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
         i += 1
     plt.xlabel('Slope [deg ˚]')
@@ -486,4 +492,53 @@ elif load_plot ==1:
 
     plt.show()
 
+elif surf_plot ==1:
+        
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    k = 1
+    # Make data.
+    Z = distance_achievable[:,k,:]
+    X = load_matrix3d[:,k,:]
+    Y = slope_matrix
 
+    # Plot the surface.
+    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+                        linewidth=0, antialiased=False)
+
+    # Customize the z axis.
+    ax.zaxis.set_major_locator(LinearLocator(10))
+    # A StrMethodFormatter is used automatically
+    ax.zaxis.set_major_formatter('{x:.02f}')
+
+
+    ax.set_xlabel('Load [kg]')
+    ax.set_ylabel('Slope [deg ˚]')
+    ax.set_zlabel('Velocity [m/s]')
+    plt.title("Relationship between slope angle, load, and velocity for: " + param_df.Name.iloc[k])
+
+    # Add a color bar which maps values to colors.
+    # fig.colorbar(surf, shrink=0.5, aspect=5)
+
+    plt.show()
+
+
+
+
+
+
+
+# # initilise and createoutput 3d matrices (dims: 0 = slope, 1 = HPV, 2 = load)
+# v_avg_matrix3d        = np.zeros((n_hpvslope_vector.size,n_load_scenes))
+# load_matrix3d  = np.zeros((slope_vector.size,n_hpv,n_load_scenes))
+# slope_matrix3d = np.repeat(slope_vector[:, np.newaxis], n_hpv, axis=1)
+# slope_matrix3d = np.repeat(slope_matrix3d, n_load_scenes, axis=2)
+
+# ####### MAIN LOOP ########
+# i=0
+# for slope in slope_vector:
+#     s =  (slope/360)*(2*pi)
+#     v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
+#     v_avg_matrix3d[i,:,:] = v_avg.reshape(n_hpv,load_res)
+#     load_matrix3d[i,:,:] = load_matrix.reshape(n_hpv,load_res)
+#     i+=1
+# ####### END MAIN LOOP ########
