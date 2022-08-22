@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
 from matplotlib.widgets import Cursor
+from scipy.optimize import fsolve
 
 class AnnotatedCursor(Cursor):
     """
@@ -359,6 +360,15 @@ def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,res):
 
     return v_load , load_matrix
 
+def bike_power_solution(p , *data ):
+    ro, C_d , A , m_t, Crr , eta , P_t , g , s =data
+    v_solve = p[0]
+    return  (1/2*ro*v_solve**3 * C_d*A 
+                            + v_solve*m_t*g*Crr 
+                            + v_solve*m_t*g*s) /eta - P_t
+
+    return v_load , load_matrix
+
 #### Start Script
 with open("data/ModelParams.csv") as csv_file:
     # read the csv file
@@ -366,7 +376,7 @@ with open("data/ModelParams.csv") as csv_file:
 
 
 # selectHPVs you're interested in
-param_df = allHPV_param_df.iloc[:]
+param_df = allHPV_param_df.iloc[1:2]
 
 #### variables (changeable)
 s_deg = 0       # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
@@ -376,6 +386,17 @@ F_max = 300     # maximum force exertion for pushing up a hill for a short amoun
 L=1             # leg length
 minimumViableLoad = 15 # in kg, the minimum useful load for such a trip
 t_hours=8       # number of hours to gather water
+L=1             # leg length
+A = 1           # cross sectional area
+C_d = 1         # constant for wind
+
+ro = 1
+eta = 0.8
+
+
+
+# model options
+model = 2
 
 ## plot options
 load_plot = 0
@@ -383,38 +404,81 @@ slope_plot = 0
 surf_plot = 1
 
 ## Options
-load_res = 3        #  0 = min load, 1 = max load, >1 = linear space between min and max
-slope_res = 4      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
-slope_start = 0     # slope min
+load_res = 50        #  0 = min load, 1 = max load, >1 = linear space between min and max
+slope_res = 50      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
+slope_start = 0.1     # slope min
 slope_end = 20      # slope max
 
 #### constants
 g=9.81
 pi = 3.1416
+n_hpv = param_df.Pilot.size
+
+
+# create load vector
+LoadCapacity = np.array(param_df.LoadCapacity).reshape((n_hpv,1))
+m_HPV_only = LoadCapacity*0.05;                    # assume 5% of load is the wight of HPV
+
+print(LoadCapacity)
+print(m_HPV_only)
 
 # create slope vector
-slope_vector = linspace_creator(np.array([slope_end]),slope_start,slope_res)
-slope_vector = slope_vector.reshape(1,slope_vector.size)
+slope_vector_deg = linspace_creator(np.array([slope_end]),slope_start,slope_res)
+slope_vector_deg = slope_vector_deg.reshape(1,slope_vector_deg.size)
 # initilise and createoutput 3d matrices (dims: 0 = HPV, 1 = Slope, 2 = load)
-n_hpv = param_df.Pilot.size
 if load_res <= 1:
     n_load_scenes = 1
 else:
     n_load_scenes = load_res
-v_load_matrix3d     = np.zeros((n_hpv,slope_vector.size,n_load_scenes))
-load_matrix3d       = np.zeros((n_hpv,slope_vector.size,n_load_scenes))
-slope_matrix3d      = np.repeat(slope_vector, n_hpv, axis=0)
-slope_matrix3d      = np.repeat(slope_matrix3d[:,:,np.newaxis], n_load_scenes, axis=2)
-slope_matrix3drads  = (slope_matrix3d/360)*(2*pi)
+v_load_matrix3d     = np.zeros((n_hpv,slope_vector_deg.size,n_load_scenes))
+load_matrix3d       = np.zeros((n_hpv,slope_vector_deg.size,n_load_scenes))
+slope_matrix3d_deg      = np.repeat(slope_vector_deg, n_hpv, axis=0)
+slope_matrix3d_deg      = np.repeat(slope_matrix3d_deg[:,:,np.newaxis], n_load_scenes, axis=2)
+slope_matrix3drads  = (slope_matrix3d_deg/360)*(2*pi)
 ####### MAIN LOOP ########
-i=0
-for slope in slope_vector.reshape(slope_vector.size,1):
-    s =  (slope/360)*(2*pi)
-    v_load , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
-    v_load_matrix3d[:,i,:] = v_load.reshape(n_hpv,load_res)
-    load_matrix3d[:,i,:] = load_matrix.reshape(n_hpv,load_res)
-    i+=1
+if model == 1:
+    i=0
+    for slope in slope_vector_deg.reshape(slope_vector_deg.size,1):
+        s =  (slope/360)*(2*pi)
+        v_load , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
+        v_load_matrix3d[:,i,:] = v_load.reshape(n_hpv,load_res)
+        load_matrix3d[:,i,:] = load_matrix.reshape(n_hpv,load_res)
+        i+=1
 ####### END MAIN LOOP ########
+
+
+
+elif model == 2:
+
+    print(LoadCapacity)
+    print(m_HPV_only)
+    m_HPV_only = LoadCapacity*0.05
+    print(m_HPV_only)
+
+
+    v_load = np.zeros((1,load_res))
+    i = 0
+    for hpv_name in param_df.Name:
+        j = 0
+        Crr = np.array(param_df.Crr).reshape((n_hpv,1))[i]
+        print(hpv_name)
+        print(i)
+        for slope in slope_vector_deg.reshape(slope_vector_deg.size,1):
+            s =  (slope/360)*(2*pi)
+            max_load_HPV = max_safe_load(m_HPV_only[i],LoadCapacity[i],F_max,s,g)
+            load_vector = linspace_creator(max_load_HPV,minimumViableLoad,load_res).reshape((load_res,1))
+            m_t = np.array(load_vector+m1+m_HPV_only[i])
+            k = 0
+            for total_load in m_t:
+                m_HPV_only = param_df.LoadCapacity*0.05
+                data = (ro, C_d , A , m_t[k], Crr , eta , P_t , g , s) 
+                V_guess = 1
+                V_r = fsolve(bike_power_solution, V_guess, args=data)
+                v_load_matrix3d[i,j,k] = V_r[0]
+                load_matrix3d[i,j,k] = load_vector[k]
+                k += 1
+            j += 1
+        i += 1
 
 #### Velocities
 v_no_load = np.array(param_df.AverageSpeedWithoutLoad)[:,np.newaxis,np.newaxis] #unloaded speed from csv file
@@ -429,12 +493,12 @@ t_secs=t_hours*60*60
 distance_achievable = (v_avg_matrix3d*t_secs)/1000 #kms
 
 ## Power
-m_t = load_matrix3d + m1  #estimate for now withot HV weight
-Ps = v_load_matrix3d*m_t*g*np.sin(np.arctan(slope_matrix3drads))
+total_load = load_matrix3d + m1  #estimate for now withot HV weight
+Ps = v_load_matrix3d*total_load*g*np.sin(np.arctan(slope_matrix3drads))
 Ps = Ps/np.array(param_df.Efficiency)[:,np.newaxis,np.newaxis]
 
-Pr = v_avg_matrix3d*m_t*g*cos(atan(slope_matrix3d)).*np.array(param_df.Crr)[:,np.newaxis,np.newaxis]/np.array(param_df.Efficiency)[:,np.newaxis,np.newaxis]
-Pw = 1/2.*C*D.*v_load.^2./n
+# Pr = v_avg_matrix3d*total_load*g*cos(atan(slope_matrix3d)).*np.array(param_df.Crr)[:,np.newaxis,np.newaxis]/np.array(param_df.Efficiency)[:,np.newaxis,np.newaxis]
+# Pw = 1/2.*C*D.*v_load.^2./n
 
 if slope_plot == 1:
     i=0
@@ -497,9 +561,9 @@ elif surf_plot ==1:
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
     k = 1
     # Make data.
-    Z = distance_achievable[:,k,:]
-    X = load_matrix3d[:,k,:]
-    Y = slope_matrix
+    Z = distance_achievable[k,:,:]
+    X = load_matrix3d[k,:,:]
+    Y = slope_matrix3d_deg[k,:,:]
 
     # Plot the surface.
     surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
