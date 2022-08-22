@@ -13,5 +13,6 @@ dependencies:
   - pip:
     - mpld3
     - plotly
+    - chart_studio 
 
 
