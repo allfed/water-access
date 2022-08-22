@@ -7,6 +7,10 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator
 from matplotlib.widgets import Cursor
 from scipy.optimize import fsolve
+import plotly.express as px
+import plotly.graph_objects as go
+
+
 
 class AnnotatedCursor(Cursor):
     """
@@ -374,6 +378,9 @@ with open("data/ModelParams.csv") as csv_file:
     # read the csv file
     allHPV_param_df = pd.read_csv("data/ModelParams.csv") 
 
+
+
+
 # selectHPVs you're interested in
 param_df = allHPV_param_df.iloc[0:5]
 surf_plot_index = 1
@@ -404,8 +411,8 @@ slope_plot = 0
 surf_plot = 1
 
 ## Options
-load_res = 50        #  0 = min load, 1 = max load, >1 = linear space between min and max
-slope_res = 50      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
+load_res = 20        #  0 = min load, 1 = max load, >1 = linear space between min and max
+slope_res = 20      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
 slope_start = 0.1     # slope min
 slope_end = 20      # slope max
 
@@ -463,7 +470,6 @@ elif model == 2:
             load_vector = linspace_creator(max_load_HPV,minimumViableLoad,load_res).reshape((load_res,1))
             m_t = np.array(load_vector+m1+m_HPV_only[i])
             k = 0
-            print(max(max_load_HPV))
             for total_load in m_t:
                 data = (ro, C_d , A , m_t[k], Crr , eta , P_t , g , s) 
                 V_guess = 1
@@ -493,6 +499,15 @@ Ps = Ps/np.array(param_df.Efficiency).reshape((n_hpv,1))[:,np.newaxis,np.newaxis
 
 # Pr = v_avg_matrix3d*total_load*g*cos(atan(slope_matrix3d)).*np.array(param_df.Crr)[:,np.newaxis,np.newaxis]/np.array(param_df.Efficiency)[:,np.newaxis,np.newaxis]
 # Pw = 1/2.*C*D.*v_load.^2./n
+
+
+# big_df = pd.DataFrame
+
+# array = np.array()
+
+# df = pd.DataFrame(data = array, 
+#                   index = index_values, 
+#                   columns = column_values)
 
 if slope_plot == 1:
     i=0
@@ -527,10 +542,12 @@ elif load_plot ==1:
 
 #   # Slope Graph Sensitivity
     fig, ax = plt.subplots(figsize=(20, 10))
-    for HPVname in param_df.Name:
+    for HPVname in HPV_names:
         
-        x = slope_vector
-        y = v_avg_matrix3d[:,i]
+        
+        y = v_avg_matrix3d[i,:,0]
+        x = slope_vector_deg.reshape(y.shape)
+
         line, = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
         i += 1
     plt.xlabel('Slope [deg ˚]')
@@ -539,45 +556,50 @@ elif load_plot ==1:
     plt.legend();
 
 
-    cursor = AnnotatedCursor(
-        line=line,
-        numberformat="{0:.2f}\n{1:.2f}",
-        dataaxis='x', offset=[10, 10],
-        textprops={'color': 'blue', 'fontweight': 'bold'},
-        ax=ax,
-        useblit=True,
-        color='red', linewidth=2)
+    df = px.data.gapminder().query("continent=='Oceania'")
+    fig = px.line(df, x="year", y="lifeExp", color='country')
+    fig.show()
+    fig.write_html("plotout.html")
+    fig = px.scatter(df, x=df.sepal_length, y=df.sepal_width, color=df.species, size=df.petal_length)
 
-    plt.show()
+
+
+    plt.plot()
+    # mpld3.show()
+    mpld3.fig_to_html(fig)
 
 elif surf_plot ==1:
         
-    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    # fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
     surf_plot_index = 0
-    # Make data.
+    # # Make data.
     Z = distance_achievable[surf_plot_index,:,:]
     X = load_matrix3d[surf_plot_index,:,:]
     Y = slope_matrix3d_deg[surf_plot_index,:,:]
 
-    # Plot the surface.
-    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
-                        linewidth=0, antialiased=False)
+    # # Plot the surface.
+    # surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+    #                     linewidth=0, antialiased=False)
 
-    # Customize the z axis.
-    ax.zaxis.set_major_locator(LinearLocator(10))
-    # A StrMethodFormatter is used automatically
-    ax.zaxis.set_major_formatter('{x:.02f}')
+    # # Customize the z axis.
+    # ax.zaxis.set_major_locator(LinearLocator(10))
+    # # A StrMethodFormatter is used automatically
+    # ax.zaxis.set_major_formatter('{x:.02f}')
 
 
-    ax.set_xlabel('Load [kg]')
-    ax.set_ylabel('Slope [deg ˚]')
-    ax.set_zlabel('Velocity [m/s]')
-    plt.title("Relationship between slope angle, load, and velocity for: " + HPV_names[surf_plot_index])
+    # ax.set_xlabel('Load [kg]')
+    # ax.set_ylabel('Slope [deg ˚]')
+    # ax.set_zlabel('Velocity [m/s]')
+    # plt.title("Relationship between slope angle, load, and velocity for: " + HPV_names[surf_plot_index])
 
     # Add a color bar which maps values to colors.
     # fig.colorbar(surf, shrink=0.5, aspect=5)
 
-    plt.show()
+    fig = go.Figure(data=[go.Surface(z=Z, x=X, y=Y)])
+    fig.update_layout(title="Slope, Load & Distance for: " + HPV_names[surf_plot_index], autosize=True,
+                    width=500, height=500,
+                    margin=dict(l=65, r=50, b=65, t=90))
+    fig.show()
 
 
 
@@ -585,18 +607,4 @@ elif surf_plot ==1:
 
 
 
-# # initilise and createoutput 3d matrices (dims: 0 = slope, 1 = HPV, 2 = load)
-# v_avg_matrix3d        = np.zeros((n_hpvslope_vector.size,n_load_scenes))
-# load_matrix3d  = np.zeros((slope_vector.size,n_hpv,n_load_scenes))
-# slope_matrix3d = np.repeat(slope_vector[:, np.newaxis], n_hpv, axis=1)
-# slope_matrix3d = np.repeat(slope_matrix3d, n_load_scenes, axis=2)
 
-# ####### MAIN LOOP ########
-# i=0
-# for slope in slope_vector:
-#     s =  (slope/360)*(2*pi)
-#     v_avg , load_matrix = walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,load_res)
-#     v_avg_matrix3d[i,:,:] = v_avg.reshape(n_hpv,load_res)
-#     load_matrix3d[i,:,:] = load_matrix.reshape(n_hpv,load_res)
-#     i+=1
-# ####### END MAIN LOOP ########
