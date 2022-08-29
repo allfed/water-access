@@ -12,7 +12,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import chart_studio
 import chart_studio.plotly as py
-
+from dotenv import load_dotenv, find_dotenv
+import os 
 
 class AnnotatedCursor(Cursor):
     """
@@ -375,23 +376,20 @@ def bike_power_solution(p , *data ):
 
     return v_load , load_matrix
 
-
 ## Plotly creds
-chart_studio.tools.set_credentials_file(username='krassool', api_key='AnRzVNs3FiZxOuDFotPE')
+load_dotenv(find_dotenv())
+chart_studio.tools.set_credentials_file(username=os.environ.get("USERNAME"), api_key=os.environ.get("API_KEY"))
 
 #### Start Script
-with open("data/ModelParams.csv") as csv_file:
+with open("../data/ModelParams.csv") as csv_file:
     # read the csv file
-    allHPV_param_df = pd.read_csv("data/ModelParams.csv") 
-
-
-
+    allHPV_param_df = pd.read_csv("../data/ModelParams.csv") 
 
 # selectHPVs you're interested in
-param_df = allHPV_param_df.iloc[0:5]
+param_df = allHPV_param_df.iloc[:]
 surf_plot_index = 1
 
-#### variables (changeable)
+#### variables (changeable) 
 s_deg = 0       # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
 m1=83           # mass of rider/person
 P_t=75          # power output of person (steady state average)
@@ -402,14 +400,15 @@ t_hours=8       # number of hours to gather water
 L=1             # leg length
 A = 1           # cross sectional area
 C_d = 1         # constant for wind
-
 ro = 1
 eta = 0.8
+
+# def run_model(s_deg=0, m1=83):
 
 
 
 # model options
-model = 2
+model = 1 # 1 is walking, 2 is cycling
 
 ## plot options
 load_plot = 0
@@ -429,6 +428,8 @@ g=9.81
 pi = 3.1416
 n_hpv = param_df.Pilot.size
 
+
+# data accounting
 
 # create load vector
 LoadCapacity = np.array(param_df.LoadCapacity).reshape((n_hpv,1))
@@ -589,7 +590,6 @@ elif surf_plot ==1:
 
     plt.show()
 
-
 elif surf_plotly ==1:
         
     # # Make data.
@@ -604,9 +604,13 @@ elif surf_plotly ==1:
                     margin=dict(l=65, r=50, b=65, t=90))
     fig.show()
 
-
 elif surf_plotly_multi ==1:
 
+    plot_height = 700
+    plot_width  = 900
+    xaxis_title = 'Load [kg]'
+    yaxis_title = 'Slope [˚]'
+    zaxis_title = 'Distannce [km]'
     # create list for plot specs based on number of hpvs
     specs_list = []
     spec_single = [{'type': 'surface'}]
@@ -628,17 +632,23 @@ elif surf_plotly_multi ==1:
             go.Surface(z=Z, x=X, y=Y, colorscale='Viridis', showscale=False),
             row=1+surf_plot_index, col=1)
 
+
+        fig.update_scenes(xaxis_title_text=xaxis_title,  
+                  yaxis_title_text=yaxis_title,  
+                  zaxis_title_text=zaxis_title)
+
         surf_plot_index += 1
 
     # update the layout and create a title for whole thing
     fig.update_layout(
         title_text='3D subplots of HPVs',
-        height=1400,
-        width=500)
+        height=plot_height*n_hpv,
+        width=plot_width)
     
+    fig.show()
+
     # show the figure
     py.iplot(fig, filename='3D subplots of HPVs')
-    fig.show()
 
 
 
