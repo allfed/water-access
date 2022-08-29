@@ -1,15 +1,17 @@
-Name,LoadCapacity,AverageSpeedWithoutLoad,Drive,GroundContact,Pilot,Crr,Efficiency,Weight
-Cycle Rickshaw,293,4.3,2,1,1,0.008,3,34
-Bicycle,136,4.3,2,1,1,0.008,3,11
-Skateboard,123,4.0,1,1,1,0.008,2,1
-Roller skates,103,3.6,1,1,1,0.008,2,3
-Scooter,100,4.0,1,1,1,0.008,2,2.2
-Hand Cart,575,1.2,0,1,0,0.008,1,41.5
-Wheelbarrow,374,1.2,0,1,0,0.008,1,25
-Hand Truck,360,1.2,0,1,0,0.008,1,12.5
-Shopping Trolley,195,1.2,0,1,0,0.008,1,21.5
-Rolling Container,158,1.2,0,1,0,0.002,1,2
-Wheelchair,83,1.2,0,1,0,0.008,1,18
+Name,LoadLimit,AverageSpeedWithoutLoad,Drive,GroundContact,Pilot,Crr,Efficiency,Weight
 Baby Carriage,20,1.2,0,1,0,0.008,1,10
+Backpack,40,1.2,0,0,0,0,1,0.5
+Bicycle,136,4.3,2,1,1,0.008,3,11
+Buckets,30,1.2,0,0,0,0,1,0.5
+Cycle Rickshaw,293,4.3,2,1,1,0.008,3,34
+Hand Cart,575,1.2,0,1,0,0.008,1,41.5
+Hand Truck,360,1.2,0,1,0,0.008,1,12.5
 Luggage,20,1.2,0,1,0,0.008,1,4
-Stretcher,83,1.2,0,0,0,0,1,39
+Roller skates,103,3.6,1,1,1,0.008,2,3
+Rolling Container,158,1.2,0,1,0,0.002,1,2
+Scooter,100,4.0,1,1,1,0.008,2,2.2
+Shopping Trolley,195,1.2,0,1,0,0.008,1,21.5
+Skateboard,123,4.0,1,1,1,0.008,2,1
+Stretcher,120,1.2,0,0,0,0,1,39
+Wheelbarrow,374,1.2,0,1,0,0.008,1,25
+Wheelchair,83,1.2,0,1,0,0.008,1,18
