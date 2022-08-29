@@ -15,261 +15,6 @@ import chart_studio.plotly as py
 from dotenv import load_dotenv, find_dotenv
 import os 
 
-class AnnotatedCursor(Cursor):
-    """
-    A crosshair cursor like `~matplotlib.widgets.Cursor` with a text showing \
-    the current coordinates.
-
-    For the cursor to remain responsive you must keep a reference to it.
-    The data of the axis specified as *dataaxis* must be in ascending
-    order. Otherwise, the `numpy.searchsorted` call might fail and the text
-    disappears. You can satisfy the requirement by sorting the data you plot.
-    Usually the data is already sorted (if it was created e.g. using
-    `numpy.linspace`), but e.g. scatter plots might cause this problem.
-    The cursor sticks to the plotted line.
-
-    Parameters
-    ----------
-    line : `matplotlib.lines.Line2D`
-        The plot line from which the data coordinates are displayed.
-
-    numberformat : `python format string <https://docs.python.org/3/\
-    library/string.html#formatstrings>`_, optional, default: "{0:.4g};{1:.4g}"
-        The displayed text is created by calling *format()* on this string
-        with the two coordinates.
-
-    offset : (float, float) default: (5, 5)
-        The offset in display (pixel) coordinates of the text position
-        relative to the cross hair.
-
-    dataaxis : {"x", "y"}, optional, default: "x"
-        If "x" is specified, the vertical cursor line sticks to the mouse
-        pointer. The horizontal cursor line sticks to *line*
-        at that x value. The text shows the data coordinates of *line*
-        at the pointed x value. If you specify "y", it works in the opposite
-        manner. But: For the "y" value, where the mouse points to, there might
-        be multiple matching x values, if the plotted function is not biunique.
-        Cursor and text coordinate will always refer to only one x value.
-        So if you use the parameter value "y", ensure that your function is
-        biunique.
-
-    Other Parameters
-    ----------------
-    textprops : `matplotlib.text` properties as dictionary
-        Specifies the appearance of the rendered text object.
-
-    **cursorargs : `matplotlib.widgets.Cursor` properties
-        Arguments passed to the internal `~matplotlib.widgets.Cursor` instance.
-        The `matplotlib.axes.Axes` argument is mandatory! The parameter
-        *useblit* can be set to *True* in order to achieve faster rendering.
-
-    """
-
-    def __init__(self, line, numberformat="{0:.4g};{1:.4g}", offset=(5, 5),
-                 dataaxis='x', textprops={}, **cursorargs):
-        # The line object, for which the coordinates are displayed
-        self.line = line
-        # The format string, on which .format() is called for creating the text
-        self.numberformat = numberformat
-        # Text position offset
-        self.offset = np.array(offset)
-        # The axis in which the cursor position is looked up
-        self.dataaxis = dataaxis
-
-        # First call baseclass constructor.
-        # Draws cursor and remembers background for blitting.
-        # Saves ax as class attribute.
-        super().__init__(**cursorargs)
-
-        # Default value for position of text.
-        self.set_position(self.line.get_xdata()[0], self.line.get_ydata()[0])
-        # Create invisible animated text
-        self.text = self.ax.text(
-            self.ax.get_xbound()[0],
-            self.ax.get_ybound()[0],
-            "0, 0",
-            animated=bool(self.useblit),
-            visible=False, **textprops)
-        # The position at which the cursor was last drawn
-        self.lastdrawnplotpoint = None
-
-    def onmove(self, event):
-        """
-        Overridden draw callback for cursor. Called when moving the mouse.
-        """
-
-        # Leave method under the same conditions as in overridden method
-        if self.ignore(event):
-            self.lastdrawnplotpoint = None
-            return
-        if not self.canvas.widgetlock.available(self):
-            self.lastdrawnplotpoint = None
-            return
-
-        # If the mouse left drawable area, we now make the text invisible.
-        # Baseclass will redraw complete canvas after, which makes both text
-        # and cursor disappear.
-        if event.inaxes != self.ax:
-            self.lastdrawnplotpoint = None
-            self.text.set_visible(False)
-            super().onmove(event)
-            return
-
-        # Get the coordinates, which should be displayed as text,
-        # if the event coordinates are valid.
-        plotpoint = None
-        if event.xdata is not None and event.ydata is not None:
-            # Get plot point related to current x position.
-            # These coordinates are displayed in text.
-            plotpoint = self.set_position(event.xdata, event.ydata)
-            # Modify event, such that the cursor is displayed on the
-            # plotted line, not at the mouse pointer,
-            # if the returned plot point is valid
-            if plotpoint is not None:
-                event.xdata = plotpoint[0]
-                event.ydata = plotpoint[1]
-
-        # If the plotpoint is given, compare to last drawn plotpoint and
-        # return if they are the same.
-        # Skip even the call of the base class, because this would restore the
-        # background, draw the cursor lines and would leave us the job to
-        # re-draw the text.
-        if plotpoint is not None and plotpoint == self.lastdrawnplotpoint:
-            return
-
-        # Baseclass redraws canvas and cursor. Due to blitting,
-        # the added text is removed in this call, because the
-        # background is redrawn.
-        super().onmove(event)
-
-        # Check if the display of text is still necessary.
-        # If not, just return.
-        # This behaviour is also cloned from the base class.
-        if not self.get_active() or not self.visible:
-            return
-
-        # Draw the widget, if event coordinates are valid.
-        if plotpoint is not None:
-            # Update position and displayed text.
-            # Position: Where the event occurred.
-            # Text: Determined by set_position() method earlier
-            # Position is transformed to pixel coordinates,
-            # an offset is added there and this is transformed back.
-            temp = [event.xdata, event.ydata]
-            temp = self.ax.transData.transform(temp)
-            temp = temp + self.offset
-            temp = self.ax.transData.inverted().transform(temp)
-            self.text.set_position(temp)
-            self.text.set_text(self.numberformat.format(*plotpoint))
-            self.text.set_visible(self.visible)
-
-            # Tell base class, that we have drawn something.
-            # Baseclass needs to know, that it needs to restore a clean
-            # background, if the cursor leaves our figure context.
-            self.needclear = True
-
-            # Remember the recently drawn cursor position, so events for the
-            # same position (mouse moves slightly between two plot points)
-            # can be skipped
-            self.lastdrawnplotpoint = plotpoint
-        # otherwise, make text invisible
-        else:
-            self.text.set_visible(False)
-
-        # Draw changes. Cannot use _update method of baseclass,
-        # because it would first restore the background, which
-        # is done already and is not necessary.
-        if self.useblit:
-            self.ax.draw_artist(self.text)
-            self.canvas.blit(self.ax.bbox)
-        else:
-            # If blitting is deactivated, the overridden _update call made
-            # by the base class immediately returned.
-            # We still have to draw the changes.
-            self.canvas.draw_idle()
-
-    def set_position(self, xpos, ypos):
-        """
-        Finds the coordinates, which have to be shown in text.
-
-        The behaviour depends on the *dataaxis* attribute. Function looks
-        up the matching plot coordinate for the given mouse position.
-
-        Parameters
-        ----------
-        xpos : float
-            The current x position of the cursor in data coordinates.
-            Important if *dataaxis* is set to 'x'.
-        ypos : float
-            The current y position of the cursor in data coordinates.
-            Important if *dataaxis* is set to 'y'.
-
-        Returns
-        -------
-        ret : {2D array-like, None}
-            The coordinates which should be displayed.
-            *None* is the fallback value.
-        """
-
-        # Get plot line data
-        xdata = self.line.get_xdata()
-        ydata = self.line.get_ydata()
-
-        # The dataaxis attribute decides, in which axis we look up which cursor
-        # coordinate.
-        if self.dataaxis == 'x':
-            pos = xpos
-            data = xdata
-            lim = self.ax.get_xlim()
-        elif self.dataaxis == 'y':
-            pos = ypos
-            data = ydata
-            lim = self.ax.get_ylim()
-        else:
-            raise ValueError(f"The data axis specifier {self.dataaxis} should "
-                             f"be 'x' or 'y'")
-
-        # If position is valid and in valid plot data range.
-        if pos is not None and lim[0] <= pos <= lim[-1]:
-            # Find closest x value in sorted x vector.
-            # This requires the plotted data to be sorted.
-            index = np.searchsorted(data, pos)
-            # Return none, if this index is out of range.
-            if index < 0 or index >= len(data):
-                return None
-            # Return plot point as tuple.
-            return (xdata[index], ydata[index])
-
-        # Return none if there is no good related point for this x position.
-        return None
-
-    def clear(self, event):
-        """
-        Overridden clear callback for cursor, called before drawing the figure.
-        """
-
-        # The base class saves the clean background for blitting.
-        # Text and cursor are invisible,
-        # until the first mouse move event occurs.
-        super().clear(event)
-        if self.ignore(event):
-            return
-        self.text.set_visible(False)
-
-    def _update(self):
-        """
-        Overridden method for either blitting or drawing the widget canvas.
-
-        Passes call to base class if blitting is activated, only.
-        In other cases, one draw_idle call is enough, which is placed
-        explicitly in this class (see *onmove()*).
-        In that case, `~matplotlib.widgets.Cursor` is not supposed to draw
-        something using this method.
-        """
-
-        if self.useblit:
-            super()._update()
-
 def linspace_creator(max_value_array,min_value,res):
     # creates a linsapce numpy array from the given inputs
     # max_value needs to be a numpy array (even if it is a 1x1)
@@ -338,9 +83,23 @@ def walkmodel(param_df,s,m1,P_t,F_max,L,minimumViableLoad,m_HPV_only,res):
     n = np.array(param_df.Efficiency).reshape((n_hpv,1))
     Crr = np.array(param_df.Crr).reshape((n_hpv,1))
     v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv,1))
-    LoadCapacity = np.array(param_df.LoadCapacity).reshape((n_hpv,1))
+    load_limit = np.array(param_df.LoadLimit).reshape((n_hpv,1))
+    load_capacity = load_limit-m1*np.array(param_df.Pilot).flatten('C')
 
-    max_load_HPV = max_safe_load(m_HPV_only,LoadCapacity,F_max,s,g) # function to calaculate the max saffe loads due to hill
+    print('original load cap')
+    print(s)
+    print(load_capacity)
+
+    max_safe_load_HPV = max_safe_load(m_HPV_only,load_capacity,F_max,s,g) # function to calaculate the max saffe loads due to hill
+    print('maxsafe')
+    
+    print(max_safe_load_HPV)
+    load_pilot_HPVs = np.array(param_df.LoadCapacity).flatten('F')-m1*np.array(param_df.Pilot).flatten('C')
+    print('laodpilot')
+    print(load_pilot_HPVs)
+    max_load_HPV = np.minimum(load_pilot_HPVs, max_safe_load_HPV.flatten('F'))
+    print('minimum load from safe + no pilot')
+    print(max_load_HPV)
     load_matrix = linspace_creator(max_load_HPV,minimumViableLoad,res)
 
     #### Derivations of further mass variables
@@ -415,11 +174,17 @@ load_plot = 0
 slope_plot = 0
 surf_plot = 0
 surf_plotly = 0
-surf_plotly_multi = 1
+surf_plotly_multi = 0
+load_plot_plotly = 0
+time_sensitivity = 0
+time_sensitivity_plotly_grouped = 0
+bar_plot_loading = 1
+
+
 
 ## Options
-load_res = 20        #  0 = min load, 1 = max load, >1 = linear space between min and max
-slope_res = 20      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
+load_res = 2        #  0 = min load, 1 = max load, >1 = linear space between min and max
+slope_res = 3      #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
 slope_start = 0    # slope min
 slope_end = 10      # slope max
 
@@ -503,6 +268,7 @@ velocitykgs=v_avg_matrix3d*load_matrix3d
 #### Distance
 t_secs=t_hours*60*60
 distance_achievable = (v_avg_matrix3d*t_secs)/1000 #kms
+distance_achievable_one_hr = (v_avg_matrix3d*60*60)/1000 #kms
 
 ## Power
 total_load = load_matrix3d + m1  #estimate for now withot HV weight
@@ -519,26 +285,16 @@ if slope_plot == 1:
 #   # Slope Graph Sensitivity
     fig, ax = plt.subplots(figsize=(20, 10))
     for HPVname in param_df.Name:
-        
-        x = slope_vector
-        y = v_avg_matrix3d[:,i]*load_matrix3d[:,i]
+        y = v_avg_matrix3d[i,:,0]*load_matrix3d[i,:,0] # SEE ZEROS <-- this is for the minimum weight
+        x = slope_vector_deg.reshape((y.shape)) # reshape to same size
         line, = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
         i += 1
     plt.xlabel('Slope [deg ˚]')
     plt.ylabel('Velocity Kgs [m/s]')
-    plt.title("Velocity Kgs as a function of Slope Plot")
+    plt.title("Velocity Kgs as a function of Slope with Load = {}kg".format(load_matrix3d[0,0,0])) 
     plt.legend();
 
-
-    cursor = AnnotatedCursor(
-        line=line,
-        numberformat="{0:.2f}\n{1:.2f}",
-        dataaxis='x', offset=[10, 10],
-        textprops={'color': 'blue', 'fontweight': 'bold'},
-        ax=ax,
-        useblit=True,
-        color='red', linewidth=2)
-
+    plt.plot()
     plt.show()
 
 elif load_plot ==1:
@@ -547,25 +303,16 @@ elif load_plot ==1:
 #   # Slope Graph Sensitivity
     fig, ax = plt.subplots(figsize=(20, 10))
     for HPVname in HPV_names:
-        
-        
-        y = v_avg_matrix3d[i,:,0]
-        x = slope_vector_deg.reshape(y.shape)
-
+        y = v_avg_matrix3d[i,0,:]*load_matrix3d[i,0,:] # SEE ZEROS <-- this is for the minimum weight
+        x = load_matrix3d[i,0,:]
         line, = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
         i += 1
-    plt.xlabel('Slope [deg ˚]')
-    plt.ylabel('Velocity [m/s]')
-    plt.title("Velocity as a function of Slope Plot with constant load")
+    plt.xlabel('Load [kg]')
+    plt.ylabel('Velocity Kilograms [kg][m/s]')
+    plt.title("Velocity Kgs as a function of Load with {}˚ Slope".format(slope_vector_deg[0,0])) 
     plt.legend();
-
-
-    df = px.data.gapminder().query("continent=='Oceania'")
-    fig = px.line(df, x="year", y="lifeExp", color='country')
-    fig.show()
-    fig.write_html("plotout.html")
-    fig = px.scatter(df, x=df.sepal_length, y=df.sepal_width, color=df.species, size=df.petal_length)
     plt.plot()
+    plt.show()
 
 elif surf_plot ==1:
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -650,10 +397,80 @@ elif surf_plotly_multi ==1:
     # show the figure
     py.iplot(fig, filename='3D subplots of HPVs')
 
+elif load_plot_plotly ==1:
+    i=0
+
+#   # Slope Graph Sensitivity
+    fig = go.Figure()
+    for HPVname in HPV_names:
+        y = v_avg_matrix3d[i,0,:]*load_matrix3d[i,0,:] # SEE ZEROS <-- this is for the minimum weight
+        x = load_matrix3d[i,0,:]
+        i += 1
+        fig.add_trace(go.Scatter(x = x , y = y, mode ='lines', name = HPVname))
+
+    fig.show()
+
+
+elif time_sensitivity ==1:
+    t_hours_list = [1,2,3,4,5,6,7,8,9,10]
+    HPV_selector = 1 # 1 = bike
+#   # Distance Sensitivity
+    X = []
+    Y = []
+    # fig = go.Figure()
+    for t_hours in t_hours_list:
+        t_secs=t_hours*60*60
+        distance_achievable = (v_avg_matrix3d*t_secs)/1000 #kms
+        y = distance_achievable[HPV_selector,0,0] # SEE ZEROS <-- this is for the minimum weight
+        x = t_hours
+        print(x)
+        print(X)
+        i += 1
+        X.append(x)
+        Y.append(y)
+    # fig.add_trace(go.Bar(x = X , y = Y, mode ='lines'))
+    fig = px.bar(x=X, y=Y, title="Wide-Form Input")
+    # fig.update_layout(title="Distance achievable, given time spent")
+    fig.show()
 
 
 
+elif time_sensitivity_plotly_grouped ==1:
+    t_hours_list = [1,2,3,4,5,6,7,8,9,10,11,12]
+    load_scene = -1
+
+    # plotly setup
+    fig = go.Figure()
+    i=0
+    # add trace for eat
+    for HPVname in HPV_names:
+        #print(col)
+        X= t_hours_list
+        Y = load_matrix3d[i,0,load_scene]*(distance_achievable_one_hr[i,0,load_scene]*np.array(t_hours_list))
+        fig.add_trace(go.Bar(x=X, y=Y, name = HPVname))
+        i += 1
+
+    fig.update_layout(title=dict(text="Distance Achievable Per HPV given different time to collect water"))
+    fig.update_layout(barmode='group')
+    fig.show()
 
 
+elif bar_plot_loading == 1:
+    t_hours_list = [1,2,3,4,5,6,7,8,9,10,11,12]
+    load_scene = -1
+    slope_scene = -1
+    slope_name = slope_vector_deg.flat[slope_scene]
+    chart_title = 'Efficiency at %0.2f degrees' %slope_name
+
+    df = pd.DataFrame({ 'Name': HPV_names,
+                        'Load': load_matrix3d[:,slope_scene,load_scene],
+                        'Average Trip Velocity': v_avg_matrix3d[:,slope_scene,load_scene],
+                        'Load Velocity [kg * m/s]' : v_avg_matrix3d[:,slope_scene,load_scene]*load_matrix3d[:,slope_scene,load_scene],
+                        'Loaded Velocity' : v_load_matrix3d[:,slope_scene,load_scene]})
 
 
+    fig = px.bar(df, x='Load', y='Load Velocity [kg * m/s]',
+            hover_data=['Name','Average Trip Velocity','Loaded Velocity' , 'Load'], color='Name',
+            labels={'Name':'Name'},
+            title = chart_title )
+    fig.show()
