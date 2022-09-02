@@ -3,6 +3,8 @@ from functools import reduce
 import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
+import numpy as np
+
 
 
 def read_road_values(path):
@@ -51,6 +53,44 @@ def read_pop_values(path):
     df = df.drop(["Year"], axis=1)
     return df
 
+
+def correlation_checker(df,corr_col_1,corr_col_2):
+    """
+    prints the correaltion between two columns denoted by their numerical index (column number)
+    """
+    corr_value = df.iloc[:, corr_col_1].corr(df.iloc[:, corr_col_2])
+    print("Correlation between %s and %s is %0.4f" % (df_master.columns[corr_col_1],df_master.columns[corr_col_2],corr_value))
+
+def bubble_plot(df):
+    fig = px.scatter(df, x="PBO", y="Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
+                size="Population", color="Entity",
+                    hover_name="Entity", log_x=True, log_y=True, size_max=60)
+    fig.show()
+
+def world_map_plot(df):
+    fig = px.choropleth(df, locations=df.index,
+                        color="RoadQuality",
+                        hover_name="Entity",
+                        title = "Risk per country",  
+                        hover_data=["Urban population (% of total population)",
+                        "Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
+                        "PBO"],
+                        color_continuous_scale=px.colors.sequential.PuRd)
+
+    fig["layout"].pop("updatemenus")
+    fig.show()
+
+
+def risk_creator(df3):
+    bike_risk = 1-df3.loc[:,'PBO']/100
+    urb_risk  = df3.loc[:,'Population in urban agglomerations of more than 1 million (% of total population)']/100
+    road_risk = 1-df3.loc[:,'RoadQuality']/7
+    TRI_quantiles = pd.qcut(df3.loc[:,"Terrain Ruggedness Index 100m (Nunn and Puga 2012)"], np.linspace(0,1,11), labels=np.linspace(0.1,1,10))
+    risk_master = TRI_quantiles.astype(float)*bike_risk*urb_risk*road_risk
+    return risk_master
+
+
+
 """
 Start main function
 """
@@ -76,10 +116,11 @@ dfs = [df_pop, df_pbo, df_tri, df_purb, df_urbagg, df_rq]
 df_master = pd.concat(dfs, join="outer", axis=1)
 df_master_na = df_master.dropna()
 
-corr_col_1 = 5
-corr_col_2 = 5
-corr_value = df_master.iloc[:, corr_col_1].corr(df_master.iloc[:, corr_col_2])
-print("Correlation between %s and %s is %0.4f" % (df_master.columns[corr_col_1],df_master.columns[corr_col_2],corr_value))
+# df3 = df_master_na
+# df3['quantiles'] = pd.qcut(df3["Terrain Ruggedness Index 100m (Nunn and Puga 2012)"], np.linspace(0,1,11), labels=np.linspace(0.1,1,10))
+
+risk_master = risk_creator(df_master_na)
+
 
 
 # 'Entity', 'Population', 'Year', 'PBO',
@@ -88,23 +129,8 @@ print("Correlation between %s and %s is %0.4f" % (df_master.columns[corr_col_1],
 #        'Population in urban agglomerations of more than 1 million (% of total population)',
 #        'RoadQuality'],
   
+# world_map_plot(df_master)
 
 
-# fig = px.scatter(df_master_na, x="PBO", y="Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
-# 	         size="Population", color="Entity",
-#                  hover_name="Entity", log_x=True, log_y=True, size_max=60)
-# fig.show()
 
-
-# fig = px.choropleth(df_master, locations=df_master.index,
-#                     color="RoadQuality",
-#                     hover_name="Entity",
-#                     title = "Risk per country",  
-#                     hover_data=["Urban population (% of total population)",
-#                      "Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
-#                      "PBO"],
-#                     color_continuous_scale=px.colors.sequential.PuRd)
-
-# fig["layout"].pop("updatemenus")
-# fig.show()
 
