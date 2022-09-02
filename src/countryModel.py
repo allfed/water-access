@@ -6,7 +6,6 @@ import plotly.express as px
 import numpy as np
 
 
-
 def read_road_values(path):
     df = pd.read_csv(path)
     df.rename(columns={"Score": "RoadQuality"}, inplace=True)
@@ -14,9 +13,10 @@ def read_road_values(path):
     df = df.set_index("alpha3")
     return df
 
+
 def read_pbo_values(path):
     df = pd.read_csv(path)
-    df.rename(columns={"ISO": "alpha3","Year": "YearPBO"}, inplace=True)
+    df.rename(columns={"ISO": "alpha3", "Year": "YearPBO"}, inplace=True)
     df = df.set_index("alpha3")
     df = df.sort_values(by="YearPBO")  # sort ascending
     df = df[
@@ -24,6 +24,7 @@ def read_pbo_values(path):
     ]  # delete duplicate entries from countries, keep the most recent data
     df = df.drop(["Group", "Households"], axis=1)
     return df
+
 
 def read_owid_values(path):
     """
@@ -39,12 +40,19 @@ def read_owid_values(path):
     df = df.drop(["Entity", "Year"], axis=1)
     return df
 
+
 def read_pop_values(path):
     """
     reads csv files downloaded from our world in data, isolates the ISO alpga 3 country code, and keeps only the most recent data per country
     """
     df = pd.read_csv(path)
-    df.rename(columns={"Code": "alpha3", "Population (historical estimates)": "Population", }, inplace=True)
+    df.rename(
+        columns={
+            "Code": "alpha3",
+            "Population (historical estimates)": "Population",
+        },
+        inplace=True,
+    )
     df = df.set_index("alpha3")
     df = df.sort_values(by="Year")  # sort ascending
     df = df[
@@ -54,41 +62,68 @@ def read_pop_values(path):
     return df
 
 
-def correlation_checker(df,corr_col_1,corr_col_2):
+def correlation_checker(df, corr_col_1, corr_col_2):
     """
     prints the correaltion between two columns denoted by their numerical index (column number)
     """
     corr_value = df.iloc[:, corr_col_1].corr(df.iloc[:, corr_col_2])
-    print("Correlation between %s and %s is %0.4f" % (df_master.columns[corr_col_1],df_master.columns[corr_col_2],corr_value))
+    print(
+        "Correlation between %s and %s is %0.4f"
+        % (df_master.columns[corr_col_1], df_master.columns[corr_col_2], corr_value)
+    )
+
 
 def bubble_plot(df):
-    fig = px.scatter(df, x="PBO", y="Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
-                size="Population", color="Entity",
-                    hover_name="Entity", log_x=True, log_y=True, size_max=60)
+    fig = px.scatter(
+        df,
+        x="PBO",
+        y="Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
+        size="Population",
+        color="Entity",
+        hover_name="Entity",
+        log_x=True,
+        log_y=True,
+        size_max=60,
+    )
     fig.show()
 
+
 def world_map_plot(df):
-    fig = px.choropleth(df, locations=df.index,
-                        color="RoadQuality",
-                        hover_name="Entity",
-                        title = "Risk per country",  
-                        hover_data=["Urban population (% of total population)",
-                        "Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
-                        "PBO"],
-                        color_continuous_scale=px.colors.sequential.PuRd)
+    fig = px.choropleth(
+        df,
+        locations=df.index,
+        color="RoadQuality",
+        hover_name="Entity",
+        title="Risk per country",
+        hover_data=[
+            "Urban population (% of total population)",
+            "Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
+            "PBO",
+        ],
+        color_continuous_scale=px.colors.sequential.PuRd,
+    )
 
     fig["layout"].pop("updatemenus")
     fig.show()
 
 
 def risk_creator(df3):
-    bike_risk = 1-df3.loc[:,'PBO']/100
-    urb_risk  = df3.loc[:,'Population in urban agglomerations of more than 1 million (% of total population)']/100
-    road_risk = 1-df3.loc[:,'RoadQuality']/7
-    TRI_quantiles = pd.qcut(df3.loc[:,"Terrain Ruggedness Index 100m (Nunn and Puga 2012)"], np.linspace(0,1,11), labels=np.linspace(0.1,1,10))
-    risk_master = TRI_quantiles.astype(float)*bike_risk*urb_risk*road_risk
+    bike_risk = 1 - df3.loc[:, "PBO"] / 100
+    urb_risk = (
+        df3.loc[
+            :,
+            "Population in urban agglomerations of more than 1 million (% of total population)",
+        ]
+        / 100
+    )
+    road_risk = 1 - df3.loc[:, "RoadQuality"] / 7
+    TRI_quantiles = pd.qcut(
+        df3.loc[:, "Terrain Ruggedness Index 100m (Nunn and Puga 2012)"],
+        np.linspace(0, 1, 11),
+        labels=np.linspace(0.1, 1, 10),
+    )
+    risk_master = TRI_quantiles.astype(float) * bike_risk * urb_risk * road_risk
     return risk_master
-
 
 
 """
@@ -122,15 +157,10 @@ df_master_na = df_master.dropna()
 risk_master = risk_creator(df_master_na)
 
 
-
 # 'Entity', 'Population', 'Year', 'PBO',
 #        'Terrain Ruggedness Index 100m (Nunn and Puga 2012)',
 #        'Urban population (% of total population)',
 #        'Population in urban agglomerations of more than 1 million (% of total population)',
 #        'RoadQuality'],
-  
+
 # world_map_plot(df_master)
-
-
-
-
