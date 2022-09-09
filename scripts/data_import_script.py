@@ -1,11 +1,13 @@
 import pandas as pd
 
+
 def read_road_values(path):
     df = pd.read_csv(path)
     df.rename(columns={"Score": "RoadQuality"}, inplace=True)
     df = df.drop(["Country / Economy"], axis=1)
     df = df.set_index("alpha3")
     return df
+
 
 def read_pbo_values(path):
     df = pd.read_csv(path)
@@ -17,6 +19,7 @@ def read_pbo_values(path):
     ]  # delete duplicate entries from countries, keep the most recent data
     df = df.drop(["Group", "Households"], axis=1)
     return df
+
 
 def read_owid_values(path):
     """
@@ -31,6 +34,7 @@ def read_owid_values(path):
     ]  # delete duplicate entries from countries, keep the most recent data
     df = df.drop(["Entity", "Year"], axis=1)
     return df
+
 
 def read_pop_values(path):
     """
@@ -52,6 +56,7 @@ def read_pop_values(path):
     df = df.drop(["Year"], axis=1)
     return df
 
+
 def correlation_checker(df, corr_col_1, corr_col_2):
     """
     prints the correaltion between two columns denoted by their numerical index (column number)
@@ -61,6 +66,7 @@ def correlation_checker(df, corr_col_1, corr_col_2):
         "Correlation between %s and %s is %0.4f"
         % (df_master.columns[corr_col_1], df_master.columns[corr_col_2], corr_value)
     )
+
 
 def input_data_creator():
     path_tri = "../data/terrain-ruggedness-index.csv"  # terrain ruggedness index
@@ -81,17 +87,28 @@ def input_data_creator():
 
     dfs = [df_pop, df_pbo, df_tri, df_purb, df_urbagg, df_rq]
     df_master = pd.concat(dfs, join="outer", axis=1)
-    df_master['Risk']=0
-    df_master.rename(columns={"Terrain Ruggedness Index 100m (Nunn and Puga 2012)": "Terrain Ruggedness"}, inplace=True)
-    df_master.rename(columns={"Population in urban agglomerations of more than 1 million (% of total population)": "Urban Agg %"}, inplace=True)
-    df_master.rename(columns={"Urban population (% of total population)": "Urban %"}, inplace=True)
+    df_master["Risk"] = 0
+    df_master.rename(
+        columns={
+            "Terrain Ruggedness Index 100m (Nunn and Puga 2012)": "Terrain Ruggedness"
+        },
+        inplace=True,
+    )
+    df_master.rename(
+        columns={
+            "Population in urban agglomerations of more than 1 million (% of total population)": "Urban Agg %"
+        },
+        inplace=True,
+    )
+    df_master.rename(
+        columns={"Urban population (% of total population)": "Urban %"}, inplace=True
+    )
     return df_master
 
 
 """
 Start main function
 """
-
 
 
 df = input_data_creator()
