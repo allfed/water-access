@@ -4,163 +4,213 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
 import numpy as np
+from dash import Dash, dcc, html, Output, Input  # pip install dash
+import dash_bootstrap_components as dbc    # pip install dash-bootstrap-components
 
 
-def read_road_values(path):
-    df = pd.read_csv(path)
-    df.rename(columns={"Score": "RoadQuality"}, inplace=True)
-    df = df.drop(["Country / Economy"], axis=1)
-    df = df.set_index("alpha3")
-    return df
+"""
+Next steps:
+Generate single csv for inpout?
+Upload to heroku
+"""
 
-
-def read_pbo_values(path):
-    df = pd.read_csv(path)
-    df.rename(columns={"ISO": "alpha3", "Year": "YearPBO"}, inplace=True)
-    df = df.set_index("alpha3")
-    df = df.sort_values(by="YearPBO")  # sort ascending
-    df = df[
-        ~df.index.duplicated(keep="last")
-    ]  # delete duplicate entries from countries, keep the most recent data
-    df = df.drop(["Group", "Households"], axis=1)
-    return df
-
-
-def read_owid_values(path):
+def risk_creator(input_df):
     """
-    reads csv files downloaded from our world in data, isolates the ISO alpga 3 country code, and keeps only the most recent data per country
+    Risk creator takes all
     """
-    df = pd.read_csv(path)
-    df.rename(columns={"Code": "alpha3"}, inplace=True)
-    df = df.set_index("alpha3")
-    df = df.sort_values(by="Year")  # sort ascending
-    df = df[
-        ~df.index.duplicated(keep="last")
-    ]  # delete duplicate entries from countries, keep the most recent data
-    df = df.drop(["Entity", "Year"], axis=1)
-    return df
+    df = input_df.copy()
+    # risk from bikes
+    df["PBO_risk"] = 1 - df.loc[:, "PBO"] / 100
 
+    # find quartiles for TRI (rather than using the adjusted score as a percent)
+    # CHECK IF THIS MAKES SENSE?
+    df["TRI_risk"] = pd.qcut(
+        df.loc[:, "Terrain Ruggedness"],
+        np.linspace(0, 1, 11),
+        labels=np.linspace(0.1, 1, 10),
+    ).astype(float)
 
-def read_pop_values(path):
-    """
-    reads csv files downloaded from our world in data, isolates the ISO alpga 3 country code, and keeps only the most recent data per country
-    """
-    df = pd.read_csv(path)
-    df.rename(
-        columns={
-            "Code": "alpha3",
-            "Population (historical estimates)": "Population",
-        },
-        inplace=True,
-    )
-    df = df.set_index("alpha3")
-    df = df.sort_values(by="Year")  # sort ascending
-    df = df[
-        ~df.index.duplicated(keep="last")
-    ]  # delete duplicate entries from countries, keep the most recent data
-    df = df.drop(["Year"], axis=1)
-    return df
-
-
-def correlation_checker(df, corr_col_1, corr_col_2):
-    """
-    prints the correaltion between two columns denoted by their numerical index (column number)
-    """
-    corr_value = df.iloc[:, corr_col_1].corr(df.iloc[:, corr_col_2])
-    print(
-        "Correlation between %s and %s is %0.4f"
-        % (df_master.columns[corr_col_1], df_master.columns[corr_col_2], corr_value)
-    )
-
-
-def bubble_plot(df):
-    fig = px.scatter(
-        df,
-        x="PBO",
-        y="Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
-        size="Population",
-        color="Entity",
-        hover_name="Entity",
-        log_x=True,
-        log_y=True,
-        size_max=60,
-    )
-    fig.show()
-
-
-def world_map_plot(df):
-    fig = px.choropleth(
-        df,
-        locations=df.index,
-        color="RoadQuality",
-        hover_name="Entity",
-        title="Risk per country",
-        hover_data=[
-            "Urban population (% of total population)",
-            "Terrain Ruggedness Index 100m (Nunn and Puga 2012)",
-            "PBO",
-        ],
-        color_continuous_scale=px.colors.sequential.PuRd,
-    )
-
-    fig["layout"].pop("updatemenus")
-    fig.show()
-
-
-def risk_creator(df3):
-    bike_risk = 1 - df3.loc[:, "PBO"] / 100
-    urb_risk = (
-        df3.loc[
+    df["urb_risk"] = (
+        df.loc[
             :,
-            "Population in urban agglomerations of more than 1 million (% of total population)",
+            "Urban %",
         ]
         / 100
     )
-    road_risk = 1 - df3.loc[:, "RoadQuality"] / 7
-    TRI_quantiles = pd.qcut(
-        df3.loc[:, "Terrain Ruggedness Index 100m (Nunn and Puga 2012)"],
-        np.linspace(0, 1, 11),
-        labels=np.linspace(0.1, 1, 10),
+
+    df["urbagg_risk"] = (
+        df.loc[
+            :,
+            "Urban Agg %",
+        ]
+        / 100
     )
-    risk_master = TRI_quantiles.astype(float) * bike_risk * urb_risk * road_risk
-    return risk_master
+
+    df["road_risk"] = 1 - df.loc[:, "RoadQuality"] / 7
+
+    return df
+
+def weight_parameter(series, slider_weight):
+    if slider_weight == 0:
+        series = 0
+    else:
+        series = series*slider_weight
+    
+    return series
+    #### NEXT STPE IF SLIDER WEIGHT = 0, amke stuff = 0
 
 
 """
 Start main function
 """
+path = "../data/country_data_master.csv"
+df = pd.read_csv(path, index_col = 'alpha3')
+df = risk_creator(df)
+ignore_columns_index = 3
 
-col = "Country / Economy"
-path_tri = "../data/terrain-ruggedness-index.csv"  # terrain ruggedness index
-path_rq = "../data/global_road_quality_processed.csv"  # road quality
-path_pbo = "../data/global-bike-ownership.csv"  # 'percent bike ownership'
-path_purb = "../data/share-of-population-urban.csv"  # share of urban population
-path_urbagg = (
-    "../data/urban-agglomerations-1-million-percent.csv"  # urban agglomerations
+# Build your components
+app = Dash(__name__, external_stylesheets=[dbc.themes.LUX])
+
+
+
+mytitle = dcc.Markdown(children='')
+mysubtitle = dcc.Markdown(children='')
+mygraph = dcc.Graph(figure={})
+dropdown = dcc.Dropdown(options=df.columns.values[2:],
+                        value='Risk',  # initial value displayed when page first loads
+                        clearable=False)
+### Create slider components on a card
+controls = dbc.Card(
+    [
+        dbc.Label("Adjust the weighting of each parameter on the final risk score with the sliders"),
+
+        html.Div(
+            [
+                dbc.Label("Bike Ownership %"),
+                dcc.Slider(0, 400, value=100, id="myslider1" , updatemode='drag',
+                tooltip={"placement": "bottom", "always_visible": True}
+                ),
+            ]
+        ),
+        html.Div(
+            [
+                dbc.Label(df.columns[ignore_columns_index+1]),
+                dcc.Slider(0, 400, value=100, id="myslider2" , updatemode='drag',
+                tooltip={"placement": "bottom", "always_visible": True}
+                ),
+            ]
+        ),
+        html.Div(
+            [
+                dbc.Label(df.columns[ignore_columns_index+2]),
+                dcc.Slider(0, 400, value=100, id="myslider3" , updatemode='drag',
+                tooltip={"placement": "bottom", "always_visible": True}
+                ),
+            ]
+        ),
+        html.Div(
+            [
+                dbc.Label(df.columns[ignore_columns_index+3]),
+                dcc.Slider(0, 400, value=100, id="myslider4" , updatemode='drag',
+                tooltip={"placement": "bottom", "always_visible": True}
+                ),
+            ]
+        ),
+        html.Div(
+            [
+                dbc.Label(df.columns[ignore_columns_index+4]),
+                dcc.Slider(0, 400, value=100, id="myslider5" , updatemode='drag',
+                tooltip={"placement": "bottom", "always_visible": True}
+                ),
+            ]
+        ),
+    ],
+    body=True,
 )
-path_pop = "../data/population.csv"  # population
-
-df_rq = read_road_values(path_rq)
-df_pbo = read_pbo_values(path_pbo)
-df_tri = read_owid_values(path_tri)
-df_purb = read_owid_values(path_purb)
-df_urbagg = read_owid_values(path_urbagg)
-df_pop = read_pop_values(path_pop)
-
-dfs = [df_pop, df_pbo, df_tri, df_purb, df_urbagg, df_rq]
-df_master = pd.concat(dfs, join="outer", axis=1)
-df_master_na = df_master.dropna()
-
-# df3 = df_master_na
-# df3['quantiles'] = pd.qcut(df3["Terrain Ruggedness Index 100m (Nunn and Puga 2012)"], np.linspace(0,1,11), labels=np.linspace(0.1,1,10))
-
-risk_master = risk_creator(df_master_na)
 
 
-# 'Entity', 'Population', 'Year', 'PBO',
-#        'Terrain Ruggedness Index 100m (Nunn and Puga 2012)',
-#        'Urban population (% of total population)',
-#        'Population in urban agglomerations of more than 1 million (% of total population)',
-#        'RoadQuality'],
+# Customize your own Layout
+app.layout = dbc.Container([
 
-# world_map_plot(df_master)
+    dbc.Row([
+        dbc.Col([mytitle], width=6)
+    ], justify='center'),
+    
+    
+    dbc.Row([
+        dbc.Col([mysubtitle], width=6)
+    ], justify='center'),
+    
+    
+    dbc.Row(
+        [
+            dbc.Col(controls, md=3),
+            dbc.Col([mygraph], width=9),
+        ],
+        align="center",
+    ),
+
+    dbc.Row([
+        dbc.Col([dropdown], width=6)
+    ], justify='center'),
+            html.Hr(),
+
+
+
+], fluid=True)
+
+# Callback allows components to interact
+@app.callback(
+    Output(mygraph, 'figure'),
+    Output(mytitle, 'children'),
+    Output(mysubtitle, 'children'),
+    Input(dropdown, 'value'),
+    Input("myslider1", 'value'),
+    Input("myslider2", 'value'),
+    Input("myslider3", 'value'),
+    Input("myslider4", 'value'),
+    Input("myslider5", 'value')
+)
+def update_graph(column_name,scaling1,scaling2,scaling3,scaling4,scaling5):  # function arguments come from the component property of the Input
+    ignore_columns_num = 9
+    dff = df.copy() # create copy of dataframe to apply weightings to before creating the risk matrix
+    slider_weights = [scaling1,scaling2,scaling3,scaling4,scaling5]
+
+    for param_index in range(0,5):
+        series = weight_parameter(df.iloc[:,param_index+ignore_columns_num],slider_weights[param_index])
+        dff.iloc[:,param_index+ignore_columns_num] = series
+
+
+    ### Sum all of the weighted risk values in to the 'Risk' column of the dataframe
+    dff['Risk'] = dff.iloc[:,ignore_columns_num:ignore_columns_num+param_index+1].sum(axis='columns',skipna=False)
+    ### Normalise for a percentage risk,
+    dff['Risk'] = dff['Risk'] / max(dff['Risk'].dropna()) *100
+
+    nancount = dff["Risk"].isnull().sum() 
+    mysubtitle = f"there are {len(df.index)-nancount} countries from a total of {len(df.index)}"
+
+    # dff['RiskAbsolute'] = risk_series
+    # dff['Risk'] = risk_series / max(risk_series.dropna()) *100
+
+    # https://plotly.com/python/choropleth-maps/
+    fig = px.choropleth(data_frame=dff,
+                        locations=dff.index,
+                        height=600,
+                        color=column_name,
+                        hover_name="Entity",
+                        hover_data=[
+                            "PBO",
+                            "Terrain Ruggedness",
+                            "Urban %",
+                            "Urban Agg %",
+                            "RoadQuality"
+                        ],
+                        )
+
+
+    return fig, "# " +column_name, mysubtitle  # returned objects are assigned to the component property of the Output
+
+
+# Run app
+if __name__=='__main__':
+    app.run_server(debug=True, port=8054)
