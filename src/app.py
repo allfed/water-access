@@ -2,7 +2,7 @@ from difflib import diff_bytes
 import pandas as pd
 import plotly.express as px
 import numpy as np
-from dash import Dash, dcc, html, Output, Input, dash_table # pip install dash
+from dash import Dash, dcc, html, Output, Input, dash_table  # pip install dash
 import dash_bootstrap_components as dbc  # pip install dash-bootstrap-components
 
 """
@@ -10,6 +10,7 @@ Next steps:
 Generate single csv for inpout?
 Upload to heroku
 """
+
 
 def risk_creator(input_df):
     """
@@ -49,6 +50,7 @@ def risk_creator(input_df):
 
     return df
 
+
 def weight_parameter(series, slider_weight):
     """
     weights each panda series (column) of the dataframe one at a time, multiples the risk by the weighting, or if zero, let's the whole column = 0. Tis is useful because it removes NaNs (and means that more countries can be displayed)
@@ -60,14 +62,26 @@ def weight_parameter(series, slider_weight):
 
     return series
 
+
 """
 Start main function
 """
 path = "../data/country_data_master.csv"
 df = pd.read_csv(path, index_col="alpha3")
 df = risk_creator(df)
-df_table = df[['Entity', 'Population', 'PBO', 'Terrain Ruggedness',
-       'Urban %', 'Urban Agg %', 'RoadQuality', 'Km','Risk',]]
+df_table = df[
+    [
+        "Entity",
+        "Population",
+        "PBO",
+        "Terrain Ruggedness",
+        "Urban %",
+        "Urban Agg %",
+        "RoadQuality",
+        "Km",
+        "Risk",
+    ]
+]
 ignore_columns_index = 3
 
 # Build your components
@@ -85,17 +99,18 @@ dropdown = dcc.Dropdown(
 )
 
 table = dash_table.DataTable(
-        columns= [{"name": i, "id": i} for i in df_table.columns],
-        data=df_table.to_dict('records'),
-        filter_action='native',
-        page_size=20,
-
-        style_data={
-            'width': '150px', 'minWidth': '150px', 'maxWidth': '150px',
-            'overflow': 'hidden',
-            'textOverflow': 'ellipsis',
-        }
-    )
+    columns=[{"name": i, "id": i} for i in df_table.columns],
+    data=df_table.to_dict("records"),
+    filter_action="native",
+    page_size=20,
+    style_data={
+        "width": "150px",
+        "minWidth": "150px",
+        "maxWidth": "150px",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+    },
+)
 
 ### Create slider components on a card
 controls = dbc.Card(
@@ -200,10 +215,8 @@ app.layout = dbc.Container(
         ),
         dbc.Row([dbc.Col([dropdown], width=6)], justify="center"),
         html.Hr(),
-    
-    dbc.Row([dbc.Col([bar], width=12)], justify="center"),    
-    dbc.Row([dbc.Col([table], width=12)], justify="center"),    
-    
+        dbc.Row([dbc.Col([bar], width=12)], justify="center"),
+        dbc.Row([dbc.Col([table], width=12)], justify="center"),
     ],
     fluid=True,
 )
@@ -271,14 +284,20 @@ def update_graph(
     )
 
     graph_filter = dff[column_name].notnull()
-    fig2 = px.bar(dff[graph_filter].sort_values(by=column_name, ascending = False), y=column_name, x=dff.sort_values(by=column_name, ascending = False)[graph_filter].index,         hover_name="Entity",
+    fig2 = px.bar(
+        dff[graph_filter].sort_values(by=column_name, ascending=False),
+        y=column_name,
+        x=dff.sort_values(by=column_name, ascending=False)[graph_filter].index,
+        hover_name="Entity",
     )
-    fig2.update_layout(uniformtext_minsize=14, uniformtext_mode='show')
+    fig2.update_layout(uniformtext_minsize=14, uniformtext_mode="show")
 
     return (
         fig1,
         fig2,
-        dff.round(decimals=1).sort_values(by=column_name, ascending = False).to_dict('records'),
+        dff.round(decimals=1)
+        .sort_values(by=column_name, ascending=False)
+        .to_dict("records"),
         "# " + column_name,
         mysubtitle,
     )  # returned objects are assigned to the component property of the Output

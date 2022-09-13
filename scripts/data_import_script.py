@@ -8,10 +8,12 @@ def read_road_values(path):
     df = df.set_index("alpha3")
     return df
 
+
 def read_simple_csv_values(path):
     df = pd.read_csv(path)
     df = df.set_index("alpha3")
     return df
+
 
 def read_pbo_values(path):
     df = pd.read_csv(path)
