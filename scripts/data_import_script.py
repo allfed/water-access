@@ -8,6 +8,10 @@ def read_road_values(path):
     df = df.set_index("alpha3")
     return df
 
+def read_simple_csv_values(path):
+    df = pd.read_csv(path)
+    df = df.set_index("alpha3")
+    return df
 
 def read_pbo_values(path):
     df = pd.read_csv(path)
@@ -77,6 +81,7 @@ def input_data_creator():
         "../data/urban-agglomerations-1-million-percent.csv"  # urban agglomerations
     )
     path_pop = "../data/population.csv"  # population
+    path_kummu = "../data/KummuAlpha3.csv"
 
     df_rq = read_road_values(path_rq)
     df_pbo = read_pbo_values(path_pbo)
@@ -84,8 +89,9 @@ def input_data_creator():
     df_purb = read_owid_values(path_purb)
     df_urbagg = read_owid_values(path_urbagg)
     df_pop = read_pop_values(path_pop)
+    df_kummu = read_simple_csv_values(path_kummu)
 
-    dfs = [df_pop, df_pbo, df_tri, df_purb, df_urbagg, df_rq]
+    dfs = [df_pop, df_pbo, df_tri, df_purb, df_urbagg, df_rq, df_kummu]
     df_master = pd.concat(dfs, join="outer", axis=1)
     df_master["Risk"] = 0
     df_master.rename(
