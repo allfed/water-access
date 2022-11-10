@@ -15,13 +15,15 @@ import os
 
 
 def linspace_creator(max_value_array, min_value, res):
-    # creates a linsapce numpy array from the given inputs
-    # max_value needs to be a numpy array (even if it is a 1x1)
-    # min value is to be an int or float
-    # resolution to be an int
-    # returns
-    # res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
 
+    """
+    creates a linsapce numpy array from the given inputs
+    max_value needs to be a numpy array (even if it is a 1x1)
+    min value is to be an int or float
+    resolution to be an int
+    returns
+    res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
+    """
     if res == 1:  # if res =1 , calculate for max load of HPV
         load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
         load_matrix = max_value_array
@@ -57,7 +59,6 @@ def linspace_creator(max_value_array, min_value, res):
 
     return load_matrix
 
-
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
     max_load_HPV = LoadCapacity
 
@@ -77,15 +78,19 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
     return max_load_HPV
 
+def sprott_solution(param_df, s, mv, mo):
+    """
+    takes in the HPV dataframe, the slope, the model variables, and model options
+    returns the velocity of walking based on the energetics of walking model outlined by Sprott
+    https://sprott.physics.wisc.edu/technote/Walkrun.htm
 
-def walkmodel(param_df, s, m1, P_t, F_max, L, minimumViableLoad, m_HPV_only, res, g):
-
+    """
     #### constants
     pi = np.pi
-
-    n_hpv = (
-        param_df.Pilot.size
-    )  # number of HPVs (by taking the pilot value as it is alwways a simple int [more complex data types get cnfusing wwhen the dataframe nly has 1 row])
+    n_hpv = (    param_df.Pilot.size )  # number of HPVs 
+  
+    
+    m_HPV_only = np.array(param_df.Weight).reshape((n_hpv, 1))
     n = np.array(param_df.Efficiency).reshape((n_hpv, 1))
     Crr = np.array(param_df.Crr).reshape((n_hpv, 1))
     v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv, 1))
@@ -93,10 +98,10 @@ def walkmodel(param_df, s, m1, P_t, F_max, L, minimumViableLoad, m_HPV_only, res
     load_capacity = load_limit - mv.m1 * np.array(param_df.Pilot).reshape((n_hpv, 1))
 
     max_safe_load_HPV = max_safe_load(
-        m_HPV_only, load_capacity, F_max, s, g
+        m_HPV_only, load_capacity, mv.F_max, s, mv.g
     )  # function to calaculate the max saffe loads due to hill
     max_load_HPV = np.minimum(load_capacity, max_safe_load_HPV.reshape((n_hpv, 1)))
-    load_matrix = linspace_creator(max_load_HPV, minimumViableLoad, res)
+    load_matrix = linspace_creator(max_load_HPV, mv.minimumViableLoad, mo.load_res)
 
     #### Derivations of further mass variables
     m_HPV_pilot = np.array(
@@ -113,20 +118,20 @@ def walkmodel(param_df, s, m1, P_t, F_max, L, minimumViableLoad, m_HPV_only, res
         * (np.array(param_df.GroundContact).reshape((n_hpv, 1)) - 1)
         * -1
     )  # negative 1 is to make the wheeled = 0 and the walking = 1
-    m_HPV_load = load_matrix + np.array(m_HPV_only).reshape((n_hpv, 1))
+    # m_HPV_load = load_matrix + np.array(m_HPV_only).reshape((n_hpv, 1))
     # weight of the mass being 'walked', i.e the wieght of the human plus anything they are carrying (not pushing or riding)
 
     #### Constants from polynomial equation analysis
-    C = ((m_walk_carry) * g / pi) * (3 * g * L / 2) ** (1 / 2)  # component of walking
-    D = pi**2 / (6 * g * L)  # leg component?
+    C = ((m_walk_carry) * mv.g / pi) * (3 * mv.g * mv.L / 2) ** (1 / 2)  # component of walking
+    D = pi**2 / (6 * mv.g * mv.L)  # leg component?
     B1 = (
-        m_HPV_load_pilot * g * np.cos(np.arctan(s)) * Crr
+        m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * Crr
     )  # rolling resistance component
     B2 = m_HPV_load_pilot * np.sin(np.arctan(s))  # slope component
     B = B1 + B2
 
     ##### velocities
-    v_load = (-B + np.sqrt(B**2 + (2 * C * D * P_t) / n)) / (C * D / n)
+    v_load = (-B + np.sqrt(B**2 + (2 * C * D * mv.P_t) / n)) / (C * D / n)
     # loaded velocity
 
     # if loaded speed is greater than unloaded avg speed, make equal to avg unloaded speed
@@ -148,8 +153,7 @@ def bike_power_solution(p, *data):
         + v_solve * m_t * g * s
     ) / eta - P_t
 
-
-def bike_model(param_df, slope_vector_deg, F_max, g, load_res):
+def bike_model(param_df, slope_vector_deg, mv, mo):
     HPV_names = param_df["Name"].tolist()
     n_hpv = param_df.Pilot.size
     m_HPV_only = np.array(param_df.Weight).reshape((n_hpv, 1))
@@ -159,24 +163,23 @@ def bike_model(param_df, slope_vector_deg, F_max, g, load_res):
     for hpv_name in HPV_names:
         j = 0
         Crr = np.array(param_df.Crr).reshape((n_hpv, 1))[i]
-        # print(hpv_name)
-        # print(i)
+
         for slope in slope_vector_deg.reshape(slope_vector_deg.size, 1):
             s = (slope / 360) * (2 * pi)  # determine slope in radians
             max_load_HPV = max_safe_load(
-                m_HPV_only[i], load_limit[i], F_max, s, g
+                m_HPV_only[i], load_limit[i], mv.F_max, s, mv.g
             )  # find maximum pushing load
             if max_load_HPV > load_limit[i]:
                 max_load_HPV = load_limit[
                     i
                 ]  # see if load of HPV or load of pushing is the limitng factor.
             load_vector = linspace_creator(
-                max_load_HPV, minimumViableLoad, load_res
+                max_load_HPV, mv.minimumViableLoad, mo.load_res
             ).reshape((load_res, 1))
             m_t = np.array(load_vector + mv.m1 + m_HPV_only[i])
             k = 0
             for total_load in m_t:
-                data = (ro, C_d, A, m_t[k], Crr, eta, P_t, g, s)
+                data = (mv.ro, mv.C_d, mv.A, m_t[k], Crr, mv.eta, mv.P_t, mv.g, s)
                 V_guess = 1
                 V_r = fsolve(bike_power_solution, V_guess, args=data)
                 v_load_matrix3d[i, j, k] = V_r[0]
@@ -187,8 +190,7 @@ def bike_model(param_df, slope_vector_deg, F_max, g, load_res):
 
     return v_load_matrix3d, load_matrix3d
 
-
-def sprott_model(param_df, slope_vector_deg, F_max, g, load_res, m1):
+def sprott_model(param_df, slope_vector_deg, mv, mo):
 
     # define extra vars
     pi = np.pi
@@ -197,23 +199,16 @@ def sprott_model(param_df, slope_vector_deg, F_max, g, load_res, m1):
     i = 0
     for slope in slope_vector_deg.reshape(slope_vector_deg.size, 1):
         s = (slope / 360) * (2 * pi)
-        v_load, load_matrix = walkmodel(
+        v_load, load_matrix = sprott_solution(
             param_df,
             s,
-            mv.m1,
-            P_t,
-            F_max,
-            L,
-            minimumViableLoad,
-            m_HPV_only,
-            load_res,
-            g,
+            mv, 
+            mo
         )
-        v_load_matrix3d[:, i, :] = v_load.reshape(n_hpv, load_res)
-        load_matrix3d[:, i, :] = load_matrix.reshape(n_hpv, load_res)
+        v_load_matrix3d[:, i, :] = v_load.reshape(n_hpv, mo.load_res)
+        load_matrix3d[:, i, :] = load_matrix.reshape(n_hpv, mo.load_res)
         i += 1
     return v_load_matrix3d, load_matrix3d
-
 
 def lankford_model(
     param_df, slope_vector_deg, F_max, g, load_res, m1, MET_budget_watts
@@ -248,7 +243,6 @@ def lankford_model(
 
     return v_load_matrix3d, load_matrix3d
 
-
 def LCDA_solution(p, *data):
     m_load, metabolic_budget_watts, s = data
     v_solve = p[0]
@@ -259,7 +253,6 @@ def LCDA_solution(p, *data):
         + 0.24 * v_solve**4
         + 0.34 * (1 - 1.05 ** (1 - 1.1 ** (G + 32)))
     ) * m_load - metabolic_budget_watts
-
 
 def Lankford_solution(p, *data):
     metabolic_budget, s = data
@@ -276,7 +269,6 @@ def Lankford_solution(p, *data):
         + 0.00320 * v_solve * G**3
         - metabolic_budget
     )
-
 
 class model_variables:
     def __init__(self):
@@ -295,7 +287,6 @@ class model_variables:
         self.eta = 0.8
         self.g = 9.81
 
-
 class model_options:
     def __init__(self):
         # model options
@@ -310,6 +301,36 @@ class model_options:
         self.slope_start = 0  # slope min degrees
         self.slope_end = 10  # slope max degrees
 
+class MET_values:
+    def __init__(self):
+        # Metabolic Equivalent of Task
+        self.MET_of_sustainable_excercise = (
+            6  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
+        )
+        self.MET_VO2_conversion = 3.5  # milliliters per minute per kilogram body mass
+        self.MET_watt_conversion = 1.162  # watts per kg body mass
+        # so 75 Watts output (from Marks textbook) is probably equivalent to about 6 METs
+        self.budget_VO2 = (
+            self.MET_VO2_conversion * self.MET_of_sustainable_excercise * mv.m1
+        )  # vo2 budget for a person
+        self.budget_watts = (
+            self.MET_watt_conversion * self.MET_of_sustainable_excercise * mv.m1
+        )  # vo2 budget for a person
+
+class model_results:
+    def __init__(self):
+        pass
+
+class HPV_variables:
+    def __init__(self,hpv_param_df,mv):
+        self.n_hpv = (    hpv_param_df.Pilot.size )  # number of HPVs 
+        self.m_HPV_only = np.array(hpv_param_df.Weight).reshape((self.n_hpv, 1))
+        self.n = np.array(hpv_param_df.Efficiency).reshape((self.n_hpv, 1))
+        self.Crr = np.array(hpv_param_df.Crr).reshape((self.n_hpv, 1))
+        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape((self.n_hpv, 1))
+        self.load_limit = np.array(hpv_param_df.LoadLimit).reshape((self.n_hpv, 1))
+        self.load_capacity = self.load_limit - mv.m1 * np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))
+        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape((n_hpv, 1))[:, np.newaxis, :] 
 
 ## Plotly creds
 load_dotenv(find_dotenv())
@@ -317,7 +338,8 @@ chart_studio.tools.set_credentials_file(
     username=os.environ.get("USERNAME"), api_key=os.environ.get("API_KEY")
 )
 
-#### Start Script
+######################
+#### Import Data #####
 with open("../data/mobility-model-parameters.csv") as csv_file:
     # read the csv file
     allHPV_param_df = pd.read_csv("../data/mobility-model-parameters.csv")
@@ -326,8 +348,12 @@ with open("../data/mobility-model-parameters.csv") as csv_file:
 ##### Options ######
 ####################
 
+
+filter_col = 3
+filter_value = 1
+
+
 # selectHPVs you're interested in
-# cols = ["GroundContact"]
 column_names = [
     "Name",
     "LoadLimit",
@@ -339,91 +365,49 @@ column_names = [
     "Efficiency",
     "Weight",
 ]  # copied from
-filter_col = 3
-filter_value = 1
 col = column_names[filter_col]
 param_df = allHPV_param_df.loc[(allHPV_param_df[col] == filter_value)]
-# comment out if you want all
-# param_df = allHPV_param_df.loc[(allHPV_param_df['Drive']==0).all(1)] # comment out if you want all
 
-# model options
+
+
+
+
 model = 1  # 1 is walking, 2 is cycling 3 is lankford
-
-## Options
-load_res = 30  #  0 = min load, 1 = max load, >1 = linear space between min and max
-slope_res = (
-    30  #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
-)
-slope_start = 0  # slope min
-slope_end = 10  # slope max
-
-# param_df = allHPV_param_df.iloc[:]
-surf_plot_index = 1
-
-
 mv = model_variables()
 mo = model_options()
+met = MET_values()
 
-#### variables (changeable)
-s_deg = 0  # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
-m1 = 83  # mass of rider/person
-P_t = 75  # power output of person (steady state average)
-F_max = 300  # maximum force exertion for pushing up a hill for a short amount of time
-L = 1  # leg length
-minimumViableLoad = 15  # in kg, the minimum useful load for such a trip
-t_hours = 8  # number of hours to gather water
-L = 1  # leg length
-A = 1  # cross sectional area
-C_d = 1  # constant for wind
-ro = 1
-eta = 0.8
-
-# def run_model(s_deg=0, m1=83):
 
 #### constants
 g = 9.81
 pi = 3.1416
 n_hpv = param_df.Pilot.size
 
-# Metabolic Equivalent of Task
-MET_of_sustainable_excercise = (
-    6  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
-)
-MET_VO2_conversion = 3.5  # milliliters per minute per kilogram body mass
-MET_watt_conversion = 1.162  # watts per kg body mass
-# so 75 Watts output (from Marks textbook) is probably equivalent to about 6 METs
-MET_budget_VO2 = (
-    MET_VO2_conversion * MET_of_sustainable_excercise * mv.m1
-)  # vo2 budget for a person
-MET_budget_watts = (
-    MET_watt_conversion * MET_of_sustainable_excercise * mv.m1
-)  # vo2 budget for a person
-
 
 slope_plot = 1
 
-#### data accounting ####
 
+#### data accounting ####
 # create load vector
 load_limit = np.array(param_df.LoadLimit).reshape((n_hpv, 1))
-m_HPV_only = np.array(param_df.Weight).reshape(
-    (n_hpv, 1)
-)  # assume 5% of load is the wight of HPV
+# m_HPV_only = np.array(param_df.Weight).reshape(
+    # (n_hpv, 1)
+# )  # assume 5% of load is the wight of HPV
 
 # name list
 HPV_names = param_df["Name"].tolist()
 
 # create slope vector
-slope_vector_deg = linspace_creator(np.array([slope_end]), slope_start, slope_res)
+slope_vector_deg = linspace_creator(np.array([mo.slope_end]), mo.slope_start, mo.slope_res)
 slope_vector_deg = slope_vector_deg.reshape(1, slope_vector_deg.size)
 
 # initilise and createoutput 3d matrices (dims: 0 = HPV, 1 = Slope, 2 = load)
 
 # uses load resolution as a flag, so converts it to "load scenarios", as load_res = 0
-if load_res <= 1:
+if mo.load_res <= 1:
     n_load_scenes = 1
 else:
-    n_load_scenes = load_res  # number of load scenarios
+    n_load_scenes = mo.load_res  # number of load scenarios
 
 ## initialise matrices
 v_load_matrix3d = np.zeros((n_hpv, slope_vector_deg.size, n_load_scenes))
@@ -437,21 +421,20 @@ slope_matrix3drads = (slope_matrix3d_deg / 360) * (2 * pi)
 ####### SPROTT MODEL ########
 if model == 1:
     v_load_matrix3d, load_matrix3d = sprott_model(
-        param_df, slope_vector_deg, F_max, g, load_res, mv.m1
+        param_df, slope_vector_deg, mv, mo
     )
 
 ####### CYCLING (MARTIN ET AL.) MODEL ########
 elif model == 2:
     v_load_matrix3d, load_matrix3d = bike_model(
-        param_df, slope_vector_deg, F_max, g, load_res
+        param_df, slope_vector_deg, mv, mo
     )
 
 ####### LANKFORD MODEL ########
 elif model == 3:
     v_load_matrix3d, load_matrix3d = lankford_model(
-        param_df, slope_vector_deg, F_max, g, load_res, mv.m1, MET_budget_watts
+        param_df, slope_vector_deg, mv.F_max, mv.g, mo.load_res, mv.m1, met.budget_watts
     )
-
 
 #### Velocities
 v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv, 1))[
@@ -465,7 +448,7 @@ v_avg_matrix3d = (v_load_matrix3d + v_no_load) / 2
 velocitykgs = v_avg_matrix3d * load_matrix3d
 
 #### Distance
-t_secs = t_hours * 60 * 60
+t_secs = mv.t_hours * 60 * 60
 distance_achievable = (v_avg_matrix3d * t_secs) / 1000  # kms
 distance_achievable_one_hr = (v_avg_matrix3d * 60 * 60) / 1000  # kms
 
@@ -489,7 +472,7 @@ df = pd.DataFrame(
         * load_matrix3d[:, slope_scene, load_scene],
         "Water ration * Km": distance_achievable_one_hr[:, slope_scene, load_scene]
         * load_matrix3d[:, slope_scene, load_scene]
-        / minimumViableLoad,
+        / mv.minimumViableLoad,
         "Distance to Water Achievable": distance_achievable_one_hr[
             :, slope_scene, load_scene
         ]
