@@ -13,6 +13,7 @@ import chart_studio.plotly as py
 from dotenv import load_dotenv, find_dotenv
 import os
 
+
 def linspace_creator(max_value_array, min_value, res):
     # creates a linsapce numpy array from the given inputs
     # max_value needs to be a numpy array (even if it is a 1x1)
@@ -56,6 +57,7 @@ def linspace_creator(max_value_array, min_value, res):
 
     return load_matrix
 
+
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
     max_load_HPV = LoadCapacity
 
@@ -74,6 +76,7 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
             max_load_HPV = max_pushable_weight - m_HPV_only
 
     return max_load_HPV
+
 
 def walkmodel(param_df, s, m1, P_t, F_max, L, minimumViableLoad, m_HPV_only, res, g):
 
@@ -135,6 +138,7 @@ def walkmodel(param_df, s, m1, P_t, F_max, L, minimumViableLoad, m_HPV_only, res
 
     return v_load, load_matrix
 
+
 def bike_power_solution(p, *data):
     ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
     v_solve = p[0]
@@ -143,6 +147,7 @@ def bike_power_solution(p, *data):
         + v_solve * m_t * g * Crr
         + v_solve * m_t * g * s
     ) / eta - P_t
+
 
 def bike_model(param_df, slope_vector_deg, F_max, g, load_res):
     HPV_names = param_df["Name"].tolist()
@@ -180,9 +185,10 @@ def bike_model(param_df, slope_vector_deg, F_max, g, load_res):
             j += 1
         i += 1
 
-    return v_load_matrix3d , load_matrix3d
+    return v_load_matrix3d, load_matrix3d
 
-def sprott_model(param_df, slope_vector_deg, F_max, g, load_res,m1):
+
+def sprott_model(param_df, slope_vector_deg, F_max, g, load_res, m1):
 
     # define extra vars
     pi = np.pi
@@ -192,14 +198,26 @@ def sprott_model(param_df, slope_vector_deg, F_max, g, load_res,m1):
     for slope in slope_vector_deg.reshape(slope_vector_deg.size, 1):
         s = (slope / 360) * (2 * pi)
         v_load, load_matrix = walkmodel(
-            param_df, s, mv.m1, P_t, F_max, L, minimumViableLoad, m_HPV_only, load_res
-        ,g)
+            param_df,
+            s,
+            mv.m1,
+            P_t,
+            F_max,
+            L,
+            minimumViableLoad,
+            m_HPV_only,
+            load_res,
+            g,
+        )
         v_load_matrix3d[:, i, :] = v_load.reshape(n_hpv, load_res)
         load_matrix3d[:, i, :] = load_matrix.reshape(n_hpv, load_res)
         i += 1
-    return v_load_matrix3d , load_matrix3d
+    return v_load_matrix3d, load_matrix3d
 
-def lankford_model(param_df, slope_vector_deg, F_max, g, load_res,m1,MET_budget_watts):
+
+def lankford_model(
+    param_df, slope_vector_deg, F_max, g, load_res, m1, MET_budget_watts
+):
 
     i = 0
     for hpv_name in HPV_names:
@@ -228,7 +246,8 @@ def lankford_model(param_df, slope_vector_deg, F_max, g, load_res,m1,MET_budget_
             j += 1
         i += 1
 
-    return v_load_matrix3d , load_matrix3d
+    return v_load_matrix3d, load_matrix3d
+
 
 def LCDA_solution(p, *data):
     m_load, metabolic_budget_watts, s = data
@@ -240,6 +259,7 @@ def LCDA_solution(p, *data):
         + 0.24 * v_solve**4
         + 0.34 * (1 - 1.05 ** (1 - 1.1 ** (G + 32)))
     ) * m_load - metabolic_budget_watts
+
 
 def Lankford_solution(p, *data):
     metabolic_budget, s = data
@@ -276,18 +296,16 @@ class model_variables:
         self.g = 9.81
 
 
-
-
 class model_options:
     def __init__(self):
         # model options
         self.model_selection = 1  # 1 is sprott, 2 is cycling 3 is lankford
-        
+
         #  0 = min load, 1 = max load, >1 = linear space between min and max
-        self.load_res = 30  
+        self.load_res = 30
         #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
-        self.slope_res = 30  
-        
+        self.slope_res = 30
+
         # slope start and end
         self.slope_start = 0  # slope min degrees
         self.slope_end = 10  # slope max degrees
@@ -310,13 +328,21 @@ with open("../data/mobility-model-parameters.csv") as csv_file:
 
 # selectHPVs you're interested in
 # cols = ["GroundContact"]
-column_names = ['Name', 'LoadLimit', 'AverageSpeedWithoutLoad', 'Drive',
-       'GroundContact', 'Pilot', 'Crr', 'Efficiency', 'Weight'] #copied from 
+column_names = [
+    "Name",
+    "LoadLimit",
+    "AverageSpeedWithoutLoad",
+    "Drive",
+    "GroundContact",
+    "Pilot",
+    "Crr",
+    "Efficiency",
+    "Weight",
+]  # copied from
 filter_col = 3
 filter_value = 1
 col = column_names[filter_col]
-param_df = allHPV_param_df.loc[
-    (allHPV_param_df[col] == filter_value)]
+param_df = allHPV_param_df.loc[(allHPV_param_df[col] == filter_value)]
 # comment out if you want all
 # param_df = allHPV_param_df.loc[(allHPV_param_df['Drive']==0).all(1)] # comment out if you want all
 
@@ -397,7 +423,7 @@ slope_vector_deg = slope_vector_deg.reshape(1, slope_vector_deg.size)
 if load_res <= 1:
     n_load_scenes = 1
 else:
-    n_load_scenes = load_res # number of load scenarios
+    n_load_scenes = load_res  # number of load scenarios
 
 ## initialise matrices
 v_load_matrix3d = np.zeros((n_hpv, slope_vector_deg.size, n_load_scenes))
@@ -410,17 +436,21 @@ slope_matrix3drads = (slope_matrix3d_deg / 360) * (2 * pi)
 
 ####### SPROTT MODEL ########
 if model == 1:
-     v_load_matrix3d , load_matrix3d = sprott_model(param_df, slope_vector_deg, F_max, g, load_res,mv.m1)
+    v_load_matrix3d, load_matrix3d = sprott_model(
+        param_df, slope_vector_deg, F_max, g, load_res, mv.m1
+    )
 
 ####### CYCLING (MARTIN ET AL.) MODEL ########
 elif model == 2:
-    v_load_matrix3d , load_matrix3d =  bike_model(param_df, slope_vector_deg, F_max, g, load_res)
+    v_load_matrix3d, load_matrix3d = bike_model(
+        param_df, slope_vector_deg, F_max, g, load_res
+    )
 
 ####### LANKFORD MODEL ########
 elif model == 3:
-    v_load_matrix3d , load_matrix3d =  lankford_model(param_df, slope_vector_deg, F_max, g, load_res,mv.m1,MET_budget_watts)
-
-
+    v_load_matrix3d, load_matrix3d = lankford_model(
+        param_df, slope_vector_deg, F_max, g, load_res, mv.m1, MET_budget_watts
+    )
 
 
 #### Velocities
@@ -448,7 +478,7 @@ Ps = Ps / np.array(param_df.Efficiency).reshape((n_hpv, 1))[:, np.newaxis, np.ne
 # Pw = 1/2.*C*D.*v_load.^2./n
 
 load_scene = 1
-slope_scene= 1
+slope_scene = 1
 
 df = pd.DataFrame(
     {
