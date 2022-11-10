@@ -8,7 +8,6 @@ import dash_bootstrap_components as dbc  # pip install dash-bootstrap-components
 
 # Declare server for Heroku deployment. Needed for Procfile.
 
-
 """
 Next steps:
 Generate single csv for inpout?
@@ -51,6 +50,8 @@ def risk_creator(input_df):
 
     df["road_risk"] = 1 - df.loc[:, "RoadQuality"] / 7
 
+    df["distance_risk"] = df.loc[:, "Km"]
+
     return df
 
 def weight_parameter(series, slider_weight):
@@ -70,24 +71,22 @@ Start main function
 # find dataframe
 PATH = pathlib.Path(__file__).parent
 DATA_PATH = PATH.joinpath("../data").resolve()
-df = pd.read_csv(DATA_PATH.joinpath('country_data_master.csv'), index_col="alpha3")
+df_input = pd.read_csv(DATA_PATH.joinpath('country_data_master.csv'), index_col="alpha3")
 #do stuff with dataframe
-df = risk_creator(df)
+df = risk_creator(df_input)
 df_table = df[['Entity', 'Population', 'PBO', 'Terrain Ruggedness',
        'Urban %', 'Urban Agg %', 'RoadQuality', 'Km','Risk',]]
 ignore_columns_index = 3
-
-
 
 # Build your components
 app = Dash(__name__, external_stylesheets=[dbc.themes.LUX])
 server = app.server # for heroku deployment
 
-
 mytitle = dcc.Markdown(children="")
 mysubtitle = dcc.Markdown(children="")
 choro = dcc.Graph(figure={})
 bar = dcc.Graph(figure={})
+bubble = dcc.Graph(figure={})
 dropdown = dcc.Dropdown(
     options=df.columns.values[2:],
     value="Risk",  # initial value displayed when page first loads
@@ -211,6 +210,7 @@ app.layout = dbc.Container(
         dbc.Row([dbc.Col([dropdown], width=6)], justify="center"),
         html.Hr(),
     
+    dbc.Row([dbc.Col([bubble], width=12)], justify="center"),    
     dbc.Row([dbc.Col([bar], width=12)], justify="center"),    
     dbc.Row([dbc.Col([table], width=12)], justify="center"),    
     
@@ -222,6 +222,7 @@ app.layout = dbc.Container(
 @app.callback(
     Output(choro, "figure"),
     Output(bar, "figure"),
+    Output(bubble, "figure"),
     Output(table, "data"),
     Output(mytitle, "children"),
     Output(mysubtitle, "children"),
@@ -236,32 +237,34 @@ app.layout = dbc.Container(
 def update_graph(
     column_name, scaling1, scaling2, scaling3, scaling4, scaling5, scaling6
 ):  # function arguments come from the component property of the Input
-    ignore_columns_num = 9
+    # ignore_columns_num = 9
+
     dff = (
         df.copy()
     )  # create copy of dataframe to apply weightings to before creating the risk matrix
     slider_weights = [scaling1, scaling2, scaling3, scaling4, scaling5, scaling6]
+    slider_cols = ['PBO', 'Terrain Ruggedness', 'Urban %', 'Urban Agg %', 'RoadQuality', 'Km' ]
+    risk_cols = ['PBO_risk','TRI_risk', 'urb_risk', 'urbagg_risk', 'road_risk',"distance_risk"]
 
     # check hardcoding here, this is the number of factors that are summed in to the risk matrix
-    for param_index in range(0, 6):
+    for id, col in enumerate(slider_cols):
         series = weight_parameter(
-            df.iloc[:, param_index + ignore_columns_num], slider_weights[param_index]
+            df[risk_cols[id]], slider_weights[id]
         )
-        dff.iloc[:, param_index + ignore_columns_num] = series
+        dff[risk_cols[id]] = series
 
     dff = dff[dff[column_name].notnull()]
     ### Sum all of the weighted risk values in to the 'Risk' column of the dataframe
     ###  !!!! Why is there a +1 required here? I can't work it out.
-    dff["Risk"] = dff.iloc[
-        :, ignore_columns_num : ignore_columns_num + param_index + 1
-    ].sum(axis="columns", skipna=False)
+    dff["Risk"] = dff[risk_cols].sum(axis="columns", skipna=False)
 
     ### Normalise for a percentage risk,
+
     dff["Risk"] = dff["Risk"] / max(dff["Risk"].dropna()) * 100
 
     nancount = dff["Risk"].isnull().sum()
     mysubtitle = (
-        f"there are {len(df.index)-nancount} countries from a total of {len(df.index)}"
+        f"Displaying {len(df.index)-nancount} countries from a total of {len(df.index)} based on data availability"
     )
 
     # https://plotly.com/python/choropleth-maps/
@@ -285,9 +288,16 @@ def update_graph(
     )
     fig2.update_layout(uniformtext_minsize=14, uniformtext_mode='show')
 
+
+    fig3 = px.scatter(dff[graph_filter].sort_values(by=column_name, ascending = False), x="Entity", y=column_name,
+                size="Population",
+                    hover_name="Entity", log_y=True, size_max=60)
+
+
     return (
         fig1,
         fig2,
+        fig3,
         dff.round(decimals=1).sort_values(by=column_name, ascending = False).to_dict('records'),
         "# " + column_name,
         mysubtitle,
