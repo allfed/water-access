@@ -14,6 +14,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 
 
+
 def linspace_creator(max_value_array, min_value, res):
 
     """
@@ -146,6 +147,25 @@ def sprott_solution(param_df, s, mv, mo):
 
     return v_load, load_matrix
 
+def sprott_model(param_df, mv, mo,mr):
+
+    # define extra vars
+    pi = np.pi
+    # n_hpv = n_hpv = param_df.Pilot.size
+
+    i = 0
+    for slope in mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1):
+        s = (slope / 360) * (2 * pi)
+        v_load, load_matrix = sprott_solution(
+            param_df,
+            s,
+            mv, 
+            mo
+        )
+        mr.v_load_matrix3d[:, i, :] = v_load.reshape(hpv.n_hpv, mo.load_res)
+        mr.load_matrix3d[:, i, :] = load_matrix.reshape(hpv.n_hpv, mo.load_res)
+        i += 1
+    return mr.v_load_matrix3d, mr.load_matrix3d
 
 def bike_power_solution(p, *data):
     ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
@@ -156,44 +176,40 @@ def bike_power_solution(p, *data):
         + v_solve * m_t * g * s
     ) / eta - P_t
 
-
-def bike_model(param_df, slope_vector_deg, mv, mo):
-    HPV_names = param_df["Name"].tolist()
-    n_hpv = param_df.Pilot.size
-    m_HPV_only = np.array(param_df.Weight).reshape((n_hpv, 1))
-    load_limit = np.array(param_df.LoadLimit).reshape((n_hpv, 1))
+def bike_model(param_df, mr, mv, mo, hpv):
+    # HPV_names = param_df["Name"].tolist()
+    # n_hpv = param_df.Pilot.size
+    # m_HPV_only = np.array(param_df.Weight).reshape((n_hpv, 1))
+    # load_limit = np.array(param_df.LoadLimit).reshape((n_hpv, 1))
 
     i = 0
-    for hpv_name in HPV_names:
+    for hpv_name in hpv.HPV_names:
         j = 0
-        Crr = np.array(param_df.Crr).reshape((n_hpv, 1))[i]
-
-        for slope in slope_vector_deg.reshape(slope_vector_deg.size, 1):
+        for slope in mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1):
             s = (slope / 360) * (2 * pi)  # determine slope in radians
             max_load_HPV = max_safe_load(
-                m_HPV_only[i], load_limit[i], mv.F_max, s, mv.g
+                hpv.m_HPV_only[i], hpv.load_limit[i], mv.F_max, s, mv.g
             )  # find maximum pushing load
-            if max_load_HPV > load_limit[i]:
-                max_load_HPV = load_limit[
+            if max_load_HPV > hpv.load_limit[i]:
+                max_load_HPV = hpv.load_limit[
                     i
                 ]  # see if load of HPV or load of pushing is the limitng factor.
             load_vector = linspace_creator(
                 max_load_HPV, mv.minimumViableLoad, mo.load_res
-            ).reshape((load_res, 1))
-            m_t = np.array(load_vector + mv.m1 + m_HPV_only[i])
+            ).reshape((mo.load_res, 1))
+            m_t = np.array(load_vector + mv.m1 + hpv.m_HPV_only[i])
             k = 0
             for total_load in m_t:
-                data = (mv.ro, mv.C_d, mv.A, m_t[k], Crr, mv.eta, mv.P_t, mv.g, s)
+                data = (mv.ro, mv.C_d, mv.A, m_t[k], hpv.Crr, mv.eta, mv.P_t, mv.g, s)
                 V_guess = 1
                 V_r = fsolve(bike_power_solution, V_guess, args=data)
-                v_load_matrix3d[i, j, k] = V_r[0]
-                load_matrix3d[i, j, k] = load_vector[k]
+                mr.v_load_matrix3d[i, j, k] = V_r[0]
+                mr.load_matrix3d[i, j, k] = load_vector[k]
                 k += 1
             j += 1
         i += 1
 
-    return v_load_matrix3d, load_matrix3d
-
+    return mr.v_load_matrix3d, mr.load_matrix3d
 
 def sprott_model(param_df, slope_vector_deg, mv, mo):
 
@@ -204,40 +220,44 @@ def sprott_model(param_df, slope_vector_deg, mv, mo):
     i = 0
     for slope in slope_vector_deg.reshape(slope_vector_deg.size, 1):
         s = (slope / 360) * (2 * pi)
-        v_load, load_matrix = sprott_solution(param_df, s, mv, mo)
+        v_load, load_matrix = sprott_solution(
+            param_df,
+            s,
+            mv, 
+            mo
+        )
         v_load_matrix3d[:, i, :] = v_load.reshape(n_hpv, mo.load_res)
         load_matrix3d[:, i, :] = load_matrix.reshape(n_hpv, mo.load_res)
         i += 1
     return v_load_matrix3d, load_matrix3d
-
 
 def lankford_model(
     param_df, slope_vector_deg, F_max, g, load_res, m1, MET_budget_watts
 ):
 
     i = 0
-    for hpv_name in HPV_names:
+    for name in hpv.name:
         j = 0
-        for slope in slope_vector_deg.reshape(slope_vector_deg.size, 1):
+        for slope in mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1):
             s = (slope / 360) * (2 * pi)  # determine slope in radians
             max_load_HPV = max_safe_load(
-                m_HPV_only[i], load_limit[i], F_max, s, g
+                hpv.m_HPV_only[i], hpv.load_limit[i], mv.F_max, s, mv.g
             )  # find maximum pushing load
-            if max_load_HPV > load_limit[i]:
-                max_load_HPV = load_limit[
+            if max_load_HPV > hpv.load_limit[i]:
+                max_load_HPV = hpv.load_limit[
                     i
                 ]  # see if load of HPV or load of pushing is the limitng factor.
             load_vector = linspace_creator(
-                max_load_HPV, minimumViableLoad, load_res
-            ).reshape((load_res, 1))
-            m_t = np.array(load_vector + mv.m1 + m_HPV_only[i])
+                max_load_HPV, mv.minimumViableLoad, mo.load_res
+            ).reshape((mo.load_res, 1))
+            m_t = np.array(load_vector + mv.m1 + hpv.m_HPV_only[i])
             k = 0
             for total_load in m_t:
-                data = (m_t[k], MET_budget_watts, s)
+                data = (m_t[k], met.budget_watts, s)
                 V_guess = 1
                 V_r = fsolve(LCDA_solution, V_guess, args=data)
-                v_load_matrix3d[i, j, k] = V_r[0]
-                load_matrix3d[i, j, k] = load_vector[k]
+                mr.v_load_matrix3d[i, j, k] = V_r[0]
+                mr.load_matrix3d[i, j, k] = load_vector[k]
                 k += 1
             j += 1
         i += 1
@@ -273,7 +293,6 @@ def Lankford_solution(p, *data):
         - metabolic_budget
     )
 
-
 class model_variables:
     def __init__(self):
         #### variables (changeable)
@@ -294,6 +313,7 @@ class model_variables:
 
 class model_options:
     def __init__(self):
+
         # model options
         self.model_selection = 1  # 1 is sprott, 2 is cycling 3 is lankford
 
@@ -305,7 +325,6 @@ class model_options:
         # slope start and end
         self.slope_start = 0  # slope min degrees
         self.slope_end = 10  # slope max degrees
-
 
 class MET_values:
     def __init__(self):
@@ -325,27 +344,19 @@ class MET_values:
 
 
 class model_results:
-    def __init__(self):
-        pass
-
+    def __init__(self,hpv,mo):
+        self.hpv_name = hpv.name,
 
 class HPV_variables:
-    def __init__(self, hpv_param_df, mv):
-        self.n_hpv = hpv_param_df.Pilot.size  # number of HPVs
+    def __init__(self,hpv_param_df,mv):
+        self.n_hpv = (    hpv_param_df.Pilot.size )  # number of HPVs 
         self.m_HPV_only = np.array(hpv_param_df.Weight).reshape((self.n_hpv, 1))
         self.n = np.array(hpv_param_df.Efficiency).reshape((self.n_hpv, 1))
         self.Crr = np.array(hpv_param_df.Crr).reshape((self.n_hpv, 1))
-        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
-            (self.n_hpv, 1)
-        )
+        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape((self.n_hpv, 1))
         self.load_limit = np.array(hpv_param_df.LoadLimit).reshape((self.n_hpv, 1))
-        self.load_capacity = self.load_limit - mv.m1 * np.array(
-            hpv_param_df.Pilot
-        ).reshape((self.n_hpv, 1))
-        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
-            (n_hpv, 1)
-        )[:, np.newaxis, :]
-
+        self.load_capacity = self.load_limit - mv.m1 * np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))
+        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape((n_hpv, 1))[:, np.newaxis, :] 
 
 ## Plotly creds
 load_dotenv(find_dotenv())
@@ -384,6 +395,9 @@ col = column_names[filter_col]
 param_df = allHPV_param_df.loc[(allHPV_param_df[col] == filter_value)]
 
 
+
+
+
 model = 1  # 1 is walking, 2 is cycling 3 is lankford
 mv = model_variables()
 mo = model_options()
@@ -403,435 +417,437 @@ slope_plot = 1
 # create load vector
 load_limit = np.array(param_df.LoadLimit).reshape((n_hpv, 1))
 # m_HPV_only = np.array(param_df.Weight).reshape(
-# (n_hpv, 1)
+    # (n_hpv, 1)
 # )  # assume 5% of load is the wight of HPV
 
 # name list
 HPV_names = param_df["Name"].tolist()
 
 # create slope vector
-slope_vector_deg = linspace_creator(
-    np.array([mo.slope_end]), mo.slope_start, mo.slope_res
-)
+slope_vector_deg = linspace_creator(np.array([mo.slope_end]), mo.slope_start, mo.slope_res)
 slope_vector_deg = slope_vector_deg.reshape(1, slope_vector_deg.size)
 
-# initilise and createoutput 3d matrices (dims: 0 = HPV, 1 = Slope, 2 = load)
+        # initilise and createoutput 3d matrices (dims: 0 = HPV, 1 = Slope, 2 = load)
+        # uses load resolution as a flag, so converts it to "load scenarios", as load_res = 0
 
-# uses load resolution as a flag, so converts it to "load scenarios", as load_res = 0
-if mo.load_res <= 1:
-    n_load_scenes = 1
-else:
-    n_load_scenes = mo.load_res  # number of load scenarios
-
-## initialise matrices
-v_load_matrix3d = np.zeros((n_hpv, slope_vector_deg.size, n_load_scenes))
-load_matrix3d = np.zeros((n_hpv, slope_vector_deg.size, n_load_scenes))
-slope_matrix3d_deg = np.repeat(slope_vector_deg, n_hpv, axis=0)
-slope_matrix3d_deg = np.repeat(
-    slope_matrix3d_deg[:, :, np.newaxis], n_load_scenes, axis=2
-)
-slope_matrix3drads = (slope_matrix3d_deg / 360) * (2 * pi)
+        ## initialise matrices
+        self.v_load_matrix3d = np.zeros((hpv.n_hpv, self.slope_vector_deg.size, mo.n_load_scenes))
+        self.load_matrix3d = np.zeros((hpv.n_hpv, self.slope_vector_deg.size, mo.n_load_scenes))
+        self.slope_matrix3d_deg = np.repeat(self.slope_vector_deg, hpv.n_hpv, axis=0)
+        self.slope_matrix3d_deg = np.repeat(
+            self.slope_matrix3d_deg[:, :, np.newaxis], mo.n_load_scenes, axis=2
+        )
+        self.slope_matrix3drads = (self.slope_matrix3d_deg / 360) * (2 * 3.1416)
 
 ####### SPROTT MODEL ########
 if model == 1:
-    v_load_matrix3d, load_matrix3d = sprott_model(param_df, slope_vector_deg, mv, mo)
+    v_load_matrix3d, load_matrix3d = sprott_model(
+        param_df, slope_vector_deg, mv, mo
+    )
 
 ####### CYCLING (MARTIN ET AL.) MODEL ########
 elif model == 2:
-    v_load_matrix3d, load_matrix3d = bike_model(param_df, slope_vector_deg, mv, mo)
-
-####### LANKFORD MODEL ########
-elif model == 3:
-    v_load_matrix3d, load_matrix3d = lankford_model(
-        param_df, slope_vector_deg, mv.F_max, mv.g, mo.load_res, mv.m1, met.budget_watts
+    v_load_matrix3d, load_matrix3d = bike_model(
+        param_df, slope_vector_deg, mv, mo
     )
 
-#### Velocities
-v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv, 1))[
-    :, np.newaxis, :
-]  # unloaded speed from csv file
-# calcualte average speed, half of the trip is loaded, and half is unloaded
-v_avg_matrix3d = (v_load_matrix3d + v_no_load) / 2
-# average velocity for a round trip
 
-# calculation of velocity kgs
-velocitykgs = v_avg_matrix3d * load_matrix3d
+    def load_results(self,hpv,mv,mo):
 
-#### Distance
-t_secs = mv.t_hours * 60 * 60
-distance_achievable = (v_avg_matrix3d * t_secs) / 1000  # kms
-distance_achievable_one_hr = (v_avg_matrix3d * 60 * 60) / 1000  # kms
+        self.model_name = mo.model_name
 
-## Power
-total_load = load_matrix3d + mv.m1  # estimate for now withot HV weight
-Ps = v_load_matrix3d * total_load * g * np.sin(np.arctan(slope_matrix3drads))
-Ps = Ps / np.array(param_df.Efficiency).reshape((n_hpv, 1))[:, np.newaxis, np.newaxis]
-### NEED to FIX POWER below.
-# Pr = v_avg_matrix3d*total_load*g*cos(atan(slope_matrix3d)).*np.array(param_df.Crr)[:,np.newaxis,np.newaxis]/np.array(param_df.Efficiency)[:,np.newaxis,np.newaxis]
-# Pw = 1/2.*C*D.*v_load.^2./n
+        ## Calculate average speed 
+        # ### CAUTION! this currently uses a hardcoded 'average speed' which is from lit serach, not form the model
+        # # Thismight be appropriate, as the model currentl assumes downhill to the water, uphill away, so it is conservative.
+        # # average velocity for a round trip
+        self.v_avg_matrix3d = (self.v_load_matrix3d + hpv.v_no_load) / 2
 
-load_scene = 1
-slope_scene = 1
+        self.velocitykgs = self.v_avg_matrix3d * self.load_matrix3d
 
-df = pd.DataFrame(
-    {
-        "Name": HPV_names,
-        "Load": load_matrix3d[:, slope_scene, load_scene],
-        "Average Trip Velocity": v_avg_matrix3d[:, slope_scene, load_scene],
-        "Litres * Km": distance_achievable_one_hr[:, slope_scene, load_scene]
-        * load_matrix3d[:, slope_scene, load_scene],
-        "Water ration * Km": distance_achievable_one_hr[:, slope_scene, load_scene]
-        * load_matrix3d[:, slope_scene, load_scene]
-        / mv.minimumViableLoad,
-        "Distance to Water Achievable": distance_achievable_one_hr[
-            :, slope_scene, load_scene
-        ]
-        / 2,
-        "Total Round trip Distance Achievable": distance_achievable_one_hr[
-            :, slope_scene, load_scene
-        ],
-        "Load Velocity [kg * m/s]": v_avg_matrix3d[:, slope_scene, load_scene]
-        * load_matrix3d[:, slope_scene, load_scene],
-        "Loaded Velocity": v_load_matrix3d[:, slope_scene, load_scene],
-        "Unloaded Velocity": param_df["AverageSpeedWithoutLoad"],
-    }
+        # #### Distance
+        self.t_secs = mv.t_hours * 60 * 60
+        self.distance_achievable = (self.v_avg_matrix3d * self.t_secs) / 1000  # kms
+        self.distance_achievable_one_hr = (self.v_avg_matrix3d * 60 * 60) / 1000  # kms
+        
+        # power
+        self.total_load = self.load_matrix3d + (mv.m1*hpv.Pilot + hpv.m_HPV_only)  # total weight when loaded
+        # self.Ps = self.v_load_matrix3d * self.total_load * mv.g * np.sin(np.arctan(self.slope_matrix3drads))
+        # self.Ps = self.Ps / hpv.n[:, np.newaxis, np.newaxis]
+
+
+"""
+Plotting Class
+"""
+
+class plotting_hpv:
+
+    def slope_plot(mr,mo,hpv):
+        i = 0
+
+        #   # Slope Graph Sensitivity
+        fig, ax = plt.subplots(figsize=(20, 10))
+        for HPVname in param_df.Name:
+            y = (
+                mr.v_avg_matrix3d[i, :, 0] * mr.load_matrix3d[i, :, 0]
+            )  # SEE ZEROS <-- this is for the minimum weight
+            x = mr.slope_vector_deg.reshape((y.shape))  # reshape to same size
+            (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
+            i += 1
+        plt.xlabel("Slope [deg ˚]")
+        plt.ylabel("Velocity Kgs [m/s]")
+        plt.title(
+            "Velocity Kgs as a function of Slope with Load = {}kg".format(
+                mr.load_matrix3d[0, 0, 0]
+            )
+        )
+        plt.legend()
+
+        plt.plot()
+        plt.show()
+
+    def load_plot(mr,mo,hpv):
+        i = 0
+
+        #   # Slope Graph Sensitivity
+        fig, ax = plt.subplots(figsize=(20, 10))
+        for HPVname in hpv.name:
+            y = (
+                mr.v_avg_matrix3d[i, 0, :] * mr.load_matrix3d[i, 0, :]
+            )  # SEE ZEROS <-- this is for the minimum weight
+            x = mr.load_matrix3d[i, 0, :]
+            (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
+            i += 1
+        plt.xlabel("Load [kg]")
+        plt.ylabel("Velocity Kilograms [kg][m/s]")
+        plt.title(
+            "Velocity Kgs as a function of Load with {}˚ Slope".format(
+                mr.slope_vector_deg[0, 0]
+            )
+        )
+        plt.legend()
+        plt.plot()
+        plt.show()
+
+    def surf_plot(mr,mo,hpv):
+        
+        
+        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        # Make data.
+        Z = mr.distance_achievable[mo.surf_plot_index, :, :]
+        X = mr.load_matrix3d[mo.surf_plot_index, :, :]
+        Y = mr.slope_matrix3d_deg[mo.surf_plot_index, :, :]
+
+        # Plot the surface.
+        surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+
+        # Customize the z axis.
+        ax.zaxis.set_major_locator(LinearLocator(10))
+        # A StrMethodFormatter is used automatically
+        ax.zaxis.set_major_formatter("{x:.02f}")
+
+        ax.set_xlabel("Load [kg]")
+        ax.set_ylabel("Slope [deg ˚]")
+        ax.set_zlabel("Velocity [m/s]")
+        plt.title("Slope, Load & Distance for: " + mr.hpv_name[0][mo.surf_plot_index][0][0])
+
+        plt.show()
+
+    def surf_plotly(mr,mo,hpv):
+        mo.surf_plot_index = 0
+
+        # # Make data.
+        Z = mr.distance_achievable[mo.surf_plot_index, :, :]
+        X = mr.load_matrix3d[mo.surf_plot_index, :, :]
+        Y = mr.slope_matrix3d_deg[mo.surf_plot_index, :, :]
+
+        # using the graph options from plotly, create 3d plot.
+        fig = go.Figure(data=[go.Surface(z=Z, x=X, y=Y)])
+        fig.update_layout(
+            title="Slope, Load & Distance for: " + mr.hpv_name[0][mo.surf_plot_index][0][0],
+            autosize=True,
+            width=500,
+            height=500,
+            margin=dict(l=65, r=50, b=65, t=90),
+        )
+        fig.show()
+
+    def surf_plotly_multi(mr,mo,hpv):
+
+        plot_height = 700
+        plot_width = 900
+        xaxis_title = "Load [kg]"
+        yaxis_title = "Slope [˚]"
+        zaxis_title = "Distannce [km]"
+        # create list for plot specs based on number of hpvs
+        specs_list = []
+        spec_single = [{"type": "surface"}]
+        for HPVname in mr.hpv_name:
+            specs_list.append(spec_single)
+
+        # create figure and subplots
+        fig = make_subplots(
+            rows=mr.n_hpv, cols=1, specs=specs_list, subplot_titles=mr.hpv_name
+        )  # name the subplots the HPV names (create a new list of strings if you'd like to rename)
+
+        # in a for loop, create the subplots
+        mo.surf_plot_index = 0
+        for HPVname in mr.hpv_name:
+            Z = mr.distance_achievable[mo.surf_plot_index, :, :]
+            X = mr.load_matrix3d[mo.surf_plot_index, :, :]
+            Y = mr.slope_matrix3d_deg[mo.surf_plot_index, :, :]
+
+            fig.add_trace(
+                go.Surface(z=Z, x=X, y=Y, colorscale="Viridis", showscale=False),
+                row=1 + mo.surf_plot_index,
+                col=1,
+            )
+
+            fig.update_scenes(
+                xaxis_title_text=xaxis_title,
+                yaxis_title_text=yaxis_title,
+                zaxis_title_text=zaxis_title,
+            )
+
+            mo.surf_plot_index += 1
+
+        # update the layout and create a title for whole thing
+        fig.update_layout(
+            title_text="3D subplots of HPVs", height=plot_height * mr.n_hpv, width=plot_width
+        )
+
+        fig.show()
+
+        # show the figure
+        py.iplot(fig, filename="3D subplots of HPVs New")
+
+    def load_plot_plotly(mr,mo,hpv):
+
+        xaxis_title = "Load [kg]"
+        yaxis_title = "Kms"
+        slope_scene = 0
+
+        slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
+        chart_title = "Km/hour with different loads, Constant %0.1f slope, model %s" % (
+            slope_name,
+            mr.model_name,
+        )
+
+        i = 0
+
+        fig = go.Figure()
+        for HPVname in mr.hpv_name[0].transpose()[0][0]:
+            y = mr.distance_achievable_one_hr[
+                i, mo.slope_scene, :
+            ]  # SEE ZEROS <-- this is for the minimum weight
+            x = mr.load_matrix3d[i, slope_scene, :]
+            i += 1
+            fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
+
+        # Update the title
+        fig.update_layout(title=dict(text=chart_title))
+        # Update te axis label (valid for 2d graphs using graph object)
+        fig.update_xaxes(title_text=xaxis_title)
+        fig.update_yaxes(title_text=yaxis_title)
+        # fig.update_yaxes(range = [2,5.5])
+
+        fig.show()
+        # py.iplot(fig, filename=chart_title)
+
+    def slope_plot_plotly(mr,mo,hpv):
+
+        load_scene = -1
+
+        xaxis_title = "Slope [˚]"
+        yaxis_title = "Kms"
+        load_name = mr.load_matrix3d.flat[load_scene]
+        chart_title = (
+            "Km/hour with different slope, Constant %0.1f kg load, model %s"
+            % (load_name, mr.model_name)
+        )
+        i = 0
+
+        fig = go.Figure()
+        for HPVname in mr.hpv_name[0].transpose()[0][0]:
+            y = mr.distance_achievable_one_hr[
+                i, :, mo.load_scene
+            ]  # SEE ZEROS <-- this is for the minimum weight
+            x = mr.slope_matrix3d_deg[i, :, load_scene]
+            i += 1
+            fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
+
+        # Update the title
+        fig.update_layout(title=dict(text=chart_title))
+        # Update te axis label (valid for 2d graphs using graph object)
+        fig.update_xaxes(title_text=xaxis_title)
+        fig.update_yaxes(title_text=yaxis_title)
+        fig.update_yaxes(range=[0, 15])
+
+        fig.show()
+        # py.iplot(fig, filename=chart_title)
+
+    def time_sensitivity_plotly_grouped(mr,mo,hpv):
+        t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        load_scene = -1
+
+        # plotly setup
+        fig = go.Figure()
+        i = 0
+        # add trace for eat
+        for HPVname in mr.hpv_name[0].transpose()[0][0]:
+            # print(col)
+            X = t_hours_list
+            Y = mr.load_matrix3d[i, 0, load_scene] * (
+                mr.distance_achievable_one_hr[i, 0, load_scene] * np.array(t_hours_list)
+            )
+            fig.add_trace(go.Bar(x=X, y=Y, name=HPVname))
+            i += 1
+
+        fig.update_layout(
+            title=dict(
+                text="Distance Achievable Per HPV given different time to collect water"
+            )
+        )
+        fig.update_layout(barmode="group")
+        fig.show()
+
+    def bar_plot_loading(mr,mo,hpv):
+        t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+        slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
+        chart_title = "Efficiency at %0.2f degrees" % slope_name
+
+        df = mr.create_dataframe_single_scenario(hpv,mo.load_scene,mo.slope_scene)
+
+        fig = px.bar(
+            df,
+            x="Load",
+            y="Load Velocity [kg * m/s]",
+            hover_data=[
+                "Name",
+                "Average Trip Velocity",
+                "Loaded Velocity",
+                "Unloaded Velocity",
+                "Load",
+            ],
+            color="Name",
+            labels={"Name": "Name"},
+            title=chart_title,
+        )
+        fig.show()
+        py.iplot(fig, filename=chart_title)
+
+    def bar_plot_loading_distance(mr,mo,hpv):
+        load_scene = -1
+        slope_scene = 0
+        slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
+        chart_title = "Efficiency at %0.2f degrees, with model %s" % (slope_name, mr.model_name)
+
+        df = mr.create_dataframe_single_scenario(hpv,mo.load_scene,mo.slope_scene)
+
+        fig = px.bar(
+            df,
+            x="Load",
+            y="Litres * Km",
+            hover_data=[
+                "Name",
+                "Average Trip Velocity",
+                "Loaded Velocity",
+                "Unloaded Velocity",
+                "Distance to Water Achievable",
+                "Total Round trip Distance Achievable",
+                "Load",
+            ],
+            color="Name",
+            labels={"Name": "Name"},
+            title=chart_title,
+        )
+        fig.show()
+        py.iplot(fig, filename=chart_title)
+
+
+## Plotly creds
+load_dotenv(find_dotenv())
+chart_studio.tools.set_credentials_file(
+    username=os.environ.get("USERNAME"), api_key=os.environ.get("API_KEY")
 )
 
-if slope_plot == 1:
-    i = 0
+######################
+#### Import Data #####
+with open("../data/mobility-model-parameters.csv") as csv_file:
+    # read the csv file
+    allHPV_param_df = pd.read_csv("../data/mobility-model-parameters.csv")
 
-    #   # Slope Graph Sensitivity
-    fig, ax = plt.subplots(figsize=(20, 10))
-    for HPVname in param_df.Name:
-        y = (
-            v_avg_matrix3d[i, :, 0] * load_matrix3d[i, :, 0]
-        )  # SEE ZEROS <-- this is for the minimum weight
-        x = slope_vector_deg.reshape((y.shape))  # reshape to same size
-        (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
-        i += 1
-    plt.xlabel("Slope [deg ˚]")
-    plt.ylabel("Velocity Kgs [m/s]")
-    plt.title(
-        "Velocity Kgs as a function of Slope with Load = {}kg".format(
-            load_matrix3d[0, 0, 0]
-        )
-    )
-    plt.legend()
+####################
+##### Options ######
+####################
 
-    plt.plot()
-    plt.show()
+filter_col = -1
+filter_value = 1
 
-elif load_plot == 1:
-    i = 0
+# selectHPVs you're interested in
 
-    #   # Slope Graph Sensitivity
-    fig, ax = plt.subplots(figsize=(20, 10))
-    for HPVname in HPV_names:
-        y = (
-            v_avg_matrix3d[i, 0, :] * load_matrix3d[i, 0, :]
-        )  # SEE ZEROS <-- this is for the minimum weight
-        x = load_matrix3d[i, 0, :]
-        (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
-        i += 1
-    plt.xlabel("Load [kg]")
-    plt.ylabel("Velocity Kilograms [kg][m/s]")
-    plt.title(
-        "Velocity Kgs as a function of Load with {}˚ Slope".format(
-            slope_vector_deg[0, 0]
-        )
-    )
-    plt.legend()
-    plt.plot()
-    plt.show()
+if filter_col > 0: 
+    column_names = [
+        "Name",
+        "LoadLimit",
+        "AverageSpeedWithoutLoad",
+        "Drive",
+        "GroundContact",
+        "Pilot",
+        "Crr",
+        "Efficiency",
+        "Weight",
+    ]  # copied from
+    col = column_names[filter_col]
+    param_df = allHPV_param_df.loc[(allHPV_param_df[col] == filter_value)]
+else:
+    param_df=allHPV_param_df
 
-elif surf_plot == 1:
-    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    # Make data.
-    Z = distance_achievable[surf_plot_index, :, :]
-    X = load_matrix3d[surf_plot_index, :, :]
-    Y = slope_matrix3d_deg[surf_plot_index, :, :]
 
-    # Plot the surface.
-    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
 
-    # Customize the z axis.
-    ax.zaxis.set_major_locator(LinearLocator(10))
-    # A StrMethodFormatter is used automatically
-    ax.zaxis.set_major_formatter("{x:.02f}")
+# initialise variables, options, MET, hpv and results classes, populated with data via 'init' functions
+mv = model_variables()
+mo = model_options()
+met = MET_values()
+hpv = HPV_variables(param_df,mv)
+mr = model_results(hpv,mo)
 
-    ax.set_xlabel("Load [kg]")
-    ax.set_ylabel("Slope [deg ˚]")
-    ax.set_zlabel("Velocity [m/s]")
-    plt.title("Slope, Load & Distance for: " + HPV_names[surf_plot_index])
+#### constants
+pi = 3.1416
 
-    plt.show()
+#### data accounting ####
 
-elif surf_plotly == 1:
 
-    # # Make data.
-    Z = distance_achievable[surf_plot_index, :, :]
-    X = load_matrix3d[surf_plot_index, :, :]
-    Y = slope_matrix3d_deg[surf_plot_index, :, :]
-
-    # using the graph options from plotly, create 3d plot.
-    fig = go.Figure(data=[go.Surface(z=Z, x=X, y=Y)])
-    fig.update_layout(
-        title="Slope, Load & Distance for: " + HPV_names[surf_plot_index],
-        autosize=True,
-        width=500,
-        height=500,
-        margin=dict(l=65, r=50, b=65, t=90),
-    )
-    fig.show()
-
-elif surf_plotly_multi == 1:
-
-    plot_height = 700
-    plot_width = 900
-    xaxis_title = "Load [kg]"
-    yaxis_title = "Slope [˚]"
-    zaxis_title = "Distannce [km]"
-    # create list for plot specs based on number of hpvs
-    specs_list = []
-    spec_single = [{"type": "surface"}]
-    for HPVname in HPV_names:
-        specs_list.append(spec_single)
-
-    # create figure and subplots
-    fig = make_subplots(
-        rows=n_hpv, cols=1, specs=specs_list, subplot_titles=HPV_names
-    )  # name the subplots the HPV names (create a new list of strings if you'd like to rename)
-
-    # in a for loop, create the subplots
-    surf_plot_index = 0
-    for HPVname in HPV_names:
-        Z = distance_achievable[surf_plot_index, :, :]
-        X = load_matrix3d[surf_plot_index, :, :]
-        Y = slope_matrix3d_deg[surf_plot_index, :, :]
-
-        fig.add_trace(
-            go.Surface(z=Z, x=X, y=Y, colorscale="Viridis", showscale=False),
-            row=1 + surf_plot_index,
-            col=1,
-        )
-
-        fig.update_scenes(
-            xaxis_title_text=xaxis_title,
-            yaxis_title_text=yaxis_title,
-            zaxis_title_text=zaxis_title,
-        )
-
-        surf_plot_index += 1
-
-    # update the layout and create a title for whole thing
-    fig.update_layout(
-        title_text="3D subplots of HPVs", height=plot_height * n_hpv, width=plot_width
+####### SPROTT MODEL ########
+if mo.model_selection == 1:
+    mr.v_load_matrix3d, mr.load_matrix3d = sprott_model(
+        param_df, mv, mo, mr
     )
 
-    fig.show()
-
-    # show the figure
-    py.iplot(fig, filename="3D subplots of HPVs New")
-
-elif load_plot_plotly == 1:
-
-    xaxis_title = "Load [kg]"
-    yaxis_title = "Kms"
-    slope_scene = 0
-
-    slope_name = slope_vector_deg.flat[slope_scene]
-    chart_title = "Km/hour with different loads, Constant %0.1f slope, model %0.1f" % (
-        slope_name,
-        model,
+####### CYCLING (MARTIN ET AL.) MODEL ########
+elif mo.model_selection == 2:
+    mr.v_load_matrix3d, mr.load_matrix3d = bike_model(
+        param_df, mr.slope_vector_deg, mv, mo
     )
 
-    i = 0
-
-    fig = go.Figure()
-    for HPVname in HPV_names:
-        y = distance_achievable_one_hr[
-            i, slope_scene, :
-        ]  # SEE ZEROS <-- this is for the minimum weight
-        x = load_matrix3d[i, slope_scene, :]
-        i += 1
-        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
-
-    # Update the title
-    fig.update_layout(title=dict(text=chart_title))
-    # Update te axis label (valid for 2d graphs using graph object)
-    fig.update_xaxes(title_text=xaxis_title)
-    fig.update_yaxes(title_text=yaxis_title)
-    # fig.update_yaxes(range = [2,5.5])
-
-    fig.show()
-    # py.iplot(fig, filename=chart_title)
-
-elif slope_plot_plotly == 1:
-
-    load_scene = -1
-
-    xaxis_title = "Slope [˚]"
-    yaxis_title = "Kms"
-    load_name = load_matrix3d.flat[load_scene]
-    chart_title = (
-        "Km/hour with different slope, Constant %0.1f kg load, model %0.1f"
-        % (load_name, model)
-    )
-    i = 0
-
-    fig = go.Figure()
-    for HPVname in HPV_names:
-        y = distance_achievable_one_hr[
-            i, :, load_scene
-        ]  # SEE ZEROS <-- this is for the minimum weight
-        x = slope_matrix3d_deg[i, :, load_scene]
-        i += 1
-        fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
-
-    # Update the title
-    fig.update_layout(title=dict(text=chart_title))
-    # Update te axis label (valid for 2d graphs using graph object)
-    fig.update_xaxes(title_text=xaxis_title)
-    fig.update_yaxes(title_text=yaxis_title)
-    fig.update_yaxes(range=[0, 15])
-
-    fig.show()
-    py.iplot(fig, filename=chart_title)
-
-
-elif time_sensitivity == 1:
-    t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    HPV_selector = 1  # 1 = bike
-    #   # Distance Sensitivity
-    X = []
-    Y = []
-    # fig = go.Figure()
-    for t_hours in t_hours_list:
-        t_secs = t_hours * 60 * 60
-        distance_achievable = (v_avg_matrix3d * t_secs) / 1000  # kms
-        y = distance_achievable[
-            HPV_selector, 0, 0
-        ]  # SEE ZEROS <-- this is for the minimum weight
-        x = t_hours
-        print(x)
-        print(X)
-        i += 1
-        X.append(x)
-        Y.append(y)
-    # fig.add_trace(go.Bar(x = X , y = Y, mode ='lines'))
-    fig = px.bar(x=X, y=Y, title="Wide-Form Input")
-    # fig.update_layout(title="Distance achievable, given time spent")
-    fig.show()
-
-elif time_sensitivity_plotly_grouped == 1:
-    t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    load_scene = -1
-
-    # plotly setup
-    fig = go.Figure()
-    i = 0
-    # add trace for eat
-    for HPVname in HPV_names:
-        # print(col)
-        X = t_hours_list
-        Y = load_matrix3d[i, 0, load_scene] * (
-            distance_achievable_one_hr[i, 0, load_scene] * np.array(t_hours_list)
-        )
-        fig.add_trace(go.Bar(x=X, y=Y, name=HPVname))
-        i += 1
-
-    fig.update_layout(
-        title=dict(
-            text="Distance Achievable Per HPV given different time to collect water"
-        )
-    )
-    fig.update_layout(barmode="group")
-    fig.show()
-
-elif bar_plot_loading == 1:
-    t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    load_scene = -1
-    slope_scene = -1
-    slope_name = slope_vector_deg.flat[slope_scene]
-    chart_title = "Efficiency at %0.2f degrees" % slope_name
-
-    df = pd.DataFrame(
-        {
-            "Name": HPV_names,
-            "Load": load_matrix3d[:, slope_scene, load_scene],
-            "Average Trip Velocity": v_avg_matrix3d[:, slope_scene, load_scene],
-            "Load Velocity [kg * m/s]": v_avg_matrix3d[:, slope_scene, load_scene]
-            * load_matrix3d[:, slope_scene, load_scene],
-            "Loaded Velocity": v_load_matrix3d[:, slope_scene, load_scene],
-            "Unloaded Velocity": param_df["AverageSpeedWithoutLoad"],
-        }
+####### LANKFORD MODEL ########
+elif mo.model_selection == 3:
+    mr.v_load_matrix3d, mr.load_matrix3d = lankford_model(
+        param_df, mr.slope_vector_deg, mv.F_max, mv.g, mo.load_res, mv.m1, met.budget_watts
     )
 
-    fig = px.bar(
-        df,
-        x="Load",
-        y="Load Velocity [kg * m/s]",
-        hover_data=[
-            "Name",
-            "Average Trip Velocity",
-            "Loaded Velocity",
-            "Unloaded Velocity",
-            "Load",
-        ],
-        color="Name",
-        labels={"Name": "Name"},
-        title=chart_title,
-    )
-    fig.show()
-    py.iplot(fig, filename=chart_title)
 
+mr.load_results(hpv,mv,mo)
 
-elif bar_plot_loading_distance == 1:
-    load_scene = -1
-    slope_scene = 0
-    slope_name = slope_vector_deg.flat[slope_scene]
-    chart_title = "Efficiency at %0.2f degrees, with model %d" % (slope_name, model)
+### Plotting ####
+# plotting_hpv.surf_plot(mr,mo,hpv)
+# plotting_hpv.slope_plot(mr,mo,hpv)
+# plotting_hpv.bar_plot_loading_distance(mr,mo,hpv)
+# plotting_hpv.bar_plot_loading(mr,mo,hpv)
 
-    df = pd.DataFrame(
-        {
-            "Name": HPV_names,
-            "Load": load_matrix3d[:, slope_scene, load_scene],
-            "Average Trip Velocity": v_avg_matrix3d[:, slope_scene, load_scene],
-            "Litres * Km": distance_achievable_one_hr[:, slope_scene, load_scene]
-            * load_matrix3d[:, slope_scene, load_scene],
-            "Water ration * Km": distance_achievable_one_hr[:, slope_scene, load_scene]
-            * load_matrix3d[:, slope_scene, load_scene]
-            / minimumViableLoad,
-            "Distance to Water Achievable": distance_achievable_one_hr[
-                :, slope_scene, load_scene
-            ]
-            / 2,
-            "Total Round trip Distance Achievable": distance_achievable_one_hr[
-                :, slope_scene, load_scene
-            ],
-            "Load Velocity [kg * m/s]": v_avg_matrix3d[:, slope_scene, load_scene]
-            * load_matrix3d[:, slope_scene, load_scene],
-            "Loaded Velocity": v_load_matrix3d[:, slope_scene, load_scene],
-            "Unloaded Velocity": param_df["AverageSpeedWithoutLoad"],
-        }
-    )
-
-    fig = px.bar(
-        df,
-        x="Load",
-        y="Litres * Km",
-        hover_data=[
-            "Name",
-            "Average Trip Velocity",
-            "Loaded Velocity",
-            "Unloaded Velocity",
-            "Distance to Water Achievable",
-            "Total Round trip Distance Achievable",
-            "Load",
-        ],
-        color="Name",
-        labels={"Name": "Name"},
-        title=chart_title,
-    )
-    fig.show()
-    py.iplot(fig, filename=chart_title)
+# df = mr.create_dataframe_single_scenario(hpv,0,0)
+plotting_hpv.bar_plot_loading(mr,mo,hpv)
+plotting_hpv.load_plot(mr,mo,hpv)
+plotting_hpv.load_plot_plotly(mr,mo,hpv)
+plotting_hpv.slope_plot_plotly(mr,mo,hpv)
+plotting_hpv.time_sensitivity_plotly_grouped(mr,mo,hpv)
