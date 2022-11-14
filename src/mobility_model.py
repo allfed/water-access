@@ -16,26 +16,27 @@ import os
 
 def linspace_creator(max_value_array, min_value, res):
 
-    """
-    creates a linsapce numpy array from the given inputs
-    max_value needs to be a numpy array (even if it is a 1x1)
-    min value is to be an int or float
-    resolution to be an int
-    returns
-    res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
-    """
-    if res == 1:  # if res =1 , calculate for max load of HPV
-        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
-        load_matrix = max_value_array
-    elif (
-        res == 0
-    ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
-        load_matrix = (
-            np.zeros((len(max_value_array), 1)) + min_value
-        )  # initilaise numpy matrix
-        load_matrix = load_matrix
-    elif res > 1:
-        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
+        """
+        creates a linsapce numpy array from the given inputs
+        max_value needs to be a numpy array (even if it is a 1x1)
+        min value is to be an int or float
+        resolution to be an int
+        returns
+        res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
+        Output is an N1 * N2 matrix where N1 = the number of hpvs and N2 = the resolution.
+        """
+        if res == 1:  # if res =1 , calculate for max load of HPV
+            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
+            load_matrix = max_value_array
+        elif (
+            res == 0
+        ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
+            load_matrix = (
+                np.zeros((len(max_value_array), 1)) + min_value
+            )  # initilaise numpy matrix
+            load_matrix = load_matrix
+        elif res > 1:
+            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
 
         #### Create linear space of weights
         # creates a vector for each of the HPVs, an equal number of elements spaced
@@ -62,10 +63,12 @@ def linspace_creator(max_value_array, min_value, res):
 
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
     max_load_HPV = LoadCapacity
-
+    """
     #### Weight limits
+    Takes in the mass of the HPV (array), the load capacity of the HPV (array), max force that a person can push up a hill, the slope, and gravity
     # Calculate weight limits for hills. There are some heavy loads which humans will not be able to push up certain hills
     # Note that this is for average slopes etc. This will be innacurate (i.e one VERY hilly section could render the whole thing impossible, this isn't accounted for here)
+    """
     if s != 0:  # requires check to avoid divide by zero
         max_pushable_weight = F_max / (np.sin(s) * g)
         i = 0
@@ -81,6 +84,34 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
 
 class mobility_models:
+
+    def sprott_model(hpv, mv, mo, mr):
+        """
+        takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity
+        """
+
+        # define extra vars
+        pi = np.pi
+
+        ## loop over all of the different slopes. Dimensions for results: 0 = HPV, 1 = slope, 2 = load
+        i = 0
+        for slope in mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1):
+            s = (slope / 360) * (2 * pi)
+            v_load, load_matrix = mobility_models.sprott_solution(hpv, s, mv, mo)
+            mr.v_load_matrix3d[:, i, :] = v_load.reshape(hpv.n_hpv, mo.load_res)
+            mr.load_matrix3d[:, i, :] = load_matrix.reshape(hpv.n_hpv, mo.load_res)
+            i += 1
+        return mr.v_load_matrix3d, mr.load_matrix3d
+
+    def bike_power_solution(p, *data):
+        ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
+        v_solve = p[0]
+        return (
+            1 / 2 * ro * v_solve**3 * C_d * A
+            + v_solve * m_t * g * Crr
+            + v_solve * m_t * g * s
+        ) / eta - P_t
+
     def sprott_solution(hpv, s, mv, mo):
         """
         takes in the HPV dataframe, the slope, the model variables, and model options
@@ -91,26 +122,14 @@ class mobility_models:
         #### constants
         pi = np.pi
 
-        # m_HPV_only = np.array(param_df.Weight).reshape((n_hpv, 1))
-        # n = np.array(param_df.Efficiency).reshape((n_hpv, 1))
-        # Crr = np.array(param_df.Crr).reshape((n_hpv, 1))
-        # v_no_load = np.array(param_df.AverageSpeedWithoutLoad).reshape((n_hpv, 1))
-        # load_limit = np.array(param_df.LoadLimit).reshape((n_hpv, 1))
-        # load_capacity = load_limit - mv.m1 * np.array(param_df.Pilot).reshape((n_hpv, 1))
-
         max_safe_load_HPV = max_safe_load(
             hpv.m_HPV_only, hpv.load_capacity, mv.F_max, s, mv.g
         )
-
-        # print("max safe load below")
-        # print(max_safe_load_HPV)
-        print("load cap. below")
-        print(hpv.load_capacity)
-
         # function to calaculate the max saffe loads due to hill
         max_load_HPV = np.minimum(
-            hpv.load_capacity, max_safe_load_HPV.reshape((hpv.n_hpv, 1))
+            hpv.load_capacity, max_safe_load_HPV.reshape(hpv.load_capacity.shape)
         )
+
         load_matrix = linspace_creator(max_load_HPV, mv.minimumViableLoad, mo.load_res)
 
         #### Derivations of further mass variables
@@ -158,7 +177,78 @@ class mobility_models:
 
         return v_load, load_matrix
 
-    def sprott_model(hpv, mv, mo, mr):
+
+    def sprott_solution2(hpv, s, k,mv, mo):
+        """
+        takes in the HPV dataframe, the slope, the model variables, and model options
+        returns the velocity of walking based on the energetics of walking model outlined by Sprott
+        https://sprott.physics.wisc.edu/technote/Walkrun.htm
+
+        """
+        #### constants
+        pi = np.pi
+
+        max_safe_load_HPV = max_safe_load(
+            hpv.m_HPV_only, hpv.load_capacity, mv.F_max, s, mv.g
+        )
+
+        # function to calaculate the max saffe loads due to hill
+        max_load_HPV = np.minimum(
+            hpv.load_capacity, max_safe_load_HPV.reshape(hpv.load_capacity.shape)
+        )
+
+        print(f"For the slope of {s} ")
+        print(max_load_HPV)
+        load_matrix = linspace_creator(max_load_HPV, mv.minimumViableLoad, mo.load_res)
+
+        # print(load_matrix)
+
+        #### Derivations of further mass variables
+        m_HPV_pilot = np.array(
+            mv.m1 * hpv.Pilot + hpv.m_HPV_only.reshape((hpv.Pilot.shape))
+        ).reshape(
+            (hpv.n_hpv, 1)
+        )  # create vector with extra weights to add
+        m_HPV_load_pilot = (
+            load_matrix + m_HPV_pilot
+        )  # weight of the HPV plus the rider (if any) plus the load
+        m_walk_carry = (
+            mv.m1
+            + m_HPV_load_pilot
+            * (np.array(hpv.GroundContact).reshape((hpv.n_hpv, 1)) - 1)
+            * -1
+        )  # negative 1 is to make the wheeled = 0 and the walking = 1
+        # m_HPV_load = load_matrix + np.array(m_HPV_only).reshape((n_hpv, 1))
+        # weight of the mass being 'walked', i.e the wieght of the human plus anything they are carrying (not pushing or riding)
+
+        #### Constants from polynomial equation analysis
+        C = ((m_walk_carry) * mv.g / pi) * (3 * mv.g * mv.L / 2) ** (
+            1 / 2
+        )  # component of walking
+        D = pi**2 / (6 * mv.g * mv.L)  # leg component?
+
+        B1 = (
+            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]
+        )  # rolling resistance component
+        B2 = m_HPV_load_pilot * np.sin(np.arctan(s))  # slope component
+        B = B1 + B2
+
+        ##### velocities
+        v_load = (-B + np.sqrt(B**2 + (2 * C * D * mv.P_t) / hpv.n[:, 0, :])) / (
+            C * D / hpv.n[:, 0, :]
+        )
+        # loaded velocity
+
+        # if loaded speed is greater than unloaded avg speed, make equal to avg unloaded speed
+        i = 0
+        for maxval in hpv.v_no_load[:, 0, :]:
+            indeces = v_load[i] > maxval
+            v_load[i, indeces] = maxval
+            i += 1
+
+        return v_load, load_matrix
+
+    def sprott_model2(hpv, mv, mo, mr):
         """
         takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity
         """
@@ -167,13 +257,15 @@ class mobility_models:
         pi = np.pi
 
         ## loop over all of the different slopes. Dimensions for results: 0 = HPV, 1 = slope, 2 = load
-        i = 0
-        for slope in mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1):
+        for i, slope in enumerate(mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1)):
             s = (slope / 360) * (2 * pi)
-            v_load, load_matrix = mobility_models.sprott_solution(hpv, s, mv, mo)
-            mr.v_load_matrix3d[:, i, :] = v_load.reshape(hpv.n_hpv, mo.load_res)
-            mr.load_matrix3d[:, i, :] = load_matrix.reshape(hpv.n_hpv, mo.load_res)
-            i += 1
+
+            for k, load in enumerate(mr.load_vector.reshape(mr.slope_vector_deg.size, 1)):
+
+                v_load, load_matrix = mobility_models.sprott_solution2(hpv, s,load, mv, mo)
+                mr.v_load_matrix3d[:, i, k] = v_load.reshape(hpv.n_hpv, mo.load_res)
+                mr.load_matrix3d[:, i, k] = load_matrix.reshape(hpv.n_hpv, mo.load_res)
+
         return mr.v_load_matrix3d, mr.load_matrix3d
 
     def bike_power_solution(p, *data):
@@ -303,7 +395,6 @@ class HPV_variables:
     reshapes the incoming dataframe in to the appropriate dimensions for doing numpy maths
     """
 
-    # @property
     def __init__(self, hpv_param_df, mv):
         self.n_hpv = hpv_param_df.Pilot.size  # number of HPVs
         self.name = np.array(hpv_param_df.Name).reshape((self.n_hpv, 1))[
@@ -322,20 +413,25 @@ class HPV_variables:
         self.load_limit = np.array(hpv_param_df.LoadLimit).reshape((self.n_hpv, 1))[
             :, np.newaxis, :
         ]
-        self.load_capacity = (
-            self.load_limit
-            - mv.m1
-            * np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[:, np.newaxis, :]
-        )
+
+        self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[
+            :, np.newaxis, :]
+
+
+        self.PilotLoad = mv.m1* self.Pilot
+
         self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
             (self.n_hpv, 1)
         )[:, np.newaxis, :]
-        self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[
-            :, np.newaxis, :
-        ]
+        
         self.GroundContact = np.array(hpv_param_df.GroundContact).reshape(
             (self.n_hpv, 1)
         )[:, np.newaxis, :]
+
+    @property
+    def load_capacity(self):
+        return             self.load_limit - self.PilotLoad
+
 
 
 class model_variables:
@@ -363,9 +459,9 @@ class model_options:
         self.model_selection = 1  # 1 is sprott, 2 is cycling 3 is lankford
 
         #  0 = min load, 1 = max load, >1 = linear space between min and max
-        self.load_res = 10
+        self.load_res = 15
         #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
-        self.slope_res = 4
+        self.slope_res = 15
 
         # slope start and end
         self.slope_start = 0  # slope min degrees
@@ -376,7 +472,7 @@ class model_options:
             0  # 0 is flat ground, -1 will be the steepest hill (slope_end)
         )
         self.load_scene = (
-            -1
+            0
         )  # 0 is probably 15kg, -1 will be max that the HPV can manage
         self.surf_plot_index = 0  # this one counts the HPVs (as you can only plot one per surf usually, so 0 is the first HPV in the list, -1 will be the last in the list)
 
@@ -648,7 +744,7 @@ class plotting_hpv:
         fig.show()
 
         # show the figure
-        py.iplot(fig, filename="3D subplots of HPVs New")
+        # py.iplot(fig, filename="3D subplots of HPVs New")
 
     def load_plot_plotly(mr, mo, hpv):
 
@@ -694,7 +790,7 @@ class plotting_hpv:
 
         fig = go.Figure()
         for HPVname in mr.hpv_name[0].transpose()[0][0]:
-            y = mr.distance_achievable_one_hr[
+            y = mr.velocitykgs[
                 i, :, mo.load_scene
             ]  # SEE ZEROS <-- this is for the minimum weight
             x = mr.slope_matrix3d_deg[i, :, mo.load_scene]
@@ -706,7 +802,7 @@ class plotting_hpv:
         # Update te axis label (valid for 2d graphs using graph object)
         fig.update_xaxes(title_text=xaxis_title)
         fig.update_yaxes(title_text=yaxis_title)
-        fig.update_yaxes(range=[0, 15])
+        # fig.update_yaxes(range=[0, 15])
 
         fig.show()
         # py.iplot(fig, filename=chart_title)
@@ -759,7 +855,7 @@ class plotting_hpv:
             title=chart_title,
         )
         fig.show()
-        py.iplot(fig, filename=chart_title)
+        # py.iplot(fig, filename=chart_title)
 
     def bar_plot_loading_distance(mr, mo, hpv):
 
@@ -789,7 +885,7 @@ class plotting_hpv:
             title=chart_title,
         )
         fig.show()
-        py.iplot(fig, filename=chart_title)
+        # py.iplot(fig, filename=chart_title)
 
 
 ## Plotly creds
