@@ -36,7 +36,9 @@ def linspace_creator(max_value_array, min_value, res):
         )  # initilaise numpy matrix
         load_matrix = load_matrix
     elif res > 1:
-        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
+        load_matrix = np.zeros(
+            (len(max_value_array), res)
+        )  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
 
     #### Create linear space of weights
     # creates a vector for each of the HPVs, an equal number of elements spaced
@@ -84,7 +86,6 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
 
 class mobility_models:
-
     def sprott_model(hpv, mv, mo, mr):
         """
         takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity
@@ -177,8 +178,7 @@ class mobility_models:
 
         return v_load, load_matrix
 
-
-    def sprott_solution2(hpv, s, k,mv, mo):
+    def sprott_solution2(hpv, s, k, mv, mo):
         """
         takes in the HPV dataframe, the slope, the model variables, and model options
         returns the velocity of walking based on the energetics of walking model outlined by Sprott
@@ -257,12 +257,18 @@ class mobility_models:
         pi = np.pi
 
         ## loop over all of the different slopes. Dimensions for results: 0 = HPV, 1 = slope, 2 = load
-        for i, slope in enumerate(mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1)):
+        for i, slope in enumerate(
+            mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1)
+        ):
             s = (slope / 360) * (2 * pi)
 
-            for k, load in enumerate(mr.load_vector.reshape(mr.slope_vector_deg.size, 1)):
+            for k, load in enumerate(
+                mr.load_vector.reshape(mr.slope_vector_deg.size, 1)
+            ):
 
-                v_load, load_matrix = mobility_models.sprott_solution2(hpv, s,load, mv, mo)
+                v_load, load_matrix = mobility_models.sprott_solution2(
+                    hpv, s, load, mv, mo
+                )
                 mr.v_load_matrix3d[:, i, k] = v_load.reshape(hpv.n_hpv, mo.load_res)
                 mr.load_matrix3d[:, i, k] = load_matrix.reshape(hpv.n_hpv, mo.load_res)
 
@@ -415,23 +421,22 @@ class HPV_variables:
         ]
 
         self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[
-            :, np.newaxis, :]
+            :, np.newaxis, :
+        ]
 
-
-        self.PilotLoad = mv.m1* self.Pilot
+        self.PilotLoad = mv.m1 * self.Pilot
 
         self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
             (self.n_hpv, 1)
         )[:, np.newaxis, :]
-        
+
         self.GroundContact = np.array(hpv_param_df.GroundContact).reshape(
             (self.n_hpv, 1)
         )[:, np.newaxis, :]
 
     @property
     def load_capacity(self):
-        return             self.load_limit - self.PilotLoad
-
+        return self.load_limit - self.PilotLoad
 
 
 class model_variables:
@@ -472,8 +477,8 @@ class model_options:
             0  # 0 is flat ground, -1 will be the steepest hill (slope_end)
         )
         self.load_scene = (
-            0
-        )  # 0 is probably 15kg, -1 will be max that the HPV can manage
+            0  # 0 is probably 15kg, -1 will be max that the HPV can manage
+        )
         self.surf_plot_index = 0  # this one counts the HPVs (as you can only plot one per surf usually, so 0 is the first HPV in the list, -1 will be the last in the list)
 
         # name the model
