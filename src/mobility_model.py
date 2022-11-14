@@ -16,48 +16,49 @@ import os
 
 def linspace_creator(max_value_array, min_value, res):
 
-        """
-        creates a linsapce numpy array from the given inputs
-        max_value needs to be a numpy array (even if it is a 1x1)
-        min value is to be an int or float
-        resolution to be an int
-        returns
-        res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
-        """
-        if res == 1:  # if res =1 , calculate for max load of HPV
-            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
-            load_matrix = max_value_array
-        elif (
-            res == 0
-        ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
-            load_matrix = (
-                np.zeros((len(max_value_array), 1)) + min_value
-            )  # initilaise numpy matrix
-            load_matrix = load_matrix
-        elif res > 1:
-            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
+    """
+    creates a linsapce numpy array from the given inputs
+    max_value needs to be a numpy array (even if it is a 1x1)
+    min value is to be an int or float
+    resolution to be an int
+    returns
+    res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
+    """
+    if res == 1:  # if res =1 , calculate for max load of HPV
+        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
+        load_matrix = max_value_array
+    elif (
+        res == 0
+    ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
+        load_matrix = (
+            np.zeros((len(max_value_array), 1)) + min_value
+        )  # initilaise numpy matrix
+        load_matrix = load_matrix
+    elif res > 1:
+        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
 
-            #### Create linear space of weights
-            # creates a vector for each of the HPVs, an equal number of elements spaced
-            # evenly between the minimum viable load and the maximum load for that HPV
-            i = 0  # initliase index
-            for maxval in np.nditer(max_value_array):  # iterate through numpy array
-                minval = min_value
-                load_vector = np.linspace(
-                    start=minval,  # define linear space of weights
-                    stop=maxval,  # define maximum value for linear space
-                    num=res,  # how many data points?
-                    endpoint=True,
-                    retstep=False,
-                    dtype=None,
-                )
-                load_matrix[i:] = load_vector  # place the vector in to a matrix
-                i += 1  # increment index
-        else:
-            print("Error: unexpected loading resolution, setting default")
-            load_matrix = max_value_array
+        #### Create linear space of weights
+        # creates a vector for each of the HPVs, an equal number of elements spaced
+        # evenly between the minimum viable load and the maximum load for that HPV
+        i = 0  # initliase index
+        for maxval in np.nditer(max_value_array):  # iterate through numpy array
+            minval = min_value
+            load_vector = np.linspace(
+                start=minval,  # define linear space of weights
+                stop=maxval,  # define maximum value for linear space
+                num=res,  # how many data points?
+                endpoint=True,
+                retstep=False,
+                dtype=None,
+            )
+            load_matrix[i:] = load_vector  # place the vector in to a matrix
+            i += 1  # increment index
+    else:
+        print("Error: unexpected loading resolution, setting default")
+        load_matrix = max_value_array
 
-        return load_matrix
+    return load_matrix
+
 
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
     max_load_HPV = LoadCapacity
@@ -80,7 +81,6 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
 
 class mobility_models:
-    
     def sprott_solution(hpv, s, mv, mo):
         """
         takes in the HPV dataframe, the slope, the model variables, and model options
@@ -90,8 +90,7 @@ class mobility_models:
         """
         #### constants
         pi = np.pi
-    
-        
+
         # m_HPV_only = np.array(param_df.Weight).reshape((n_hpv, 1))
         # n = np.array(param_df.Efficiency).reshape((n_hpv, 1))
         # Crr = np.array(param_df.Crr).reshape((n_hpv, 1))
@@ -101,15 +100,17 @@ class mobility_models:
 
         max_safe_load_HPV = max_safe_load(
             hpv.m_HPV_only, hpv.load_capacity, mv.F_max, s, mv.g
-        ) 
-        
+        )
+
         # print("max safe load below")
         # print(max_safe_load_HPV)
         print("load cap. below")
         print(hpv.load_capacity)
-        
-         # function to calaculate the max saffe loads due to hill
-        max_load_HPV = np.minimum(hpv.load_capacity, max_safe_load_HPV.reshape((hpv.n_hpv, 1)))
+
+        # function to calaculate the max saffe loads due to hill
+        max_load_HPV = np.minimum(
+            hpv.load_capacity, max_safe_load_HPV.reshape((hpv.n_hpv, 1))
+        )
         load_matrix = linspace_creator(max_load_HPV, mv.minimumViableLoad, mo.load_res)
 
         #### Derivations of further mass variables
@@ -131,35 +132,33 @@ class mobility_models:
         # weight of the mass being 'walked', i.e the wieght of the human plus anything they are carrying (not pushing or riding)
 
         #### Constants from polynomial equation analysis
-        C = ((m_walk_carry) * mv.g / pi) * (3 * mv.g * mv.L / 2) ** (1 / 2)  # component of walking
+        C = ((m_walk_carry) * mv.g / pi) * (3 * mv.g * mv.L / 2) ** (
+            1 / 2
+        )  # component of walking
         D = pi**2 / (6 * mv.g * mv.L)  # leg component?
-        
+
         B1 = (
-            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:,0,:]
+            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]
         )  # rolling resistance component
         B2 = m_HPV_load_pilot * np.sin(np.arctan(s))  # slope component
         B = B1 + B2
 
-
         ##### velocities
-        v_load = (-B + np.sqrt(B**2 + (2 * C * D * mv.P_t)  / hpv.n[:,0,:]))  / (C * D / hpv.n[:,0,:])
+        v_load = (-B + np.sqrt(B**2 + (2 * C * D * mv.P_t) / hpv.n[:, 0, :])) / (
+            C * D / hpv.n[:, 0, :]
+        )
         # loaded velocity
-
 
         # if loaded speed is greater than unloaded avg speed, make equal to avg unloaded speed
         i = 0
-        for maxval in hpv.v_no_load[:,0,:]:
+        for maxval in hpv.v_no_load[:, 0, :]:
             indeces = v_load[i] > maxval
             v_load[i, indeces] = maxval
             i += 1
 
         return v_load, load_matrix
 
-
-
-
-
-    def sprott_model(hpv, mv, mo,mr):
+    def sprott_model(hpv, mv, mo, mr):
         """
         takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity
         """
@@ -171,12 +170,7 @@ class mobility_models:
         i = 0
         for slope in mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1):
             s = (slope / 360) * (2 * pi)
-            v_load, load_matrix = mobility_models.sprott_solution(
-                hpv,
-                s,
-                mv, 
-                mo
-            )
+            v_load, load_matrix = mobility_models.sprott_solution(hpv, s, mv, mo)
             mr.v_load_matrix3d[:, i, :] = v_load.reshape(hpv.n_hpv, mo.load_res)
             mr.load_matrix3d[:, i, :] = load_matrix.reshape(hpv.n_hpv, mo.load_res)
             i += 1
@@ -215,21 +209,37 @@ class mobility_models:
                 m_t = np.array(load_vector + mv.m1 + hpv.m_HPV_only[i])
                 k = 0
                 for total_load in m_t:
-                    data = (mv.ro, mv.C_d, mv.A, m_t[k], hpv.Crr, mv.eta, mv.P_t, mv.g, s)
+                    data = (
+                        mv.ro,
+                        mv.C_d,
+                        mv.A,
+                        m_t[k],
+                        hpv.Crr,
+                        mv.eta,
+                        mv.P_t,
+                        mv.g,
+                        s,
+                    )
                     V_guess = 1
-                    V_r = fsolve(mobility_models.bike_power_solution, V_guess, args=data)
+                    V_r = fsolve(
+                        mobility_models.bike_power_solution, V_guess, args=data
+                    )
                     mr.v_load_matrix3d[i, j, k] = V_r[0]
                     mr.load_matrix3d[i, j, k] = load_vector[k]
                     k += 1
-                j += 1  
+                j += 1
             i += 1
 
         return mr.v_load_matrix3d, mr.load_matrix3d
 
     def lankford_model(
-        param_df, mr, mv, mo, hpv
+        param_df,
+        mr,
+        mv,
+        mo,
+        hpv
         # param_df, slope_vector_deg, F_max, g, load_res, m1, MET_budget_watts
-    ): 
+    ):
 
         i = 0
         for name in hpv.name:
@@ -292,20 +302,42 @@ class HPV_variables:
     """
     reshapes the incoming dataframe in to the appropriate dimensions for doing numpy maths
     """
+
     # @property
-    def __init__(self,hpv_param_df,mv):
-        self.n_hpv = (    hpv_param_df.Pilot.size )  # number of HPVs 
-        self.name = np.array(hpv_param_df.Name).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.m_HPV_only = np.array(hpv_param_df.Weight).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.n = np.array(hpv_param_df.Efficiency).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.Crr = np.array(hpv_param_df.Crr).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.load_limit = np.array(hpv_param_df.LoadLimit).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.load_capacity = self.load_limit - mv.m1 * np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-        self.GroundContact = np.array(hpv_param_df.GroundContact).reshape((self.n_hpv, 1))[:, np.newaxis, :] 
-    
+    def __init__(self, hpv_param_df, mv):
+        self.n_hpv = hpv_param_df.Pilot.size  # number of HPVs
+        self.name = np.array(hpv_param_df.Name).reshape((self.n_hpv, 1))[
+            :, np.newaxis, :
+        ]
+        self.m_HPV_only = np.array(hpv_param_df.Weight).reshape((self.n_hpv, 1))[
+            :, np.newaxis, :
+        ]
+        self.n = np.array(hpv_param_df.Efficiency).reshape((self.n_hpv, 1))[
+            :, np.newaxis, :
+        ]
+        self.Crr = np.array(hpv_param_df.Crr).reshape((self.n_hpv, 1))[:, np.newaxis, :]
+        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
+            (self.n_hpv, 1)
+        )[:, np.newaxis, :]
+        self.load_limit = np.array(hpv_param_df.LoadLimit).reshape((self.n_hpv, 1))[
+            :, np.newaxis, :
+        ]
+        self.load_capacity = (
+            self.load_limit
+            - mv.m1
+            * np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[:, np.newaxis, :]
+        )
+        self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
+            (self.n_hpv, 1)
+        )[:, np.newaxis, :]
+        self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[
+            :, np.newaxis, :
+        ]
+        self.GroundContact = np.array(hpv_param_df.GroundContact).reshape(
+            (self.n_hpv, 1)
+        )[:, np.newaxis, :]
+
+
 class model_variables:
     def __init__(self):
         #### variables (changeable)
@@ -323,6 +355,7 @@ class model_variables:
         self.eta = 0.8
         self.g = 9.81
 
+
 class model_options:
     def __init__(self):
 
@@ -339,24 +372,27 @@ class model_options:
         self.slope_end = 10  # slope max degrees
 
         # for plotting of single scenarios, likle on surf plots
-        self.slope_scene = 0 # 0 is flat ground, -1 will be the steepest hill (slope_end)
-        self.load_scene = -1  # 0 is probably 15kg, -1 will be max that the HPV can manage
-        self.surf_plot_index = 0 # this one counts the HPVs (as you can only plot one per surf usually, so 0 is the first HPV in the list, -1 will be the last in the list)
-
-
+        self.slope_scene = (
+            0  # 0 is flat ground, -1 will be the steepest hill (slope_end)
+        )
+        self.load_scene = (
+            -1
+        )  # 0 is probably 15kg, -1 will be max that the HPV can manage
+        self.surf_plot_index = 0  # this one counts the HPVs (as you can only plot one per surf usually, so 0 is the first HPV in the list, -1 will be the last in the list)
 
         # name the model
         if self.model_selection == 1:
             self.model_name = "Sprott"
-        elif self.model_selection ==2:
+        elif self.model_selection == 2:
             self.model_name = "Cycling"
-        elif self.model_selection ==3:
+        elif self.model_selection == 3:
             self.model_name = "Lankford"
 
         if self.load_res <= 1:
             self.n_load_scenes = 1
         else:
             self.n_load_scenes = self.load_res  # number of load scenarios
+
 
 class MET_values:
     def __init__(self):
@@ -374,44 +410,63 @@ class MET_values:
             self.MET_watt_conversion * self.MET_of_sustainable_excercise * mv.m1
         )  # vo2 budget for a person
 
+
 class model_results:
-    def __init__(self,hpv,mo):
-        self.hpv_name = hpv.name,
+    def __init__(self, hpv, mo):
+        self.hpv_name = (hpv.name,)
 
         # create slope vector
-        self.slope_vector_deg = linspace_creator(np.array([mo.slope_end]), mo.slope_start, mo.slope_res)
-        self.slope_vector_deg = self.slope_vector_deg.reshape(1, self.slope_vector_deg.size)
+        self.slope_vector_deg = linspace_creator(
+            np.array([mo.slope_end]), mo.slope_start, mo.slope_res
+        )
+        self.slope_vector_deg = self.slope_vector_deg.reshape(
+            1, self.slope_vector_deg.size
+        )
 
         # initilise and createoutput 3d matrices (dims: 0 = HPV, 1 = Slope, 2 = load)
         # uses load resolution as a flag, so converts it to "load scenarios", as load_res = 0
 
         ## initialise matrices
-        self.v_load_matrix3d = np.zeros((hpv.n_hpv, self.slope_vector_deg.size, mo.n_load_scenes))
-        self.load_matrix3d = np.zeros((hpv.n_hpv, self.slope_vector_deg.size, mo.n_load_scenes))
+        self.v_load_matrix3d = np.zeros(
+            (hpv.n_hpv, self.slope_vector_deg.size, mo.n_load_scenes)
+        )
+        self.load_matrix3d = np.zeros(
+            (hpv.n_hpv, self.slope_vector_deg.size, mo.n_load_scenes)
+        )
         self.slope_matrix3d_deg = np.repeat(self.slope_vector_deg, hpv.n_hpv, axis=0)
         self.slope_matrix3d_deg = np.repeat(
             self.slope_matrix3d_deg[:, :, np.newaxis], mo.n_load_scenes, axis=2
         )
         self.slope_matrix3drads = (self.slope_matrix3d_deg / 360) * (2 * 3.1416)
 
-    def create_dataframe_single_scenario(self,hpv,load_scene,slope_scene):
+    def create_dataframe_single_scenario(self, hpv, load_scene, slope_scene):
 
         df = pd.DataFrame(
             {
                 "Name": self.hpv_name[0].transpose()[0][0],
                 "Load": self.load_matrix3d[:, slope_scene, load_scene],
-                "Average Trip Velocity": self.v_avg_matrix3d[:, slope_scene, load_scene],
-                "Litres * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Average Trip Velocity": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ],
+                "Litres * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene],
-                "Water ration * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Water ration * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
-                / self.load_matrix3d[0][0][0], # <-- minimum load,
+                / self.load_matrix3d[0][0][0],  # <-- minimum load,
                 "Distance to Water Achievable": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene                ]/ 2,
+                    :, slope_scene, load_scene
+                ]
+                / 2,
                 "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ],
-                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[:, slope_scene, load_scene]
+                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene],
                 "Loaded Velocity": self.v_load_matrix3d[:, slope_scene, load_scene],
                 "Unloaded Velocity": hpv.v_no_load.transpose()[0][0],
@@ -419,12 +474,11 @@ class model_results:
         )
         return df
 
-
-    def load_results(self,hpv,mv,mo):
+    def load_results(self, hpv, mv, mo):
 
         self.model_name = mo.model_name
 
-        ## Calculate average speed 
+        ## Calculate average speed
         # ### CAUTION! this currently uses a hardcoded 'average speed' which is from lit serach, not form the model
         # # Thismight be appropriate, as the model currentl assumes downhill to the water, uphill away, so it is conservative.
         # # average velocity for a round trip
@@ -436,9 +490,11 @@ class model_results:
         self.t_secs = mv.t_hours * 60 * 60
         self.distance_achievable = (self.v_avg_matrix3d * self.t_secs) / 1000  # kms
         self.distance_achievable_one_hr = (self.v_avg_matrix3d * 60 * 60) / 1000  # kms
-        
+
         # power
-        self.total_load = self.load_matrix3d + (mv.m1*hpv.Pilot + hpv.m_HPV_only)  # total weight when loaded
+        self.total_load = self.load_matrix3d + (
+            mv.m1 * hpv.Pilot + hpv.m_HPV_only
+        )  # total weight when loaded
         # self.Ps = self.v_load_matrix3d * self.total_load * mv.g * np.sin(np.arctan(self.slope_matrix3drads))
         # self.Ps = self.Ps / hpv.n[:, np.newaxis, np.newaxis]
 
@@ -447,9 +503,9 @@ class model_results:
 Plotting Class
 """
 
-class plotting_hpv:
 
-    def slope_plot(mr,mo,hpv):
+class plotting_hpv:
+    def slope_plot(mr, mo, hpv):
         i = 0
 
         #   # Slope Graph Sensitivity
@@ -473,7 +529,7 @@ class plotting_hpv:
         plt.plot()
         plt.show()
 
-    def load_plot(mr,mo,hpv):
+    def load_plot(mr, mo, hpv):
         i = 0
 
         #   # Slope Graph Sensitivity
@@ -496,9 +552,8 @@ class plotting_hpv:
         plt.plot()
         plt.show()
 
-    def surf_plot(mr,mo,hpv):
-        
-        
+    def surf_plot(mr, mo, hpv):
+
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         # Make data.
         Z = mr.distance_achievable[mo.surf_plot_index, :, :]
@@ -506,7 +561,9 @@ class plotting_hpv:
         Y = mr.slope_matrix3d_deg[mo.surf_plot_index, :, :]
 
         # Plot the surface.
-        surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+        surf = ax.plot_surface(
+            X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False
+        )
 
         # Customize the z axis.
         ax.zaxis.set_major_locator(LinearLocator(10))
@@ -516,11 +573,13 @@ class plotting_hpv:
         ax.set_xlabel("Load [kg]")
         ax.set_ylabel("Slope [deg ˚]")
         ax.set_zlabel("Velocity [m/s]")
-        plt.title("Slope, Load & Distance for: " + mr.hpv_name[0][mo.surf_plot_index][0][0])
+        plt.title(
+            "Slope, Load & Distance for: " + mr.hpv_name[0][mo.surf_plot_index][0][0]
+        )
 
         plt.show()
 
-    def surf_plotly(mr,mo,hpv):
+    def surf_plotly(mr, mo, hpv):
         mo.surf_plot_index = 0
 
         # # Make data.
@@ -531,7 +590,8 @@ class plotting_hpv:
         # using the graph options from plotly, create 3d plot.
         fig = go.Figure(data=[go.Surface(z=Z, x=X, y=Y)])
         fig.update_layout(
-            title="Slope, Load & Distance for: " + mr.hpv_name[0][mo.surf_plot_index][0][0],
+            title="Slope, Load & Distance for: "
+            + mr.hpv_name[0][mo.surf_plot_index][0][0],
             autosize=True,
             width=500,
             height=500,
@@ -539,7 +599,7 @@ class plotting_hpv:
         )
         fig.show()
 
-    def surf_plotly_multi(mr,mo,hpv):
+    def surf_plotly_multi(mr, mo, hpv):
 
         plot_height = 700
         plot_width = 900
@@ -580,7 +640,9 @@ class plotting_hpv:
 
         # update the layout and create a title for whole thing
         fig.update_layout(
-            title_text="3D subplots of HPVs", height=plot_height * mr.n_hpv, width=plot_width
+            title_text="3D subplots of HPVs",
+            height=plot_height * mr.n_hpv,
+            width=plot_width,
         )
 
         fig.show()
@@ -588,7 +650,7 @@ class plotting_hpv:
         # show the figure
         py.iplot(fig, filename="3D subplots of HPVs New")
 
-    def load_plot_plotly(mr,mo,hpv):
+    def load_plot_plotly(mr, mo, hpv):
 
         xaxis_title = "Load [kg]"
         yaxis_title = "Kms/hour"
@@ -600,14 +662,11 @@ class plotting_hpv:
             mr.model_name,
         )
 
-
         i = 0
 
         fig = go.Figure()
         for HPVname in mr.hpv_name[0].transpose()[0][0]:
-            y = mr.distance_achievable_one_hr[
-                i, mo.slope_scene, :
-            ]  
+            y = mr.distance_achievable_one_hr[i, mo.slope_scene, :]
             x = mr.load_matrix3d[i, slope_scene, :]
             i += 1
             fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
@@ -622,7 +681,7 @@ class plotting_hpv:
         fig.show()
         # py.iplot(fig, filename=chart_title)
 
-    def slope_plot_plotly(mr,mo,hpv):
+    def slope_plot_plotly(mr, mo, hpv):
 
         xaxis_title = "Slope [˚]"
         yaxis_title = "Kms/Hour"
@@ -652,7 +711,7 @@ class plotting_hpv:
         fig.show()
         # py.iplot(fig, filename=chart_title)
 
-    def time_sensitivity_plotly_grouped(mr,mo,hpv):
+    def time_sensitivity_plotly_grouped(mr, mo, hpv):
         t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
         load_scene = -1
 
@@ -676,13 +735,13 @@ class plotting_hpv:
         fig.update_layout(barmode="group")
         fig.show()
 
-    def bar_plot_loading(mr,mo,hpv):
+    def bar_plot_loading(mr, mo, hpv):
         t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
         chart_title = "Efficiency at %0.2f degrees" % slope_name
 
-        df = mr.create_dataframe_single_scenario(hpv,mo.load_scene,mo.slope_scene)
+        df = mr.create_dataframe_single_scenario(hpv, mo.load_scene, mo.slope_scene)
 
         fig = px.bar(
             df,
@@ -702,13 +761,15 @@ class plotting_hpv:
         fig.show()
         py.iplot(fig, filename=chart_title)
 
-    def bar_plot_loading_distance(mr,mo,hpv):
-
+    def bar_plot_loading_distance(mr, mo, hpv):
 
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
-        chart_title = "Efficiency at %0.2f degrees, with model %s" % (slope_name, mr.model_name)
+        chart_title = "Efficiency at %0.2f degrees, with model %s" % (
+            slope_name,
+            mr.model_name,
+        )
 
-        df = mr.create_dataframe_single_scenario(hpv,mo.load_scene,mo.slope_scene)
+        df = mr.create_dataframe_single_scenario(hpv, mo.load_scene, mo.slope_scene)
 
         fig = px.bar(
             df,
@@ -752,7 +813,7 @@ filter_value = 1
 
 # selectHPVs you're interested in
 
-if filter_col > 0: 
+if filter_col > 0:
     column_names = [
         "Name",
         "LoadLimit",
@@ -767,16 +828,15 @@ if filter_col > 0:
     col = column_names[filter_col]
     param_df = allHPV_param_df.loc[(allHPV_param_df[col] == filter_value)]
 else:
-    param_df=allHPV_param_df
-
+    param_df = allHPV_param_df
 
 
 # initialise variables, options, MET, hpv and results classes, populated with data via 'init' functions
 mv = model_variables()
 mo = model_options()
 met = MET_values()
-hpv = HPV_variables(param_df,mv)
-mr = model_results(hpv,mo)
+hpv = HPV_variables(param_df, mv)
+mr = model_results(hpv, mo)
 
 #### constants
 pi = 3.1416
@@ -786,9 +846,7 @@ pi = 3.1416
 
 ####### SPROTT MODEL ########
 if mo.model_selection == 1:
-    mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.sprott_model(
-        hpv, mv, mo, mr
-    )
+    mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.sprott_model(hpv, mv, mo, mr)
 
 ####### CYCLING (MARTIN ET AL.) MODEL ########
 elif mo.model_selection == 2:
@@ -799,11 +857,17 @@ elif mo.model_selection == 2:
 ####### LANKFORD MODEL ########
 elif mo.model_selection == 3:
     mr.v_load_matrix3d, mr.load_matrix3d = lankford_model(
-        param_df, mr.slope_vector_deg, mv.F_max, mv.g, mo.load_res, mv.m1, met.budget_watts
+        param_df,
+        mr.slope_vector_deg,
+        mv.F_max,
+        mv.g,
+        mo.load_res,
+        mv.m1,
+        met.budget_watts,
     )
 
 
-mr.load_results(hpv,mv,mo)
+mr.load_results(hpv, mv, mo)
 
 ### Plotting ####
 # plotting_hpv.surf_plot(mr,mo,hpv)
@@ -812,9 +876,9 @@ mr.load_results(hpv,mv,mo)
 # plotting_hpv.bar_plot_loading(mr,mo,hpv)
 
 # df = mr.create_dataframe_single_scenario(hpv,0,0)
-plotting_hpv.bar_plot_loading(mr,mo,hpv)
-plotting_hpv.load_plot(mr,mo,hpv)
-plotting_hpv.load_plot_plotly(mr,mo,hpv)
-plotting_hpv.slope_plot_plotly(mr,mo,hpv)
+plotting_hpv.bar_plot_loading(mr, mo, hpv)
+plotting_hpv.load_plot(mr, mo, hpv)
+plotting_hpv.load_plot_plotly(mr, mo, hpv)
+plotting_hpv.slope_plot_plotly(mr, mo, hpv)
 # plotting_hpv.time_sensitivity_plotly_grouped(mr,mo,hpv)
-plotting_hpv.bar_plot_loading_distance(mr,mo,hpv)
+plotting_hpv.bar_plot_loading_distance(mr, mo, hpv)
