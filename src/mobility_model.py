@@ -16,44 +16,44 @@ import os
 
 def linspace_creator(max_value_array, min_value, res):
 
-        """
-        creates a linsapce numpy array from the given inputs
-        max_value needs to be a numpy array (even if it is a 1x1)
-        min value is to be an int or float
-        resolution to be an int
-        returns
-        res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
-        Output is an N1 * N2 matrix where N1 = the number of hpvs and N2 = the resolution.
-        """
-        if res == 1:  # if res =1 , calculate for max load of HPV
-            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
-            load_matrix = max_value_array
-        elif (
-            res == 0
-        ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
-            load_matrix = (
-                np.zeros((len(max_value_array), 1)) + min_value
-            )  # initilaise numpy matrix
-            load_matrix = load_matrix
-        elif res > 1:
-            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
+    """
+    creates a linsapce numpy array from the given inputs
+    max_value needs to be a numpy array (even if it is a 1x1)
+    min value is to be an int or float
+    resolution to be an int
+    returns
+    res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
+    Output is an N1 * N2 matrix where N1 = the number of hpvs and N2 = the resolution.
+    """
+    if res == 1:  # if res =1 , calculate for max load of HPV
+        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
+        load_matrix = max_value_array
+    elif (
+        res == 0
+    ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
+        load_matrix = (
+            np.zeros((len(max_value_array), 1)) + min_value
+        )  # initilaise numpy matrix
+        load_matrix = load_matrix
+    elif res > 1:
+        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
 
-        #### Create linear space of weights
-        # creates a vector for each of the HPVs, an equal number of elements spaced
-        # evenly between the minimum viable load and the maximum load for that HPV
-        i = 0  # initliase index
-        for maxval in np.nditer(max_value_array):  # iterate through numpy array
-            minval = min_value
-            load_vector = np.linspace(
-                start=minval,  # define linear space of weights
-                stop=maxval,  # define maximum value for linear space
-                num=res,  # how many data points?
-                endpoint=True,
-                retstep=False,
-                dtype=None,
-            )
-            load_matrix[i:] = load_vector  # place the vector in to a matrix
-            i += 1  # increment index
+    #### Create linear space of weights
+    # creates a vector for each of the HPVs, an equal number of elements spaced
+    # evenly between the minimum viable load and the maximum load for that HPV
+    i = 0  # initliase index
+    for maxval in np.nditer(max_value_array):  # iterate through numpy array
+        minval = min_value
+        load_vector = np.linspace(
+            start=minval,  # define linear space of weights
+            stop=maxval,  # define maximum value for linear space
+            num=res,  # how many data points?
+            endpoint=True,
+            retstep=False,
+            dtype=None,
+        )
+        load_matrix[i:] = load_vector  # place the vector in to a matrix
+        i += 1  # increment index
     else:
         print("Error: unexpected loading resolution, setting default")
         load_matrix = max_value_array
