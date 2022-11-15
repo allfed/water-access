@@ -16,49 +16,51 @@ import os
 
 def linspace_creator(max_value_array, min_value, res):
 
-        """
-        creates a linsapce numpy array from the given inputs
-        max_value needs to be a numpy array (even if it is a 1x1)
-        min value is to be an int or float
-        resolution to be an int
-        returns
-        res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
-        Output is an N1 * N2 matrix where N1 = the number of hpvs and N2 = the resolution.
-        """
-        if res == 1:  # if res =1 , calculate for max load of HPV
-            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
-            load_matrix = max_value_array
-        elif (
-            res == 0
-        ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
-            load_matrix = (
-                np.zeros((len(max_value_array), 1)) + min_value
-            )  # initilaise numpy matrix
-            load_matrix = load_matrix
-        elif res > 1:
-            load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
+    """
+    creates a linsapce numpy array from the given inputs
+    max_value needs to be a numpy array (even if it is a 1x1)
+    min value is to be an int or float
+    resolution to be an int
+    returns
+    res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
+    Output is an N1 * N2 matrix where N1 = the number of hpvs and N2 = the resolution.
+    """
+    if res == 1:  # if res =1 , calculate for max load of HPV
+        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
+        load_matrix = max_value_array
+    elif (
+        res == 0
+    ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
+        load_matrix = (
+            np.zeros((len(max_value_array), 1)) + min_value
+        )  # initilaise numpy matrix
+        load_matrix = load_matrix
+    elif res > 1:
+        load_matrix = np.zeros(
+            (len(max_value_array), res)
+        )  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
 
-            #### Create linear space of weights
-            # creates a vector for each of the HPVs, an equal number of elements spaced
-            # evenly between the minimum viable load and the maximum load for that HPV
-            i = 0  # initliase index
-            for maxval in np.nditer(max_value_array):  # iterate through numpy array
-                minval = min_value
-                load_vector = np.linspace(
-                    start=minval,  # define linear space of weights
-                    stop=maxval,  # define maximum value for linear space
-                    num=res,  # how many data points?
-                    endpoint=True,
-                    retstep=False,
-                    dtype=None,
-                )
-                load_matrix[i:] = load_vector  # place the vector in to a matrix
-                i += 1  # increment index
-        else:
-            print("Error: unexpected loading resolution, setting default")
-            load_matrix = max_value_array
+        #### Create linear space of weights
+        # creates a vector for each of the HPVs, an equal number of elements spaced
+        # evenly between the minimum viable load and the maximum load for that HPV
+        i = 0  # initliase index
+        for maxval in np.nditer(max_value_array):  # iterate through numpy array
+            minval = min_value
+            load_vector = np.linspace(
+                start=minval,  # define linear space of weights
+                stop=maxval,  # define maximum value for linear space
+                num=res,  # how many data points?
+                endpoint=True,
+                retstep=False,
+                dtype=None,
+            )
+            load_matrix[i:] = load_vector  # place the vector in to a matrix
+            i += 1  # increment index
+    else:
+        print("Error: unexpected loading resolution, setting default")
+        load_matrix = max_value_array
 
-        return load_matrix
+    return load_matrix
 
 
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
@@ -84,7 +86,6 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
 
 class mobility_models:
-
     def sprott_model(hpv, mv, mo, mr):
         """
         takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity
@@ -177,7 +178,6 @@ class mobility_models:
 
         return v_load, load_matrix
 
-
     def bike_power_solution(p, *data):
         ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
         v_solve = p[0]
@@ -210,8 +210,8 @@ class mobility_models:
                         mv.ro,
                         mv.C_d,
                         mv.A,
-                        total_load, #
-                        hpv.Crr.flatten()[i], #CRR related to the HPV
+                        total_load,  #
+                        hpv.Crr.flatten()[i],  # CRR related to the HPV
                         mv.eta,
                         mv.P_t,
                         mv.g,
@@ -320,23 +320,22 @@ class HPV_variables:
         ]
 
         self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[
-            :, np.newaxis, :]
+            :, np.newaxis, :
+        ]
 
-
-        self.PilotLoad = mv.m1* self.Pilot
+        self.PilotLoad = mv.m1 * self.Pilot
 
         self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
             (self.n_hpv, 1)
         )[:, np.newaxis, :]
-        
+
         self.GroundContact = np.array(hpv_param_df.GroundContact).reshape(
             (self.n_hpv, 1)
         )[:, np.newaxis, :]
 
     @property
     def load_capacity(self):
-        return             self.load_limit - self.PilotLoad
-
+        return self.load_limit - self.PilotLoad
 
 
 class model_variables:
@@ -377,8 +376,8 @@ class model_options:
             0  # 0 is flat ground, -1 will be the steepest hill (slope_end)
         )
         self.load_scene = (
-            0
-        )  # 0 is probably 15kg, -1 will be max that the HPV can manage
+            0  # 0 is probably 15kg, -1 will be max that the HPV can manage
+        )
         self.surf_plot_index = 0  # this one counts the HPVs (as you can only plot one per surf usually, so 0 is the first HPV in the list, -1 will be the last in the list)
 
         # name the model
@@ -663,7 +662,6 @@ class plotting_hpv:
             mr.model_name,
         )
 
-
         i = 0
 
         fig = go.Figure()
@@ -852,9 +850,7 @@ if mo.model_selection == 1:
 
 ####### CYCLING (MARTIN ET AL.) MODEL ########
 elif mo.model_selection == 2:
-    mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.bike_model(
-        mr, mv, mo, hpv
-    )
+    mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.bike_model(mr, mv, mo, hpv)
 
 ####### LANKFORD MODEL ########
 elif mo.model_selection == 3:
