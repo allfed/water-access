@@ -8,8 +8,10 @@ from scipy.optimize import fsolve
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
 # import chart_studio
 import chart_studio.plotly as py
+
 # from dotenv import load_dotenv, find_dotenv
 # import os
 
@@ -62,6 +64,7 @@ def linspace_creator(max_value_array, min_value, res):
 
     return load_matrix
 
+
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
     max_load_HPV = LoadCapacity
     """
@@ -82,6 +85,7 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
             max_load_HPV = max_pushable_weight - m_HPV_only
 
     return max_load_HPV
+
 
 class mobility_models:
     def sprott_model(hpv, mv, mo, mr):
@@ -227,23 +231,14 @@ class mobility_models:
 
         return mr.v_load_matrix3d, mr.load_matrix3d
 
-    def walking_model(
-        param_df,
-        mr,
-        mv,
-        mo,
-        met,
-        hpv
-    ):
-        if mo.model_selection ==3:
+    def walking_model(param_df, mr, mv, mo, met, hpv):
+        if mo.model_selection == 3:
             model = mobility_models.Lankford_solution
-        elif mo.model_selection ==4:
+        elif mo.model_selection == 4:
             model = mobility_models.LCDA_solution
         else:
             print("Unrecognised Model Selection Number")
             exit()
-
-
 
         i = 0
         for name in hpv.name:
@@ -266,13 +261,14 @@ class mobility_models:
                     data = (total_load, met, s[0])
                     V_guess = 1
                     V_r = fsolve(model, V_guess, args=data, full_output=True)
-                    if V_r[2]==1:
+                    if V_r[2] == 1:
                         mr.v_load_matrix3d[i, j, k] = V_r[0][0]
-                        mr.load_matrix3d[i, j, k] = load_vector[k] #amount of water carried
+                        mr.load_matrix3d[i, j, k] = load_vector[
+                            k
+                        ]  # amount of water carried
                     else:
                         mr.v_load_matrix3d[i, j, k] = np.nan
                         mr.load_matrix3d[i, j, k] = load_vector[k]
-
 
                     k += 1
                 j += 1
@@ -304,11 +300,11 @@ class mobility_models:
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
             + (0.00320 * v_solve * G**3)
-            - (met.budget_VO2/mv.m1)
+            - (met.budget_VO2 / mv.m1)
         )
 
-
     # 5.43483+ (6.47383 * v_solve)+ (-0.05372 * G)+ (0.652298 * v_solve * G)+ (0.023761 * v_solve * G**2)+ (0.00320 * v_solve * G**3)
+
 
 class HPV_variables:
     """
@@ -417,7 +413,7 @@ class MET_values:
     def __init__(self):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
-            4 # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
+            4  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
         )
         self.MET_VO2_conversion = 3.5  # milliliters per minute per kilogram body mass
         self.MET_watt_conversion = 1.162  # watts per kg body mass
@@ -873,12 +869,7 @@ elif mo.model_selection == 2:
 ####### Walking MODEL ########
 elif mo.model_selection > 2:
     mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.walking_model(
-        param_df,
-        mr,
-        mv,
-        mo,
-        met,
-        hpv
+        param_df, mr, mv, mo, met, hpv
     )
 
 
