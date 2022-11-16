@@ -231,7 +231,6 @@ class mobility_models:
                     max_load_HPV = hpv.load_capacity[
                         i
                     ]  # see if load of HPV or load of pushing is the limitng factor.
-                
 
                 load_vector = linspace_creator(
                     max_load_HPV, mv.minimumViableLoad, mo.load_res
@@ -249,14 +248,14 @@ class mobility_models:
                         mv.eta,
                         mv.P_t,
                         mv.g,
-                        s[0] * mo.ulhillpo, # hill polarity, see model options
+                        s[0] * mo.ulhillpo,  # hill polarity, see model options
                     )
                     V_guess = 12
                 else:
                     data = (
                         mv.m1 + hpv.m_HPV_only.flatten()[i],
                         met,
-                        s[0] * mo.ulhillpo, # hill polarity, see model options
+                        s[0] * mo.ulhillpo,  # hill polarity, see model options
                     )
                     V_guess = 1
 
@@ -353,8 +352,6 @@ class HPV_variables:
         ]
 
         self.PilotLoad = mv.m1 * self.Pilot
-
-
 
         self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
             (self.n_hpv, 1)
@@ -798,7 +795,6 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_velocities(mr, mo, hpv):
-
 
         HPV = 0
 
