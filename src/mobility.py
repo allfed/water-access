@@ -8,10 +8,10 @@ from scipy.optimize import fsolve
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import chart_studio
+# import chart_studio
 import chart_studio.plotly as py
-from dotenv import load_dotenv, find_dotenv
-import os
+# from dotenv import load_dotenv, find_dotenv
+# import os
 
 
 def linspace_creator(max_value_array, min_value, res):
@@ -62,7 +62,6 @@ def linspace_creator(max_value_array, min_value, res):
 
     return load_matrix
 
-
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
     max_load_HPV = LoadCapacity
     """
@@ -83,7 +82,6 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
             max_load_HPV = max_pushable_weight - m_HPV_only
 
     return max_load_HPV
-
 
 class mobility_models:
     def sprott_model(hpv, mv, mo, mr):
@@ -229,14 +227,23 @@ class mobility_models:
 
         return mr.v_load_matrix3d, mr.load_matrix3d
 
-    def lankford_model(
+    def walking_model(
         param_df,
         mr,
         mv,
         mo,
+        met,
         hpv
-        # param_df, slope_vector_deg, F_max, g, load_res, m1, MET_budget_watts
     ):
+        if mo.model_selection ==3:
+            model = mobility_models.Lankford_solution
+        elif mo.model_selection ==4:
+            model = mobility_models.LCDA_solution
+        else:
+            print("Unrecognised Model Selection Number")
+            exit()
+
+
 
         i = 0
         for name in hpv.name:
@@ -255,20 +262,26 @@ class mobility_models:
                 ).reshape((mo.load_res, 1))
                 m_t = np.array(load_vector + mv.m1 + hpv.m_HPV_only[i])
                 k = 0
-                for total_load in m_t:
-                    data = (m_t[k], met.budget_watts, s)
+                for total_load in m_t.flatten():
+                    data = (total_load, met, s[0])
                     V_guess = 1
-                    V_r = fsolve(mobility_models.LCDA_solution, V_guess, args=data)
-                    mr.v_load_matrix3d[i, j, k] = V_r[0]
-                    mr.load_matrix3d[i, j, k] = load_vector[k]
+                    V_r = fsolve(model, V_guess, args=data, full_output=True)
+                    if V_r[2]==1:
+                        mr.v_load_matrix3d[i, j, k] = V_r[0][0]
+                        mr.load_matrix3d[i, j, k] = load_vector[k] #amount of water carried
+                    else:
+                        mr.v_load_matrix3d[i, j, k] = np.nan
+                        mr.load_matrix3d[i, j, k] = load_vector[k]
+
+
                     k += 1
                 j += 1
             i += 1
 
-        return v_load_matrix3d, load_matrix3d
+        return mr.v_load_matrix3d, mr.load_matrix3d
 
     def LCDA_solution(p, *data):
-        m_load, metabolic_budget_watts, s = data
+        m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45 * 100
         return (
@@ -276,24 +289,26 @@ class mobility_models:
             + 1.94 * v_solve**0.43
             + 0.24 * v_solve**4
             + 0.34 * (1 - 1.05 ** (1 - 1.1 ** (G + 32)))
-        ) * m_load - metabolic_budget_watts
+        ) * m_load - met.budget_watts
 
     def Lankford_solution(p, *data):
-        metabolic_budget, s = data
+        m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45
         # print(G)
         # print(s)
         return (
             5.43483
-            + 6.47383 * v_solve
+            + (6.47383 * v_solve)
             + (-0.05372 * G)
-            + 0.652298 * v_solve * G
-            + 0.023761 * v_solve * G**2
-            + 0.00320 * v_solve * G**3
-            - metabolic_budget
+            + (0.652298 * v_solve * G)
+            + (0.023761 * v_solve * G**2)
+            + (0.00320 * v_solve * G**3)
+            - (met.budget_VO2/mv.m1)
         )
 
+
+    # 5.43483+ (6.47383 * v_solve)+ (-0.05372 * G)+ (0.652298 * v_solve * G)+ (0.023761 * v_solve * G**2)+ (0.00320 * v_solve * G**3)
 
 class HPV_variables:
     """
@@ -346,7 +361,7 @@ class model_variables:
         self.P_t = 75  # power output of person (steady state average)
         self.F_max = 300  # maximum force exertion for pushing up a hill for a short amount of time
         self.L = 1  # leg length
-        self.minimumViableLoad = 15  # in kg, the minimum useful load for such a trip
+        self.minimumViableLoad = 0  # in kg, the minimum useful load for such a trip
         self.t_hours = 8  # number of hours to gather water
         self.L = 1  # leg length
         self.A = 1  # cross sectional area
@@ -360,12 +375,12 @@ class model_options:
     def __init__(self):
 
         # model options
-        self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford
+        self.model_selection = 3  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
 
         #  0 = min load, 1 = max load, >1 = linear space between min and max
-        self.load_res = 7
+        self.load_res = 15
         #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
-        self.slope_res = 3
+        self.slope_res = 15
 
         # slope start and end
         self.slope_start = 0  # slope min degrees
@@ -387,6 +402,10 @@ class model_options:
             self.model_name = "Cycling"
         elif self.model_selection == 3:
             self.model_name = "Lankford"
+        elif self.model_selection == 4:
+            self.model_name = "LCDA"
+        else:
+            self.model_name = "Unknown"
 
         if self.load_res <= 1:
             self.n_load_scenes = 1
@@ -398,7 +417,7 @@ class MET_values:
     def __init__(self):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
-            6  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
+            4 # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
         )
         self.MET_VO2_conversion = 3.5  # milliliters per minute per kilogram body mass
         self.MET_watt_conversion = 1.162  # watts per kg body mass
@@ -580,7 +599,6 @@ class plotting_hpv:
         plt.show()
 
     def surf_plotly(mr, mo, hpv):
-        mo.surf_plot_index = 0
 
         # # Make data.
         Z = mr.distance_achievable[mo.surf_plot_index, :, :]
@@ -654,7 +672,6 @@ class plotting_hpv:
 
         xaxis_title = "Load [kg]"
         yaxis_title = "Kms/hour"
-        slope_scene = 0
 
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
         chart_title = "Km/hour with different loads, Constant %0.1f slope, model %s" % (
@@ -666,8 +683,8 @@ class plotting_hpv:
 
         fig = go.Figure()
         for HPVname in mr.hpv_name[0].transpose()[0][0]:
-            y = mr.distance_achievable_one_hr[i, mo.slope_scene, :]
-            x = mr.load_matrix3d[i, slope_scene, :]
+            y = mr.v_load_matrix3d[i, mo.slope_scene, :]
+            x = mr.load_matrix3d[i, mo.slope_scene, :]
             i += 1
             fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
 
@@ -684,7 +701,7 @@ class plotting_hpv:
     def slope_plot_plotly(mr, mo, hpv):
 
         xaxis_title = "Slope [˚]"
-        yaxis_title = "Kms/Hour"
+        yaxis_title = "Velocity Kgs"
         load_name = mr.load_matrix3d.flat[mo.load_scene]
         chart_title = (
             "Km/hour with different slope, Constant %0.1f kg load, model %s"
@@ -694,7 +711,8 @@ class plotting_hpv:
 
         fig = go.Figure()
         for HPVname in mr.hpv_name[0].transpose()[0][0]:
-            y = mr.velocitykgs[
+            # y = mr.velocitykgs[
+            y = mr.v_load_matrix3d[
                 i, :, mo.load_scene
             ]  # SEE ZEROS <-- this is for the minimum weight
             x = mr.slope_matrix3d_deg[i, :, mo.load_scene]
@@ -793,10 +811,10 @@ class plotting_hpv:
 
 
 ## Plotly creds
-load_dotenv(find_dotenv())
-chart_studio.tools.set_credentials_file(
-    username=os.environ.get("USERNAME"), api_key=os.environ.get("API_KEY")
-)
+# load_dotenv(find_dotenv())
+# chart_studio.tools.set_credentials_file(
+#     username=os.environ.get("USERNAME"), api_key=os.environ.get("API_KEY")
+# )
 
 ######################
 #### Import Data #####
@@ -808,8 +826,8 @@ with open("../data/mobility-model-parameters.csv") as csv_file:
 ##### Options ######
 ####################
 
-filter_col = -1
-filter_value = 1
+filter_col = 6
+filter_value = 0
 
 # selectHPVs you're interested in
 
@@ -852,16 +870,15 @@ if mo.model_selection == 1:
 elif mo.model_selection == 2:
     mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.bike_model(mr, mv, mo, hpv)
 
-####### LANKFORD MODEL ########
-elif mo.model_selection == 3:
-    mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.lankford_model(
+####### Walking MODEL ########
+elif mo.model_selection > 2:
+    mr.v_load_matrix3d, mr.load_matrix3d = mobility_models.walking_model(
         param_df,
-        mr.slope_vector_deg,
-        mv.F_max,
-        mv.g,
-        mo.load_res,
-        mv.m1,
-        met.budget_watts,
+        mr,
+        mv,
+        mo,
+        met,
+        hpv
     )
 
 
