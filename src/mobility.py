@@ -222,13 +222,17 @@ class mobility_models:
                 mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1)
             ):
                 s = (slope / 360) * (2 * np.pi)  # determine slope in radians
+
+                # determine safe loading for hilly scenarios
                 max_load_HPV = max_safe_load(
-                    hpv.m_HPV_only[i], hpv.load_limit[i], mv.F_max, s, mv.g
+                    hpv.m_HPV_only[i], hpv.load_capacity[i], mv.F_max, s, mv.g
                 )  # find maximum pushing load
-                if max_load_HPV > hpv.load_limit[i]:
-                    max_load_HPV = hpv.load_limit[
+                if max_load_HPV > hpv.load_capacity[i]:
+                    max_load_HPV = hpv.load_capacity[
                         i
                     ]  # see if load of HPV or load of pushing is the limitng factor.
+                
+
                 load_vector = linspace_creator(
                     max_load_HPV, mv.minimumViableLoad, mo.load_res
                 ).reshape((mo.load_res, 1))
@@ -245,14 +249,14 @@ class mobility_models:
                         mv.eta,
                         mv.P_t,
                         mv.g,
-                        s[0] * mo.ulhillpo,  # negative s, as assume downhill
+                        s[0] * mo.ulhillpo, # hill polarity, see model options
                     )
-                    V_guess = 4
+                    V_guess = 12
                 else:
                     data = (
                         mv.m1 + hpv.m_HPV_only.flatten()[i],
                         met,
-                        s[0] * mo.ulhillpo,
+                        s[0] * mo.ulhillpo, # hill polarity, see model options
                     )
                     V_guess = 1
 
@@ -277,10 +281,10 @@ class mobility_models:
                             mv.g,
                             s[0] * mo.lhillpo,
                         )
-                        V_guess = 4
+                        # V_guess = 12
                     else:
                         data = (total_load, met, s[0])
-                        V_guess = 1
+                        # V_guess = 1
 
                     V_r = fsolve(model, V_guess, args=data, full_output=True)
                     if V_r[2] == 1:
@@ -309,8 +313,6 @@ class mobility_models:
         m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45
-        # print(G)
-        # print(s)
         return (
             5.43483
             + (6.47383 * v_solve)
@@ -318,7 +320,7 @@ class mobility_models:
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
             + (0.00320 * v_solve * G**3)
-            - (met.budget_VO2 / mv.m1)
+            - (met.budget_VO2 / m_load)
         )
 
 
@@ -351,6 +353,8 @@ class HPV_variables:
         ]
 
         self.PilotLoad = mv.m1 * self.Pilot
+
+
 
         self.v_no_load = np.array(hpv_param_df.AverageSpeedWithoutLoad).reshape(
             (self.n_hpv, 1)
@@ -390,7 +394,7 @@ class model_options:
     def __init__(self):
 
         # model options
-        self.model_selection = 4  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
+        self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
 
         #  0 = min load, 1 = max load, >1 = linear space between min and max
         self.load_res = 15
@@ -401,9 +405,9 @@ class model_options:
         self.slope_start = 0  # slope min degrees
         self.slope_end = 10  # slope max degrees
 
-        # is it uphill or downhill? -1 is downhill, +1 is uphill. No other inputs accepted
+        # is it uphill or downhill? -1 is downhill, +1 is uphill. Any value between 0 to 1 will lesson the impact of the "effective hill", useful for exploring/approximating braking on bikes for donwhill (otherwise we get up to 60km/h on an unloaded bike pleting down a 10 deg hill!)
         self.lhillpo = 1  # loaded hill polarity
-        self.ulhillpo = -1  # unloaded hill polarity
+        self.ulhillpo = 0  # unloaded hill polarity
 
         # for plotting of single scenarios, likle on surf plots
         self.slope_scene = (
@@ -795,15 +799,14 @@ class plotting_hpv:
 
     def slope_velocities(mr, mo, hpv):
 
+
+        HPV = 0
+
         xaxis_title = "Slope [˚]"
         yaxis_title = "Velocity [m/s]"
-        load_name = mr.load_matrix3d.flat[mo.load_scene]
-        chart_title = (
-            "Km/hour with different slope, Constant %0.1f kg load, model %s"
-            % (load_name, mr.model_name)
-        )
+        load_name = mr.load_matrix3d[HPV][0][mo.load_scene]
 
-        HPV = 1
+        chart_title = f"m/s with different slope, {load_name} kg load,\n for HPV: {hpv.name.flatten()[0]}, model {mr.model_name}"
 
         fig = go.Figure()
         x = mr.slope_matrix3d_deg[HPV, :, mo.load_scene]
