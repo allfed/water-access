@@ -54,7 +54,9 @@ mr = mm.model_results(hpv, mo)
 
 ####### SPROTT MODEL ########
 if mo.model_selection == 1:
-    mr.v_load_matrix3d, mr.load_matrix3d = mm.mobility_models.sprott_model(hpv, mv, mo, mr)
+    mr.v_load_matrix3d, mr.load_matrix3d = mm.mobility_models.sprott_model(
+        hpv, mv, mo, mr
+    )
 
 ####### Numerical MODEL ########
 elif mo.model_selection > 1:
@@ -64,6 +66,3 @@ elif mo.model_selection > 1:
 
 ####### Organise Results #######
 mr.load_results(hpv, mv, mo)
-
-
-
