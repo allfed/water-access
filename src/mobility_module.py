@@ -432,7 +432,7 @@ class model_options:
 
 
 class MET_values:
-    def __init__(self,mv):
+    def __init__(self, mv):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
             4  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
@@ -900,4 +900,3 @@ class plotting_hpv:
         )
         fig.show()
         # py.iplot(fig, filename=chart_title)
-

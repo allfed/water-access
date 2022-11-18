@@ -5,8 +5,6 @@ import plotly.express as px
 import plotting_tools_water_access
 
 
-
-
 ######################
 #### Import Data #####
 with open("../data/mobility-model-parameters.csv") as csv_file:
@@ -30,9 +28,7 @@ mr = mm.model_results(hpv, mo)
 mo.model_selection = 2
 
 
-
-
-#get linear space for variable range
+# get linear space for variable range
 minval = 0.001
 maxval = 0.05
 res = 30
@@ -40,15 +36,14 @@ var_string = "Crr"
 var_units = ""
 
 
-
 phase_space = np.linspace(
-                start=minval,  # define linear space of weights
-                stop=maxval,  # define maximum value for linear space
-                num=res,  # how many data points?
-                endpoint=True,
-                retstep=False,
-                dtype=None,
-            )
+    start=minval,  # define linear space of weights
+    stop=maxval,  # define maximum value for linear space
+    num=res,  # how many data points?
+    endpoint=True,
+    retstep=False,
+    dtype=None,
+)
 
 
 result = []  # create empty list to place variables in to in loop
@@ -81,12 +76,12 @@ fig1 = px.line(
     y="Results",
     color_discrete_sequence=graph_colours,
     title=f"Effect of {var_string} on model results",
-).update_layout(yaxis_title=r'$\text{Velocity} \times \text{Payload  } [\frac{m}{s} kg]$',
-xaxis_title = (var_string + var_units))
+).update_layout(
+    yaxis_title=r"$\text{Velocity} \times \text{Payload  } [\frac{m}{s} kg]$",
+    xaxis_title=(var_string + var_units),
+)
 
 
-fig1 =  plotting_tools_water_access.format_plotly_graphs(fig1)
+fig1 = plotting_tools_water_access.format_plotly_graphs(fig1)
 
 fig1.show()
-
-
