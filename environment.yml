@@ -14,10 +14,12 @@ dependencies:
   - pycountry 
   - pip
   - dash
+  - scipy
   - pip:
     - plotly
     - chart_studio 
     - python-dotenv
     - dash_bootstrap_components
+    - jupyter-dash
 
 
