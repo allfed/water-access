@@ -66,3 +66,8 @@ elif mo.model_selection > 1:
 
 ####### Organise Results #######
 mr.load_results(hpv, mv, mo)
+
+
+mr.velocitykgs
+
+mm.plotting_hpv.load_plot_plotly(mr, mo, hpv)

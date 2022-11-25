@@ -12,7 +12,7 @@ def format_plotly_graphs(fig):
         title={"font": {"size": 30}},
         legend_title_font_color="dimgrey",
         legend=dict(title="Legend"),
-        legend_traceorder="reversed",
+        # legend_traceorder="reversed",
         font=dict(size=16),
         plot_bgcolor="white",
         paper_bgcolor="white",
