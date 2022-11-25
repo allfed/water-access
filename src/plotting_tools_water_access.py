@@ -21,6 +21,6 @@ def format_plotly_graphs(fig):
     fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="#e6e6e6")
     fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="#e6e6e6")
 
-    fig.update_layout(legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99))
+    # fig.update_layout(legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99))
 
     return fig
