@@ -369,18 +369,18 @@ class HPV_variables:
 class model_variables:
     def __init__(self):
         #### variables (changeable)
-        self.s_deg = 0  # slope in degrees (only used for loading scenario, is overriden in cariable slope scenario)
-        self.m1 = 83  # mass of rider/person
+        self.s_deg = 0  # slope in degrees (only used for loading scenario, is overriden in variable slope scenario)
+        self.m1 = 62  # mass of rider/person
         self.P_t = 75  # power output of person (steady state average)
         self.F_max = 300  # maximum force exertion for pushing up a hill for a short amount of time
         self.L = 1  # leg length
         self.minimumViableLoad = 0  # in kg, the minimum useful load for such a trip
         self.t_hours = 8  # number of hours to gather water
         self.L = 1  # leg length
-        self.A = 1  # cross sectional area
-        self.C_d = 1  # constant for wind
-        self.ro = 1
-        self.eta = 0.8
+        self.A = 0.51  # cross sectional area
+        self.C_d = 0.9  # constant for wind
+        self.ro = 1.225
+        self.eta = 0.92
         self.g = 9.81
         self.waterration = 15
 
