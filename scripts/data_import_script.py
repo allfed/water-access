@@ -121,6 +121,3 @@ Start main function
 
 # df = input_data_creator()
 # df.to_csv("country_data_master.csv")
-
-
-

@@ -33,6 +33,5 @@ path = "../data/WHO Household Water Data - National Piped.csv"
 df = read_road_values_fuzzy(path, col)
 
 
-filename =  "WHO_household_estimates"
+filename = "WHO_household_estimates"
 df.to_csv(filename + ".csv")
-
