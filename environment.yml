@@ -11,6 +11,7 @@ dependencies:
   - ipykernel 
   - ipywidgets >=7.6
   - notebook>=5.3
+  - Flask==2.1.0
   - pycountry 
   - pip
   - dash

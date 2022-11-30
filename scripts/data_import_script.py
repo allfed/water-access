@@ -84,6 +84,9 @@ def input_data_creator():
     )
     path_pop = "../data/population.csv"  # population
     path_kummu = "../data/KummuAlpha3.csv"
+    path_WHO = "../data/WHO SUMMARY WATER ISO.csv"
+    path_HP = "../data/hand_pump_data.csv"
+
 
     df_rq = read_road_values(path_rq)
     df_pbo = read_pbo_values(path_pbo)
@@ -92,8 +95,13 @@ def input_data_creator():
     df_urbagg = read_owid_values(path_urbagg)
     df_pop = read_pop_values(path_pop)
     df_kummu = read_simple_csv_values(path_kummu)
+    df_WHO = read_simple_csv_values(path_WHO)
+    df_HP = read_simple_csv_values(path_HP)
 
-    dfs = [df_pop, df_pbo, df_tri, df_purb, df_urbagg, df_rq, df_kummu]
+
+
+
+    dfs = [df_pop, df_pbo, df_tri, df_purb, df_urbagg, df_rq, df_kummu, df_WHO, df_HP]
     df_master = pd.concat(dfs, join="outer", axis=1)
     df_master["Risk"] = 0
     df_master.rename(
