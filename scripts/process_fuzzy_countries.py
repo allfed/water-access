@@ -28,10 +28,14 @@ def read_road_values_fuzzy(path, col):
 
 
 col = "Country"
-path = "../data/WHO Household Water Data - National Piped.csv"
+path = "../data/hand_pump_data.csv"
 
 df = read_road_values_fuzzy(path, col)
 
 
-filename = "WHO_household_estimates"
+filename =  "hand_pump_data"
 df.to_csv(filename + ".csv")
+
+
+
+
