@@ -28,7 +28,11 @@ def read_road_values_fuzzy(path, col):
 
 
 col = "Country"
-path = "../data/KummuData.csv"
-# df = pd.read_csv(path)
+path = "../data/WHO Household Water Data - National Piped.csv"
 
 df = read_road_values_fuzzy(path, col)
+
+
+filename =  "WHO_household_estimates"
+df.to_csv(filename + ".csv")
+
