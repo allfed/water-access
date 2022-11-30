@@ -1,8 +1,10 @@
 import pandas as pd
 import plotly.express as px
 
-choro_df = pd.read_csv("../data/WHO SUMMARY WATER ISO.csv",  index_col="alpha3")
-choro_df_recent = choro_df.groupby(choro_df.index).first() # works because csv is already in ascending date order
+choro_df = pd.read_csv("../data/WHO SUMMARY WATER ISO.csv", index_col="alpha3")
+choro_df_recent = choro_df.groupby(
+    choro_df.index
+).first()  # works because csv is already in ascending date order
 
 # choro_df = pd.read_csv("../data/WHO_Drinking_Estimates_ISO.csv",  index_col="alpha3")
 choro_df = pd.read_csv("../data/WHO_Household_Water_Data_ISO.csv", index_col="alpha3")

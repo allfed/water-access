@@ -33,9 +33,5 @@ path = "../data/hand_pump_data.csv"
 df = read_road_values_fuzzy(path, col)
 
 
-filename =  "hand_pump_data"
+filename = "hand_pump_data"
 df.to_csv(filename + ".csv")
-
-
-
-
