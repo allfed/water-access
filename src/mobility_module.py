@@ -402,7 +402,7 @@ class model_options:
 
         # is it uphill or downhill? -1 is downhill, +1 is uphill. Any value between 0 to 1 will lesson the impact of the "effective hill", useful for exploring/approximating braking on bikes for donwhill (otherwise we get up to 60km/h on an unloaded bike pleting down a 10 deg hill!)
         self.lhillpo = 1  # loaded hill polarity
-        self.ulhillpo = 0  # unloaded hill polarity
+        self.ulhillpo = 1  # unloaded hill polarity
 
         # for plotting of single scenarios, likle on surf plots
         self.slope_scene = (
