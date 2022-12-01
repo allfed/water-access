@@ -68,6 +68,9 @@ elif mo.model_selection > 1:
 mr.load_results(hpv, mv, mo)
 
 
-mr.velocitykgs
+# mr.velocitykgs
 
 mm.plotting_hpv.load_plot_plotly(mr, mo, hpv)
+mm.plotting_hpv.bar_plot_loading_distance(mr, mo, hpv)
+
+
