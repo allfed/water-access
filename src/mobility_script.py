@@ -72,5 +72,3 @@ mr.load_results(hpv, mv, mo)
 
 mm.plotting_hpv.load_plot_plotly(mr, mo, hpv)
 mm.plotting_hpv.bar_plot_loading_distance(mr, mo, hpv)
-
-

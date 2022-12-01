@@ -430,7 +430,6 @@ class model_options:
         else:
             self.n_load_scenes = self.load_res  # number of load scenarios
 
-
     @property
     def model_name(self):
         if self.model_selection == 1:
@@ -498,7 +497,7 @@ class model_results:
             {
                 "Name": self.hpv_name[0].transpose()[0][0],
                 "Load": self.load_matrix3d[:, slope_scene, load_scene],
-                "Slope" : self.slope_matrix3d_deg[:, slope_scene, load_scene],
+                "Slope": self.slope_matrix3d_deg[:, slope_scene, load_scene],
                 "Average Trip Velocity": self.v_avg_matrix3d[
                     :, slope_scene, load_scene
                 ],
@@ -513,11 +512,13 @@ class model_results:
                 / mv.waterration,
                 "Distance to Water Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
-                ] * mv.t_hours
+                ]
+                * mv.t_hours
                 / 2,
                 "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
-                ] * mv.t_hours,
+                ]
+                * mv.t_hours,
                 "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
                     :, slope_scene, load_scene
                 ]
@@ -525,11 +526,11 @@ class model_results:
                 "Loaded Velocity": self.v_load_matrix3d[:, slope_scene, load_scene],
                 "Unloaded Velocity": hpv.v_no_load.transpose()[0][0],
                 "Hours Collecting Water Max": mv.t_hours,
-                "Hours Spent Collecting Single Person Water" : mv.waterration / (
-                self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
-                * self.load_matrix3d[:, slope_scene, load_scene])
+                "Hours Spent Collecting Single Person Water": mv.waterration
+                / (
+                    self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                    * self.load_matrix3d[:, slope_scene, load_scene]
+                ),
             }
         )
         return df
@@ -566,7 +567,6 @@ Plotting Class
 
 
 class plotting_hpv:
-
     def surf_plot(mr, mo, hpv):
 
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
@@ -841,7 +841,7 @@ class plotting_hpv:
                 "Load",
                 "Slope",
                 "Hours Collecting Water Max",
-                "Hours Spent Collecting Single Person Water" 
+                "Hours Spent Collecting Single Person Water",
             ],
             color="Name",
             labels={"Name": "Name"},
@@ -874,7 +874,7 @@ class plotting_hpv:
                 "Load",
                 "Slope",
                 "Hours Collecting Water Max",
-                "Hours Spent Collecting Single Person Water" 
+                "Hours Spent Collecting Single Person Water",
             ],
             color="Name",
             labels={"Name": "Name"},
