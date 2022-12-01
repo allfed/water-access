@@ -413,22 +413,36 @@ class model_options:
         )
         self.surf_plot_index = 0  # this one counts the HPVs (as you can only plot one per surf usually, so 0 is the first HPV in the list, -1 will be the last in the list)
 
-        # name the model
-        if self.model_selection == 1:
-            self.model_name = "Sprott"
-        elif self.model_selection == 2:
-            self.model_name = "Cycling"
-        elif self.model_selection == 3:
-            self.model_name = "Lankford"
-        elif self.model_selection == 4:
-            self.model_name = "LCDA"
-        else:
-            self.model_name = "Unknown"
+        # # name the model
+        # if self.model_selection == 1:
+        #     self.model_name = "Sprott"
+        # elif self.model_selection == 2:
+        #     self.model_name = "Cycling"
+        # elif self.model_selection == 3:
+        #     self.model_name = "Lankford"
+        # elif self.model_selection == 4:
+        #     self.model_name = "LCDA"
+        # else:
+        #     self.model_name = "Unknown"
 
         if self.load_res <= 1:
             self.n_load_scenes = 1
         else:
             self.n_load_scenes = self.load_res  # number of load scenarios
+
+
+    @property
+    def model_name(self):
+        if self.model_selection == 1:
+            return "Sprott"
+        elif self.model_selection == 2:
+            return "Cycling"
+        elif self.model_selection == 3:
+            return "Lankford"
+        elif self.model_selection == 4:
+            return "LCDA"
+        else:
+            return "Unknown"
 
 
 class MET_values:
@@ -480,11 +494,11 @@ class model_results:
         self.slope_matrix3drads = (self.slope_matrix3d_deg / 360) * (2 * 3.1416)
 
     def create_dataframe_single_scenario(self, hpv, mv, load_scene, slope_scene):
-
         df = pd.DataFrame(
             {
                 "Name": self.hpv_name[0].transpose()[0][0],
                 "Load": self.load_matrix3d[:, slope_scene, load_scene],
+                "Slope" : self.slope_matrix3d_deg[:, slope_scene, load_scene],
                 "Average Trip Velocity": self.v_avg_matrix3d[
                     :, slope_scene, load_scene
                 ],
@@ -499,17 +513,23 @@ class model_results:
                 / mv.waterration,
                 "Distance to Water Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
-                ]
+                ] * mv.t_hours
                 / 2,
                 "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
-                ],
+                ] * mv.t_hours,
                 "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
                     :, slope_scene, load_scene
                 ]
                 * self.load_matrix3d[:, slope_scene, load_scene],
                 "Loaded Velocity": self.v_load_matrix3d[:, slope_scene, load_scene],
                 "Unloaded Velocity": hpv.v_no_load.transpose()[0][0],
+                "Hours Collecting Water Max": mv.t_hours,
+                "Hours Spent Collecting Single Person Water" : mv.waterration / (
+                self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
+                * self.load_matrix3d[:, slope_scene, load_scene])
             }
         )
         return df
@@ -546,52 +566,6 @@ Plotting Class
 
 
 class plotting_hpv:
-    def slope_plot(mr, mo, hpv):
-        i = 0
-
-        #   # Slope Graph Sensitivity
-        fig, ax = plt.subplots(figsize=(20, 10))
-        for HPVname in param_df.Name:
-            y = (
-                mr.v_avg_matrix3d[i, :, 0] * mr.load_matrix3d[i, :, 0]
-            )  # SEE ZEROS <-- this is for the minimum weight
-            x = mr.slope_vector_deg.reshape((y.shape))  # reshape to same size
-            (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
-            i += 1
-        plt.xlabel("Slope [deg ˚]")
-        plt.ylabel("Velocity Kgs [m/s]")
-        plt.title(
-            "Velocity Kgs as a function of Slope with Load = {}kg".format(
-                mr.load_matrix3d[0, 0, 0]
-            )
-        )
-        plt.legend()
-
-        plt.plot()
-        plt.show()
-
-    def load_plot(mr, mo, hpv):
-        i = 0
-
-        #   # Slope Graph Sensitivity
-        fig, ax = plt.subplots(figsize=(20, 10))
-        for HPVname in hpv.name:
-            y = (
-                mr.v_avg_matrix3d[i, 0, :] * mr.load_matrix3d[i, 0, :]
-            )  # SEE ZEROS <-- this is for the minimum weight
-            x = mr.load_matrix3d[i, 0, :]
-            (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
-            i += 1
-        plt.xlabel("Load [kg]")
-        plt.ylabel("Velocity Kilograms [kg][m/s]")
-        plt.title(
-            "Velocity Kgs as a function of Load with {}˚ Slope".format(
-                mr.slope_vector_deg[0, 0]
-            )
-        )
-        plt.legend()
-        plt.plot()
-        plt.show()
 
     def surf_plot(mr, mo, hpv):
 
@@ -845,7 +819,7 @@ class plotting_hpv:
         fig.update_layout(barmode="group")
         fig.show()
 
-    def bar_plot_loading(mr, mo, hpv):
+    def bar_plot_loading(mr, mo, hpv, mv):
         t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
@@ -862,7 +836,12 @@ class plotting_hpv:
                 "Average Trip Velocity",
                 "Loaded Velocity",
                 "Unloaded Velocity",
+                "Distance to Water Achievable",
+                "Total Round trip Distance Achievable",
                 "Load",
+                "Slope",
+                "Hours Collecting Water Max",
+                "Hours Spent Collecting Single Person Water" 
             ],
             color="Name",
             labels={"Name": "Name"},
@@ -871,7 +850,7 @@ class plotting_hpv:
         fig.show()
         # py.iplot(fig, filename=chart_title)
 
-    def bar_plot_loading_distance(mr, mo, hpv):
+    def bar_plot_loading_distance(mr, mo, hpv, mv):
 
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
         chart_title = "Efficiency at %0.2f degrees, with model %s" % (
@@ -893,6 +872,9 @@ class plotting_hpv:
                 "Distance to Water Achievable",
                 "Total Round trip Distance Achievable",
                 "Load",
+                "Slope",
+                "Hours Collecting Water Max",
+                "Hours Spent Collecting Single Person Water" 
             ],
             color="Name",
             labels={"Name": "Name"},

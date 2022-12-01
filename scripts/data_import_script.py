@@ -70,7 +70,7 @@ def correlation_checker(df, corr_col_1, corr_col_2):
     corr_value = df.iloc[:, corr_col_1].corr(df.iloc[:, corr_col_2])
     print(
         "Correlation between %s and %s is %0.4f"
-        % (df_master.columns[corr_col_1], df_master.columns[corr_col_2], corr_value)
+        % (df.columns[corr_col_1], df.columns[corr_col_2], corr_value)
     )
 
 
