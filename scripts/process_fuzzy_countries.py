@@ -38,23 +38,18 @@ def add_alpha_codes_from_ISO(df, col):
     return df
 
 
-
-
-
-
-
 def read_road_values_fuzzy(path, col):
     df = pd.read_csv(path)
     df = add_alpha_codes(df, col)
     df = df.set_index("alpha3")
     return df
 
+
 iso_num_col = "ISO Code"
 col = "Country"
 # path = "../data/hand_pump_data.csv"
-path =  "household_countries.csv"
+path = "household_countries.csv"
 df_original = pd.read_csv(path)
-
 
 
 df = add_alpha_codes_from_ISO(df_original, iso_num_col)
