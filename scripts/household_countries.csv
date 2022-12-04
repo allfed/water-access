@@ -1,0 +1,1060 @@
+Country or area,ISO Code,Data source category,Reference date (dd/mm/yyyy),Average household size (number of members)
+Afghanistan,4,MICS,7/1/10,7.75
+Afghanistan,4,DHS,19/10/15,8.04
+Albania,8,MICS,7/1/00,4.35
+Albania,8,MICS,7/1/05,4.00
+Albania,8,DHS,21/1/09,3.82
+Albania,8,DYB,7/1/11,3.86
+Albania,8,DHS,12/1/17,3.30
+Algeria,12,MICS,7/1/12,5.42
+Algeria,12,MICS,7/1/18,4.94
+Angola,24,MICS,7/1/01,4.75
+Angola,24,DHS,29/1/07,5.69
+Angola,24,DHS,3/1/11,4.98
+Angola,24,DHS,1/1/16,4.82
+Argentina,32,IPUMS,7/1/70,3.78
+Argentina,32,IPUMS,7/1/80,3.86
+Argentina,32,IPUMS,7/1/01,3.57
+Argentina,32,DYB,7/1/10,3.26
+Argentina,32,IPUMS,7/1/10,3.26
+Argentina,32,MICS,7/1/11,3.26
+Argentina,32,MICS,7/1/19,2.95
+Armenia,51,DHS,11/2/00,4.34
+Armenia,51,DYB,7/1/01,4.14
+Armenia,51,IPUMS,7/1/01,3.99
+Armenia,51,DHS,17/10/05,3.76
+Armenia,51,DHS,15/11/10,3.56
+Armenia,51,DYB,7/1/11,3.96
+Armenia,51,IPUMS,7/1/11,4.01
+Armenia,51,DHS,2/5/16,3.54
+Aruba,533,DYB,7/1/10,2.89
+Australia,36,DYB,7/1/06,2.5
+Australia,36,DYB,7/1/11,2.5
+Australia,36,DYB,7/1/16,2.55
+Austria,40,IPUMS,7/1/71,2.88
+Austria,40,IPUMS,7/1/81,2.71
+Austria,40,IPUMS,7/1/91,2.55
+Austria,40,DYB,7/1/01,2.38
+Austria,40,IPUMS,7/1/01,2.38
+Austria,40,LFS,7/1/01,2.42
+Austria,40,DYB,7/1/11,2.27
+Austria,40,IPUMS,7/1/11,2.27
+Austria,40,LFS,7/1/11,2.27
+Azerbaijan,31,DYB,7/1/99,..
+Azerbaijan,31,MICS,7/1/00,4.61
+Azerbaijan,31,DHS,14/9/06,4.15
+Azerbaijan,31,DYB,7/1/09,4.55
+Bahamas,44,DYB,7/1/10,3.4
+Bangladesh,50,IPUMS,7/1/91,5.45
+Bangladesh,50,DHS,13/1/94,5.46
+Bangladesh,50,DHS,1/5/97,5.3
+Bangladesh,50,DHS,30/1/00,5.17
+Bangladesh,50,IPUMS,7/1/01,4.85
+Bangladesh,50,DHS,14/3/04,4.96
+Bangladesh,50,MICS,7/1/06,4.83
+Bangladesh,50,DHS,6/2/07,4.71
+Bangladesh,50,DYB,7/1/11,..
+Bangladesh,50,IPUMS,7/1/11,4.44
+Bangladesh,50,DHS,10/4/11,4.6
+Bangladesh,50,MICS,7/1/12,4.57
+Bangladesh,50,DHS,22/8/14,4.47
+Bangladesh,50,DHS,1/2/18,4.28
+Bangladesh,50,MICS,7/1/19,4.26
+Barbados,52,MICS,7/1/12,2.85
+Belarus,112,DYB,7/1/99,2.57
+Belarus,112,IPUMS,7/1/99,2.63
+Belarus,112,MICS,7/1/05,2.67
+Belarus,112,DYB,7/1/09,2.43
+Belarus,112,IPUMS,7/1/09,2.48
+Belarus,112,MICS,7/1/12,2.46
+Belarus,112,DYB,7/1/19,2.16
+Belarus,112,MICS,7/1/19,2.34
+Belgium,56,DYB,7/1/01,2.36
+Belgium,56,LFS,7/1/01,2.4
+Belgium,56,DYB,7/1/11,2.32
+Belgium,56,LFS,7/1/11,2.36
+Belize,84,MICS,7/1/06,4.16
+Belize,84,MICS,7/1/11,3.91
+Belize,84,MICS,7/1/15,3.75
+Benin,204,IPUMS,7/1/79,5.4
+Benin,204,IPUMS,7/1/92,5.9
+Benin,204,DHS,18/7/96,6
+Benin,204,DHS,25/9/01,5.18
+Benin,204,DYB,7/1/02,..
+Benin,204,IPUMS,7/1/02,5.58
+Benin,204,DHS,29/9/06,5.05
+Benin,204,DHS,17/2/12,4.96
+Benin,204,DYB,7/1/13,5.52
+Benin,204,IPUMS,7/1/13,5.54
+Benin,204,MICS,7/1/14,5.18
+Benin,204,DHS,1/2/18,5.19
+Bermuda,60,DYB,7/1/00,2.47
+Bermuda,60,DYB,7/1/10,2.39
+Bermuda,60,DYB,7/1/16,2.26
+Bhutan,64,DYB,7/1/05,..
+Bhutan,64,MICS,7/1/10,4.59
+Bolivia (Plurinational State of),68,IPUMS,7/1/76,4.35
+Bolivia (Plurinational State of),68,IPUMS,7/1/92,4.35
+Bolivia (Plurinational State of),68,DHS,3/1/94,4.52
+Bolivia (Plurinational State of),68,DHS,14/6/98,4.36
+Bolivia (Plurinational State of),68,MICS,7/1/00,4.44
+Bolivia (Plurinational State of),68,DYB,7/1/01,4.09
+Bolivia (Plurinational State of),68,IPUMS,7/1/01,4.09
+Bolivia (Plurinational State of),68,DHS,27/10/03,4.23
+Bolivia (Plurinational State of),68,DHS,17/4/08,3.94
+Bolivia (Plurinational State of),68,DYB,7/1/12,3.53
+Bosnia and Herzegovina,70,MICS,7/1/00,3.37
+Bosnia and Herzegovina,70,MICS,7/1/06,3.14
+Bosnia and Herzegovina,70,MICS,7/1/11,3.5
+Botswana,72,IPUMS,7/1/81,5.61
+Botswana,72,IPUMS,7/1/91,4.73
+Botswana,72,MICS,7/1/00,4.31
+Botswana,72,DYB,7/1/01,4.15
+Botswana,72,IPUMS,7/1/01,4.11
+Botswana,72,DYB,7/1/11,..
+Botswana,72,IPUMS,7/1/11,3.52
+Brazil,76,IPUMS,7/1/60,5.13
+Brazil,76,IPUMS,7/1/70,5.1
+Brazil,76,IPUMS,7/1/80,4.65
+Brazil,76,IPUMS,7/1/91,4.19
+Brazil,76,DHS,11/8/91,4.75
+Brazil,76,DHS,5/2/96,4.09
+Brazil,76,DYB,7/1/00,3.76
+Brazil,76,IPUMS,7/1/00,3.76
+Brazil,76,IPUMS,7/1/10,3.31
+Brunei Darussalam,96,DYB,7/1/11,..
+Bulgaria,100,DYB,7/1/01,2.69
+Bulgaria,100,LFS,7/1/01,2.81
+Bulgaria,100,DYB,7/1/11,..
+Bulgaria,100,LFS,7/1/11,2.34
+Burkina Faso,854,IPUMS,7/1/85,6.23
+Burkina Faso,854,DHS,2/4/93,6.66
+Burkina Faso,854,IPUMS,7/1/96,6.55
+Burkina Faso,854,DHS,14/1/99,6.73
+Burkina Faso,854,DHS,9/9/03,6.49
+Burkina Faso,854,DYB,7/1/06,5.94
+Burkina Faso,854,IPUMS,7/1/06,5.93
+Burkina Faso,854,MICS,7/1/06,6.71
+Burkina Faso,854,DHS,9/9/10,5.67
+Burkina Faso,854,DHS,10/1/14,5.92
+Burundi,108,MICS,7/1/00,5.25
+Burundi,108,MICS,7/1/05,4.96
+Burundi,108,DYB,7/1/08,4.26
+Burundi,108,DHS,15/11/10,4.78
+Burundi,108,DHS,15/12/12,4.73
+Burundi,108,DHS,22/12/16,4.83
+Cambodia,116,IPUMS,7/1/98,5.17
+Cambodia,116,DHS,16/4/00,5.37
+Cambodia,116,IPUMS,7/1/04,4.88
+Cambodia,116,DHS,12/7/05,4.96
+Cambodia,116,DYB,7/1/08,..
+Cambodia,116,IPUMS,7/1/08,4.68
+Cambodia,116,DHS,21/10/10,4.75
+Cambodia,116,IPUMS,7/1/13,4.64
+Cambodia,116,DHS,9/1/14,4.61
+Cameroon,120,IPUMS,7/1/76,5.07
+Cameroon,120,IPUMS,7/1/87,5.14
+Cameroon,120,DHS,7/10/91,5.61
+Cameroon,120,DHS,20/4/98,5.5
+Cameroon,120,MICS,7/1/00,5.79
+Cameroon,120,DHS,6/6/04,4.79
+Cameroon,120,IPUMS,7/1/05,5.12
+Cameroon,120,MICS,7/1/06,4.51
+Cameroon,120,DHS,5/2/11,4.99
+Cameroon,120,MICS,7/1/14,4.56
+Cameroon,120,DHS,15/9/18,4.99
+Canada,124,DYB,7/1/01,2.55
+Canada,124,DYB,7/1/06,2.5
+Canada,124,DYB,7/1/11,2.47
+Canada,124,IPUMS,7/1/11,2.47
+Canada,124,DYB,7/1/16,2.45
+Cayman Islands,136,DYB,7/1/10,..
+Central African Republic,140,DHS,12/8/94,4.91
+Central African Republic,140,MICS,7/1/00,6.64
+Central African Republic,140,MICS,7/1/06,4.64
+Central African Republic,140,MICS,7/1/10,4.78
+Central African Republic,140,MICS,7/1/18,5.59
+Chad,148,DHS,29/3/97,5.33
+Chad,148,MICS,7/1/00,5.37
+Chad,148,DHS,10/1/04,5.36
+Chad,148,MICS,7/1/10,5.4
+Chad,148,DHS,16/1/15,5.78
+Chad,148,MICS,7/1/19,5.97
+Channel Islands,830,DYB,7/1/18,..
+Chile,152,IPUMS,7/1/70,5.04
+Chile,152,IPUMS,7/1/82,4.5
+Chile,152,IPUMS,7/1/92,3.98
+Chile,152,DYB,7/1/02,3.57
+Chile,152,IPUMS,7/1/02,3.58
+Chile,152,IPUMS,7/1/17,3.04
+China,156,IPUMS,7/1/82,4.41
+China,156,IPUMS,7/1/90,3.95
+China,156,IPUMS,7/1/00,3.38
+China,156,DYB,7/1/10,..
+"China, Hong Kong SAR",344,DYB,7/1/06,2.98
+"China, Hong Kong SAR",344,DYB,7/1/11,2.91
+"China, Hong Kong SAR",344,DYB,7/1/16,2.83
+"China, Macao SAR",446,DYB,7/1/11,3.08
+"China, Macao SAR",446,DYB,7/1/16,3.07
+Colombia,170,IPUMS,7/1/73,5.68
+Colombia,170,IPUMS,7/1/85,5.06
+Colombia,170,DHS,26/6/90,4.64
+Colombia,170,IPUMS,7/1/93,4.49
+Colombia,170,DHS,22/5/95,4.44
+Colombia,170,DHS,18/4/00,4.2
+Colombia,170,DHS,17/2/05,4.11
+Colombia,170,DYB,7/1/05,3.9
+Colombia,170,IPUMS,7/1/05,3.83
+Colombia,170,DHS,6/4/10,3.77
+Colombia,170,DHS,28/8/15,3.53
+Comoros,174,DHS,5/1/96,6.31
+Comoros,174,MICS,7/1/00,7.42
+Comoros,174,DHS,15/10/12,5.37
+Congo,178,DHS,15/9/05,5.17
+Congo,178,DHS,30/4/09,4.2
+Congo,178,DHS,26/11/11,4.31
+Congo,178,MICS,7/1/14,4.22
+Cook Islands,184,DYB,7/1/96,..
+Cook Islands,184,DYB,7/1/06,..
+Cook Islands,184,DYB,7/1/11,..
+Costa Rica,188,IPUMS,7/1/73,5.59
+Costa Rica,188,IPUMS,7/1/84,4.68
+Costa Rica,188,IPUMS,7/1/00,3.95
+Costa Rica,188,DYB,7/1/11,3.46
+Costa Rica,188,IPUMS,7/1/11,3.46
+Costa Rica,188,MICS,7/1/11,3.66
+Costa Rica,188,MICS,7/1/18,3.21
+Côte d’Ivoire,384,DHS,9/3/94,6.22
+Côte d’Ivoire,384,DHS,17/12/98,6.19
+Côte d’Ivoire,384,DHS,14/9/05,5.48
+Côte d’Ivoire,384,DHS,3/2/12,5.09
+Côte d’Ivoire,384,MICS,7/1/16,4.58
+Croatia,191,DYB,7/1/01,2.99
+Croatia,191,DYB,7/1/11,2.8
+Cuba,192,IPUMS,7/1/02,3.14
+Cuba,192,MICS,7/1/06,3.25
+Cuba,192,MICS,7/1/10,3.06
+Cuba,192,MICS,7/1/14,2.81
+Cuba,192,MICS,7/1/19,2.71
+Cyprus,196,DYB,7/1/01,3.06
+Cyprus,196,LFS,7/1/01,2.96
+Cyprus,196,DYB,7/1/11,2.76
+Cyprus,196,LFS,7/1/11,2.75
+Czechia,203,DYB,7/1/01,2.41
+Czechia,203,LFS,7/1/01,2.6
+Czechia,203,DYB,7/1/11,2.34
+Czechia,203,LFS,7/1/11,2.4
+Dem. People's Rep. of Korea,408,DYB,7/1/08,3.93
+Dem. Republic of the Congo,180,MICS,7/1/01,6.29
+Dem. Republic of the Congo,180,DHS,5/9/07,5.45
+Dem. Republic of the Congo,180,MICS,7/1/10,5.32
+Dem. Republic of the Congo,180,DHS,11/10/13,5.3
+Dem. Republic of the Congo,180,MICS,7/1/17,5.17
+Djibouti,262,MICS,7/1/06,5.89
+Dominican Republic,214,IPUMS,7/1/81,5
+Dominican Republic,214,DHS,18/9/91,..
+Dominican Republic,214,DHS,26/10/96,4.3
+Dominican Republic,214,DHS,18/10/99,4.21
+Dominican Republic,214,MICS,7/1/00,3.99
+Dominican Republic,214,DYB,7/1/02,3.9
+Dominican Republic,214,IPUMS,7/1/02,3.96
+Dominican Republic,214,DHS,26/9/02,3.93
+Dominican Republic,214,DHS,27/5/07,3.71
+Dominican Republic,214,DYB,7/1/10,3.53
+Dominican Republic,214,IPUMS,7/1/10,3.58
+Dominican Republic,214,DHS,9/2/13,3.48
+Dominican Republic,214,MICS,7/1/14,3.36
+Dominican Republic,214,MICS,7/1/19,3.09
+Ecuador,218,IPUMS,7/1/74,5.37
+Ecuador,218,IPUMS,7/1/82,5.06
+Ecuador,218,IPUMS,7/1/90,4.68
+Ecuador,218,DYB,7/1/01,4.19
+Ecuador,218,IPUMS,7/1/01,4.19
+Ecuador,218,DYB,7/1/10,3.78
+Ecuador,218,IPUMS,7/1/10,3.78
+Egypt,818,IPUMS,7/1/86,4.85
+Egypt,818,DHS,23/12/92,5.65
+Egypt,818,DHS,19/12/95,5.33
+Egypt,818,IPUMS,7/1/96,4.64
+Egypt,818,DHS,20/3/00,5.25
+Egypt,818,DHS,6/6/03,5.05
+Egypt,818,DHS,6/2/05,4.88
+Egypt,818,IPUMS,7/1/06,4.19
+Egypt,818,DHS,23/4/08,4.61
+Egypt,818,MICS,7/1/13,4.61
+Egypt,818,DHS,20/5/14,4.13
+El Salvador,222,IPUMS,7/1/92,4.62
+El Salvador,222,IPUMS,7/1/07,4.07
+El Salvador,222,MICS,7/1/14,3.92
+Equatorial Guinea,226,MICS,7/1/00,5.3
+Estonia,233,DYB,7/1/00,2.35
+Estonia,233,LFS,7/1/01,2.63
+Estonia,233,LFS,7/1/11,2.3
+Eswatini,748,DYB,7/1/97,..
+Eswatini,748,MICS,7/1/00,5.51
+Eswatini,748,DHS,11/11/06,4.64
+Eswatini,748,DYB,7/1/07,4.74
+Eswatini,748,MICS,7/1/10,4.26
+Eswatini,748,MICS,7/1/14,4.04
+Ethiopia,231,IPUMS,7/1/94,4.78
+Ethiopia,231,DHS,4/1/00,4.82
+Ethiopia,231,DHS,28/6/05,5.03
+Ethiopia,231,DYB,7/1/07,4.69
+Ethiopia,231,IPUMS,7/1/07,4.45
+Ethiopia,231,DHS,16/3/11,4.64
+Ethiopia,231,DHS,4/7/16,4.61
+Ethiopia,231,DHS,4/7/19,4.73
+Fiji,242,IPUMS,7/1/66,6.3
+Fiji,242,IPUMS,7/1/76,5.96
+Fiji,242,IPUMS,7/1/86,5.85
+Fiji,242,IPUMS,7/1/96,5.31
+Fiji,242,IPUMS,7/1/07,4.78
+Fiji,242,IPUMS,7/1/14,4.57
+Finland,246,DYB,7/1/10,2.07
+France,250,IPUMS,7/1/62,3.11
+France,250,IPUMS,7/1/68,3.06
+France,250,IPUMS,7/1/75,2.88
+France,250,IPUMS,7/1/82,2.71
+France,250,IPUMS,7/1/90,2.57
+France,250,IPUMS,7/1/99,2.4
+France,250,LFS,7/1/01,2.35
+France,250,IPUMS,7/1/06,2.31
+France,250,IPUMS,7/1/11,2.26
+France,250,LFS,7/1/11,2.25
+France,250,DYB,7/1/15,2.22
+French Guiana,254,DYB,7/1/15,3.45
+French Polynesia,258,DYB,7/1/07,..
+Gabon,266,DHS,19/10/00,4.97
+Gabon,266,DHS,3/8/12,4.1
+Gambia,270,MICS,7/1/05,7.39
+Gambia,270,MICS,7/1/10,8.09
+Gambia,270,DHS,13/3/13,8.23
+Gambia,270,MICS,7/1/18,8
+Gambia,270,DHS,25/1/20,8.07
+Georgia,268,DYB,7/1/02,3.52
+Georgia,268,MICS,7/1/05,3.64
+Georgia,268,DYB,7/1/14,3.34
+Georgia,268,MICS,7/1/18,3.42
+Germany,276,LFS,7/1/05,2.12
+Germany,276,DYB,7/1/11,2.14
+Germany,276,LFS,7/1/11,2.05
+Ghana,288,IPUMS,7/1/84,5.01
+Ghana,288,DHS,12/3/93,3.77
+Ghana,288,DHS,1/3/99,3.61
+Ghana,288,IPUMS,7/1/00,5.08
+Ghana,288,DHS,23/9/03,4.03
+Ghana,288,MICS,7/1/06,4.2
+Ghana,288,DHS,16/10/08,3.75
+Ghana,288,DYB,7/1/10,4.4
+Ghana,288,IPUMS,7/1/10,4.41
+Ghana,288,MICS,7/1/11,3.87
+Ghana,288,DHS,22/10/14,3.49
+Ghana,288,MICS,7/1/17,4.7
+Ghana,288,DHS,18/10/19,3.83
+Greece,300,IPUMS,7/1/71,3.39
+Greece,300,IPUMS,7/1/81,3.14
+Greece,300,IPUMS,7/1/91,2.97
+Greece,300,DYB,7/1/01,2.8
+Greece,300,IPUMS,7/1/01,2.8
+Greece,300,LFS,7/1/01,2.64
+Greece,300,IPUMS,7/1/11,2.56
+Greece,300,LFS,7/1/11,2.44
+Guadeloupe,312,DYB,7/1/15,2.3
+Guatemala,320,IPUMS,7/1/64,5.23
+Guatemala,320,IPUMS,7/1/73,4.99
+Guatemala,320,IPUMS,7/1/81,5.2
+Guatemala,320,IPUMS,7/1/94,5.21
+Guatemala,320,DHS,9/12/95,5.26
+Guatemala,320,DHS,2/7/99,5.28
+Guatemala,320,IPUMS,7/1/02,5.08
+Guatemala,320,DHS,26/2/15,4.81
+Guinea,324,IPUMS,7/1/83,6.23
+Guinea,324,IPUMS,7/1/96,6.78
+Guinea,324,DHS,6/6/99,6.62
+Guinea,324,DHS,15/4/05,6.09
+Guinea,324,DHS,8/6/12,6.25
+Guinea,324,IPUMS,7/1/14,7.15
+Guinea,324,MICS,7/1/16,5.95
+Guinea,324,DHS,8/11/21,6.39
+Guinea-Bissau,624,MICS,7/1/00,8.01
+Guinea-Bissau,624,MICS,7/1/06,7.79
+Guinea-Bissau,624,MICS,7/1/14,7.26
+Guinea-Bissau,624,MICS,7/1/18,6.81
+Guyana,328,MICS,7/1/00,4.18
+Guyana,328,DHS,31/7/05,4.16
+Guyana,328,MICS,7/1/06,4.05
+Guyana,328,DHS,20/5/09,3.8
+Guyana,328,MICS,7/1/14,3.81
+Guyana,328,MICS,7/1/19,3.5
+Haiti,332,IPUMS,7/1/71,4.6
+Haiti,332,DHS,10/1/94,5.02
+Haiti,332,DHS,30/4/00,4.69
+Haiti,332,IPUMS,7/1/03,4.68
+Haiti,332,DHS,2/3/06,4.61
+Haiti,332,DHS,4/6/12,4.43
+Haiti,332,DHS,26/1/17,4.29
+Honduras,340,IPUMS,7/1/74,5.67
+Honduras,340,IPUMS,7/1/88,5.52
+Honduras,340,IPUMS,7/1/01,5
+Honduras,340,DHS,2/7/06,4.8
+Honduras,340,DHS,21/2/12,4.47
+Honduras,340,MICS,7/1/19,3.87
+Hungary,348,IPUMS,7/1/70,3.29
+Hungary,348,IPUMS,7/1/80,2.79
+Hungary,348,IPUMS,7/1/90,2.6
+Hungary,348,DYB,7/1/01,2.57
+Hungary,348,IPUMS,7/1/01,2.57
+Hungary,348,LFS,7/1/01,2.62
+Hungary,348,DYB,7/1/11,2.36
+Hungary,348,IPUMS,7/1/11,2.36
+Hungary,348,LFS,7/1/11,2.6
+India,356,IPUMS,7/1/83,5.09
+India,356,IPUMS,7/1/87,5
+India,356,DHS,12/3/92,5.7
+India,356,IPUMS,7/1/93,4.78
+India,356,IPUMS,7/1/99,4.87
+India,356,DHS,21/9/99,5.43
+India,356,DYB,7/1/01,5.29
+India,356,IPUMS,7/1/04,4.69
+India,356,DHS,20/4/06,4.84
+India,356,IPUMS,7/1/09,4.42
+India,356,DHS,28/12/15,4.57
+India,356,DHS,23/5/20,4.38
+Indonesia,360,IPUMS,7/1/71,4.84
+Indonesia,360,IPUMS,7/1/76,4.9
+Indonesia,360,IPUMS,7/1/80,4.82
+Indonesia,360,IPUMS,7/1/85,4.68
+Indonesia,360,IPUMS,7/1/90,4.48
+Indonesia,360,DHS,28/6/91,4.63
+Indonesia,360,DHS,15/9/94,4.47
+Indonesia,360,IPUMS,7/1/95,4.23
+Indonesia,360,DHS,31/10/97,4.31
+Indonesia,360,IPUMS,7/1/00,3.94
+Indonesia,360,MICS,7/1/00,4.1
+Indonesia,360,DHS,15/1/03,4.32
+Indonesia,360,IPUMS,7/1/05,3.95
+Indonesia,360,DHS,18/9/07,4.1
+Indonesia,360,IPUMS,7/1/10,3.85
+Indonesia,360,DHS,30/6/12,3.99
+Indonesia,360,DHS,15/8/17,3.86
+Iran (Islamic Republic of),364,DYB,7/1/96,4.76
+Iran (Islamic Republic of),364,DYB,7/1/06,..
+Iran (Islamic Republic of),364,IPUMS,7/1/06,4.05
+Iran (Islamic Republic of),364,DYB,7/1/11,3.51
+Iran (Islamic Republic of),364,IPUMS,7/1/11,3.49
+Iran (Islamic Republic of),364,DYB,7/1/16,..
+Iraq,368,IPUMS,7/1/97,7.7
+Iraq,368,MICS,7/1/00,7.22
+Iraq,368,MICS,7/1/06,6.31
+Iraq,368,MICS,7/1/11,6.46
+Iraq,368,MICS,7/1/18,6.35
+Ireland,372,IPUMS,7/1/71,3.93
+Ireland,372,IPUMS,7/1/79,3.75
+Ireland,372,IPUMS,7/1/81,3.66
+Ireland,372,IPUMS,7/1/86,3.55
+Ireland,372,IPUMS,7/1/91,3.35
+Ireland,372,DYB,7/1/96,3.14
+Ireland,372,IPUMS,7/1/96,3.15
+Ireland,372,DYB,7/1/02,2.94
+Ireland,372,IPUMS,7/1/02,3.09
+Ireland,372,DYB,7/1/06,2.81
+Ireland,372,IPUMS,7/1/06,2.92
+Ireland,372,LFS,7/1/06,2.84
+Ireland,372,DYB,7/1/11,2.73
+Ireland,372,IPUMS,7/1/11,2.81
+Ireland,372,LFS,7/1/11,2.77
+Ireland,372,IPUMS,7/1/16,2.83
+Isle of Man,833,DYB,7/1/16,2.28
+Israel,376,IPUMS,7/1/72,3.8
+Israel,376,IPUMS,7/1/83,3.46
+Israel,376,DYB,7/1/95,3.3
+Israel,376,IPUMS,7/1/95,3.35
+Israel,376,DYB,7/1/08,3.14
+Italy,380,DYB,7/1/01,2.59
+Italy,380,IPUMS,7/1/01,2.59
+Italy,380,LFS,7/1/01,2.6
+Italy,380,DYB,7/1/11,2.4
+Italy,380,IPUMS,7/1/11,2.4
+Italy,380,LFS,7/1/11,2.4
+Jamaica,388,IPUMS,7/1/82,4.23
+Jamaica,388,IPUMS,7/1/91,3.87
+Jamaica,388,IPUMS,7/1/01,3.45
+Jamaica,388,MICS,7/1/05,3.29
+Jamaica,388,DYB,7/1/11,3.06
+Jamaica,388,MICS,7/1/11,3.18
+Japan,392,DYB,7/1/00,2.67
+Japan,392,DYB,7/1/05,2.55
+Japan,392,DYB,7/1/10,2.42
+Japan,392,DYB,7/1/15,2.33
+Jordan,400,DHS,29/7/97,5.99
+Jordan,400,DHS,16/8/02,5.68
+Jordan,400,IPUMS,7/1/04,5.37
+Jordan,400,DHS,17/8/07,5.27
+Jordan,400,DHS,16/11/09,5.09
+Jordan,400,DHS,29/10/12,5.07
+Jordan,400,DYB,7/1/15,..
+Jordan,400,DHS,12/1/17,4.72
+Kazakhstan,398,DHS,7/8/95,3.81
+Kazakhstan,398,DHS,25/8/99,3.61
+Kazakhstan,398,MICS,7/1/06,3.52
+Kazakhstan,398,DYB,7/1/09,3.5
+Kazakhstan,398,MICS,7/1/10,3.45
+Kazakhstan,398,MICS,7/1/15,3.44
+Kenya,404,IPUMS,7/1/69,5.34
+Kenya,404,IPUMS,7/1/89,4.9
+Kenya,404,DHS,5/11/93,4.8
+Kenya,404,DHS,5/1/98,4.29
+Kenya,404,IPUMS,7/1/99,4.43
+Kenya,404,MICS,7/1/00,5.07
+Kenya,404,DHS,20/6/03,4.36
+Kenya,404,DHS,1/4/09,4.21
+Kenya,404,IPUMS,7/1/09,4.29
+Kenya,404,DHS,30/7/14,3.92
+Kenya,404,DHS,26/7/15,3.64
+Kenya,404,DYB,7/1/19,..
+Kenya,404,DHS,12/1/20,3.75
+Kiribati,296,MICS,7/1/18,5.9
+Kosovo (under UNSC res. 1244),412,MICS,7/1/13,5.43
+Kosovo (under UNSC res. 1244),412,MICS,7/1/19,4.9
+Kyrgyzstan,417,DHS,28/9/97,4.65
+Kyrgyzstan,417,IPUMS,7/1/99,4.41
+Kyrgyzstan,417,MICS,7/1/05,4.82
+Kyrgyzstan,417,DYB,7/1/09,4.66
+Kyrgyzstan,417,IPUMS,7/1/09,4.6
+Kyrgyzstan,417,DHS,15/10/12,4.21
+Kyrgyzstan,417,MICS,7/1/14,4.3
+Kyrgyzstan,417,MICS,7/1/18,4.05
+Lao People's Dem. Republic,418,MICS,7/1/00,5.96
+Lao People's Dem. Republic,418,IPUMS,7/1/05,5.77
+Lao People's Dem. Republic,418,MICS,7/1/06,5.62
+Lao People's Dem. Republic,418,MICS,7/1/11,5.17
+Lao People's Dem. Republic,418,DYB,7/1/15,5.3
+Lao People's Dem. Republic,418,MICS,7/1/17,4.7
+Latvia,428,DYB,7/1/00,2.66
+Latvia,428,LFS,7/1/01,2.44
+Latvia,428,DYB,7/1/11,2.38
+Latvia,428,LFS,7/1/11,2.58
+Latvia,428,DYB,7/1/21,2.26
+Lesotho,426,IPUMS,7/1/96,4.96
+Lesotho,426,MICS,7/1/00,4.42
+Lesotho,426,DHS,12/8/04,3.9
+Lesotho,426,DYB,7/1/06,4.41
+Lesotho,426,IPUMS,7/1/06,4.27
+Lesotho,426,DHS,28/11/09,3.59
+Lesotho,426,DHS,11/3/14,3.34
+Lesotho,426,MICS,7/1/18,3.73
+Liberia,430,DHS,26/2/07,5.04
+Liberia,430,IPUMS,7/1/08,5.11
+Liberia,430,DHS,29/1/09,5.58
+Liberia,430,DHS,30/10/11,4.5
+Liberia,430,DHS,13/5/13,4.95
+Liberia,430,DHS,2/1/19,4.58
+Liechtenstein,438,DYB,7/1/10,2.32
+Liechtenstein,438,DYB,7/1/15,2.26
+Lithuania,440,DYB,7/1/01,2.55
+Lithuania,440,LFS,7/1/02,2.94
+Lithuania,440,DYB,7/1/11,2.38
+Lithuania,440,LFS,7/1/11,2.32
+Luxembourg,442,DYB,7/1/01,2.51
+Luxembourg,442,LFS,7/1/01,2.52
+Luxembourg,442,DYB,7/1/11,2.41
+Luxembourg,442,LFS,7/1/11,2.41
+Madagascar,450,DHS,8/8/92,5.18
+Madagascar,450,DHS,19/10/97,4.91
+Madagascar,450,MICS,7/1/00,5.1
+Madagascar,450,DHS,25/1/04,4.66
+Madagascar,450,DHS,17/3/09,4.73
+Madagascar,450,DHS,30/4/11,4.95
+Madagascar,450,MICS,7/1/18,4.5
+Malawi,454,IPUMS,7/1/87,4.26
+Malawi,454,DHS,10/8/92,4.47
+Malawi,454,IPUMS,7/1/98,4.34
+Malawi,454,DHS,14/9/00,4.4
+Malawi,454,DHS,30/11/04,4.39
+Malawi,454,MICS,7/1/06,4.29
+Malawi,454,IPUMS,7/1/08,4.52
+Malawi,454,DHS,8/6/10,4.64
+Malawi,454,MICS,7/1/13,4.52
+Malawi,454,DHS,6/1/14,4.12
+Malawi,454,DHS,17/12/15,4.51
+Malawi,454,MICS,7/1/19,4.28
+Malaysia,458,IPUMS,7/1/70,4.76
+Malaysia,458,IPUMS,7/1/80,5.12
+Malaysia,458,IPUMS,7/1/91,4.79
+Malaysia,458,DYB,7/1/00,4.57
+Malaysia,458,IPUMS,7/1/00,4.56
+Maldives,462,DHS,24/5/09,6.36
+Maldives,462,DYB,7/1/14,5.33
+Maldives,462,DHS,21/1/17,5.4
+Mali,466,IPUMS,7/1/87,5.65
+Mali,466,DHS,2/4/96,5.6
+Mali,466,IPUMS,7/1/98,6.06
+Mali,466,DHS,30/3/01,5.33
+Mali,466,DHS,8/9/06,5.69
+Mali,466,DYB,7/1/09,..
+Mali,466,IPUMS,7/1/09,6.16
+Mali,466,DHS,31/12/12,5.67
+Mali,466,DHS,27/9/18,5.81
+Malta,470,DYB,7/1/95,3.12
+Malta,470,DYB,7/1/05,2.86
+Malta,470,DYB,7/1/11,2.67
+Malta,470,LFS,7/1/11,2.85
+Martinique,474,DYB,7/1/15,2.25
+Mauritania,478,MICS,7/1/07,5.75
+Mauritania,478,MICS,7/1/11,5.97
+Mauritania,478,MICS,7/1/15,5.77
+Mauritius,480,DYB,7/1/00,..
+Mauritius,480,DYB,7/1/11,3.48
+Mayotte,175,DYB,7/1/12,4.1
+Mayotte,175,DYB,7/1/17,4.05
+Mexico,484,IPUMS,7/1/70,5.83
+Mexico,484,IPUMS,7/1/90,4.93
+Mexico,484,IPUMS,7/1/95,4.57
+Mexico,484,DYB,7/1/00,4.28
+Mexico,484,IPUMS,7/1/00,4.29
+Mexico,484,DYB,7/1/10,3.93
+Mexico,484,IPUMS,7/1/10,3.9
+Mexico,484,IPUMS,7/1/15,3.74
+Mexico,484,MICS,7/1/15,3.75
+Monaco,492,DYB,7/1/16,2.13
+Mongolia,496,IPUMS,7/1/89,4.46
+Mongolia,496,IPUMS,7/1/00,4.32
+Mongolia,496,MICS,7/1/00,4.99
+Mongolia,496,MICS,7/1/05,4.29
+Mongolia,496,MICS,7/1/13,3.45
+Mongolia,496,MICS,7/1/18,3.63
+Montenegro,499,MICS,7/1/05,3.81
+Montenegro,499,DYB,7/1/11,3.21
+Montenegro,499,MICS,7/1/13,3.41
+Montenegro,499,MICS,7/1/18,3.29
+Morocco,504,IPUMS,7/1/82,5.9
+Morocco,504,DHS,15/3/92,6.02
+Morocco,504,IPUMS,7/1/94,5.83
+Morocco,504,DHS,24/12/03,5.36
+Morocco,504,IPUMS,7/1/04,5.24
+Morocco,504,IPUMS,7/1/14,4.58
+Mozambique,508,DHS,5/9/97,4.62
+Mozambique,508,IPUMS,7/1/97,4.19
+Mozambique,508,DHS,11/7/03,4.86
+Mozambique,508,IPUMS,7/1/07,4.36
+Mozambique,508,MICS,7/1/08,4.6
+Mozambique,508,DHS,31/7/09,4.27
+Mozambique,508,DHS,29/8/11,4.37
+Mozambique,508,DHS,31/5/18,4.52
+Myanmar,104,MICS,7/1/00,5.07
+Myanmar,104,IPUMS,7/1/14,4.4
+Myanmar,104,DHS,22/3/16,4.22
+Namibia,516,DHS,14/9/92,6
+Namibia,516,DHS,11/4/00,5.06
+Namibia,516,DHS,16/1/07,4.5
+Namibia,516,DHS,25/7/13,4.24
+Nepal,524,DHS,31/3/96,5.51
+Nepal,524,DHS,4/11/01,5.29
+Nepal,524,DYB,7/1/01,..
+Nepal,524,IPUMS,7/1/01,5.38
+Nepal,524,DHS,13/5/06,4.85
+Nepal,524,DHS,4/9/11,4.45
+Nepal,524,DYB,7/1/11,..
+Nepal,524,IPUMS,7/1/11,4.84
+Nepal,524,MICS,7/1/14,4.58
+Nepal,524,DHS,10/10/16,4.24
+Nepal,524,MICS,7/1/19,4.25
+Netherlands,528,LFS,7/1/01,2.31
+Netherlands,528,LFS,7/1/11,2.23
+New Caledonia,540,DYB,7/1/04,..
+New Zealand,554,DYB,7/1/01,2.7
+New Zealand,554,DYB,7/1/06,2.7
+New Zealand,554,DYB,7/1/13,2.67
+New Zealand,554,DYB,7/1/18,2.6
+Nicaragua,558,IPUMS,7/1/71,5.86
+Nicaragua,558,IPUMS,7/1/95,5.78
+Nicaragua,558,DHS,3/1/98,5.53
+Nicaragua,558,DHS,29/10/01,5.29
+Nicaragua,558,IPUMS,7/1/05,4.92
+Niger,562,DHS,30/4/92,6.27
+Niger,562,DHS,16/4/98,5.94
+Niger,562,MICS,7/1/00,5.98
+Niger,562,DHS,3/9/06,6.09
+Niger,562,DHS,24/4/12,5.92
+Nigeria,566,DHS,15/8/90,5.39
+Nigeria,566,DHS,30/4/99,5
+Nigeria,566,DHS,26/5/03,4.98
+Nigeria,566,IPUMS,7/1/06,4.41
+Nigeria,566,IPUMS,7/1/07,4.55
+Nigeria,566,MICS,7/1/07,4.67
+Nigeria,566,IPUMS,7/1/08,4.79
+Nigeria,566,DHS,28/8/08,4.43
+Nigeria,566,IPUMS,7/1/09,4.44
+Nigeria,566,IPUMS,7/1/10,4.39
+Nigeria,566,DHS,14/11/10,5.2
+Nigeria,566,MICS,7/1/11,5.03
+Nigeria,566,DHS,24/4/13,4.6
+Nigeria,566,DHS,31/10/15,4.9
+Nigeria,566,MICS,7/1/16,5.37
+Nigeria,566,DHS,21/10/18,4.66
+Norway,578,DYB,7/1/01,2.29
+Norway,578,DYB,7/1/11,2.22
+Oman,512,DYB,7/1/03,8.02
+Pakistan,586,IPUMS,7/1/73,4.81
+Pakistan,586,DHS,28/3/91,6.73
+Pakistan,586,IPUMS,7/1/98,6.82
+Pakistan,586,DHS,12/3/06,7.15
+Pakistan,586,DHS,1/8/13,6.8
+Palau,585,DYB,7/1/05,..
+Panama,591,IPUMS,7/1/60,4.73
+Panama,591,IPUMS,7/1/70,4.85
+Panama,591,IPUMS,7/1/80,4.69
+Panama,591,IPUMS,7/1/90,4.39
+Panama,591,IPUMS,7/1/00,3.98
+Panama,591,IPUMS,7/1/10,3.67
+Panama,591,MICS,7/1/13,3.64
+Papua New Guinea,598,IPUMS,7/1/80,4.47
+Papua New Guinea,598,IPUMS,7/1/90,5.48
+Papua New Guinea,598,IPUMS,7/1/00,5.43
+Paraguay,600,IPUMS,7/1/62,5.33
+Paraguay,600,IPUMS,7/1/72,5.43
+Paraguay,600,IPUMS,7/1/82,5.14
+Paraguay,600,DHS,30/6/90,5.06
+Paraguay,600,IPUMS,7/1/92,4.76
+Paraguay,600,IPUMS,7/1/02,4.63
+Paraguay,600,MICS,7/1/16,3.87
+Peru,604,DHS,22/12/91,5.27
+Peru,604,IPUMS,7/1/93,4.58
+Peru,604,DHS,10/6/96,4.86
+Peru,604,DHS,21/9/00,4.53
+Peru,604,DHS,17/5/05,4.01
+Peru,604,DYB,7/1/07,4.01
+Peru,604,IPUMS,7/1/07,4.01
+Peru,604,DHS,17/12/07,4.01
+Peru,604,DHS,7/8/09,3.93
+Peru,604,DHS,31/7/10,3.77
+Peru,604,DHS,15/7/11,3.71
+Peru,604,DHS,31/7/12,3.75
+Peru,604,DYB,7/1/17,3.46
+Philippines,608,IPUMS,7/1/90,5.21
+Philippines,608,DHS,29/5/93,5.33
+Philippines,608,IPUMS,7/1/95,5.07
+Philippines,608,DHS,13/4/98,5.07
+Philippines,608,MICS,7/1/99,4.97
+Philippines,608,IPUMS,7/1/00,4.91
+Philippines,608,DHS,8/1/03,4.82
+Philippines,608,DYB,7/1/07,4.76
+Philippines,608,DHS,31/8/08,4.78
+Philippines,608,IPUMS,7/1/10,4.54
+Philippines,608,DHS,13/9/13,4.74
+Philippines,608,DYB,7/1/15,4.38
+Philippines,608,DHS,17/9/17,4.23
+Poland,616,IPUMS,7/1/78,3.18
+Poland,616,IPUMS,7/1/88,3.05
+Poland,616,LFS,7/1/01,3.06
+Poland,616,DYB,7/1/02,2.84
+Poland,616,IPUMS,7/1/02,2.84
+Poland,616,DYB,7/1/11,2.82
+Poland,616,LFS,7/1/11,2.81
+Portugal,620,IPUMS,7/1/81,3.35
+Portugal,620,IPUMS,7/1/91,3.11
+Portugal,620,DYB,7/1/01,2.84
+Portugal,620,IPUMS,7/1/01,2.8
+Portugal,620,LFS,7/1/01,2.9
+Portugal,620,DYB,7/1/11,2.58
+Portugal,620,IPUMS,7/1/11,2.61
+Portugal,620,LFS,7/1/11,2.66
+Puerto Rico,630,IPUMS,7/1/70,4.25
+Puerto Rico,630,IPUMS,7/1/80,3.66
+Puerto Rico,630,IPUMS,7/1/90,3.17
+Puerto Rico,630,DYB,7/1/00,2.98
+Puerto Rico,630,IPUMS,7/1/00,2.97
+Puerto Rico,630,IPUMS,7/1/05,2.76
+Puerto Rico,630,IPUMS,7/1/10,2.67
+Qatar,634,MICS,7/1/12,4.67
+Republic of Korea,410,DYB,7/1/05,2.88
+Republic of Korea,410,DYB,7/1/10,..
+Republic of Korea,410,DYB,7/1/15,2.53
+Republic of Korea,410,DYB,7/1/20,2.34
+Republic of Moldova,498,MICS,7/1/00,3.09
+Republic of Moldova,498,DYB,7/1/04,2.99
+Republic of Moldova,498,DHS,14/7/05,2.82
+Republic of Moldova,498,MICS,7/1/12,2.54
+Republic of Moldova,498,DYB,7/1/14,2.89
+Réunion,638,DYB,7/1/15,2.64
+Romania,642,IPUMS,7/1/77,3.12
+Romania,642,IPUMS,7/1/92,3.07
+Romania,642,LFS,7/1/01,3.02
+Romania,642,DYB,7/1/02,2.92
+Romania,642,IPUMS,7/1/02,2.92
+Romania,642,DYB,7/1/11,2.67
+Romania,642,IPUMS,7/1/11,2.67
+Romania,642,LFS,7/1/11,2.88
+Russian Federation,643,DYB,7/1/02,2.71
+Russian Federation,643,IPUMS,7/1/02,2.71
+Russian Federation,643,DYB,7/1/10,2.58
+Russian Federation,643,IPUMS,7/1/10,2.58
+Rwanda,646,IPUMS,7/1/91,4.74
+Rwanda,646,DHS,8/6/92,4.98
+Rwanda,646,MICS,7/1/00,4.8
+Rwanda,646,DHS,9/12/00,4.56
+Rwanda,646,DYB,7/1/02,4.53
+Rwanda,646,IPUMS,7/1/02,4.53
+Rwanda,646,DHS,20/5/05,4.57
+Rwanda,646,DHS,17/2/08,4.34
+Rwanda,646,DHS,30/12/10,4.44
+Rwanda,646,DYB,7/1/12,4.28
+Rwanda,646,IPUMS,7/1/12,4.28
+Rwanda,646,DHS,17/8/12,4.3
+Rwanda,646,DHS,19/1/15,4.26
+Rwanda,646,DHS,15/3/20,4.28
+Saint-Martin (French part),663,DYB,7/1/15,2.56
+Saint Barthélémy,652,DYB,7/1/15,2.42
+Saint Barthélémy,652,DYB,7/1/15,2.42
+Saint Helena,654,DYB,7/1/08,..
+Saint Kitts and Nevis,659,DYB,7/1/11,..
+Saint Lucia,662,MICS,7/1/12,2.89
+Saint Pierre and Miquelon,666,DYB,7/1/15,2.26
+Samoa,882,DYB,7/1/16,6.75
+Samoa,882,MICS,7/1/19,6.6
+Sao Tome and Principe,678,MICS,7/1/00,4.34
+Sao Tome and Principe,678,DYB,7/1/01,..
+Sao Tome and Principe,678,DHS,13/11/08,3.84
+Sao Tome and Principe,678,DYB,7/1/12,..
+Sao Tome and Principe,678,MICS,7/1/14,3.85
+Sao Tome and Principe,678,MICS,7/1/19,4.06
+Senegal,686,IPUMS,7/1/88,8.83
+Senegal,686,DHS,24/3/93,8.83
+Senegal,686,DHS,3/8/97,8.98
+Senegal,686,MICS,7/1/00,9.42
+Senegal,686,DYB,7/1/02,..
+Senegal,686,IPUMS,7/1/02,9.14
+Senegal,686,DHS,31/3/05,8.7
+Senegal,686,DHS,30/11/06,9.39
+Senegal,686,DHS,30/12/08,9.25
+Senegal,686,DHS,19/1/11,9.32
+Senegal,686,DHS,2/1/13,8.99
+Senegal,686,DHS,10/7/13,8.8
+Senegal,686,DHS,6/6/14,8.62
+Senegal,686,DHS,20/6/15,8.32
+Senegal,686,DHS,13/7/16,8.31
+Senegal,686,DHS,16/8/17,8.66
+Serbia,688,DYB,7/1/02,2.97
+Serbia,688,MICS,7/1/05,3.23
+Serbia,688,MICS,7/1/10,3.27
+Serbia,688,DYB,7/1/11,2.88
+Serbia,688,MICS,7/1/14,3.1
+Serbia,688,MICS,7/1/19,2.85
+Seychelles,690,DYB,7/1/02,3.78
+Seychelles,690,DYB,7/1/10,..
+Sierra Leone,694,MICS,7/1/00,6.29
+Sierra Leone,694,IPUMS,7/1/04,5.99
+Sierra Leone,694,MICS,7/1/05,6.04
+Sierra Leone,694,DHS,20/5/08,5.88
+Sierra Leone,694,MICS,7/1/10,5.85
+Sierra Leone,694,DHS,18/8/13,5.9
+Sierra Leone,694,IPUMS,7/1/15,5.6
+Sierra Leone,694,MICS,7/1/17,4.87
+Sierra Leone,694,DHS,7/10/19,5.29
+Singapore,702,DYB,7/1/00,3.58
+Singapore,702,DYB,7/1/10,3.29
+Singapore,702,DYB,7/1/20,2.95
+Sint Maarten (Dutch part),534,DYB,7/1/11,2.58
+Slovakia,703,DYB,7/1/01,3.23
+Slovakia,703,LFS,7/1/01,3.14
+Slovakia,703,DYB,7/1/11,2.9
+Slovakia,703,LFS,7/1/11,2.8
+Slovenia,705,LFS,7/1/01,2.63
+Slovenia,705,DYB,7/1/02,2.85
+Slovenia,705,IPUMS,7/1/02,2.82
+Slovenia,705,LFS,7/1/11,2.47
+Slovenia,705,DYB,7/1/15,2.47
+Somalia,706,MICS,7/1/06,5.69
+Somalia,706,MICS,7/1/11,6.16
+South Africa,710,DYB,7/1/96,..
+South Africa,710,IPUMS,7/1/96,4.06
+South Africa,710,DHS,14/5/98,4.25
+South Africa,710,DYB,7/1/01,..
+South Africa,710,IPUMS,7/1/01,3.84
+South Africa,710,IPUMS,7/1/07,3.78
+South Africa,710,DYB,7/1/11,3.38
+South Africa,710,IPUMS,7/1/11,3.24
+South Africa,710,IPUMS,7/1/16,3.2
+South Africa,710,DHS,29/8/16,3.36
+South Sudan,728,MICS,7/1/00,5.56
+South Sudan,728,IPUMS,7/1/08,5.95
+South Sudan,728,MICS,7/1/10,5.98
+Spain,724,IPUMS,7/1/91,3.26
+Spain,724,DYB,7/1/01,2.86
+Spain,724,IPUMS,7/1/01,2.86
+Spain,724,LFS,7/1/01,2.99
+Spain,724,DYB,7/1/11,2.58
+Spain,724,IPUMS,7/1/11,2.58
+Spain,724,LFS,7/1/11,2.69
+State of Palestine,275,DYB,7/1/97,6.38
+State of Palestine,275,IPUMS,7/1/97,6.36
+State of Palestine,275,DYB,7/1/07,5.89
+State of Palestine,275,IPUMS,7/1/07,5.48
+State of Palestine,275,MICS,7/1/10,5.93
+State of Palestine,275,MICS,7/1/14,5.54
+State of Palestine,275,DYB,7/1/17,5.06
+State of Palestine,275,IPUMS,7/1/17,5.07
+State of Palestine,275,MICS,7/1/19,5.06
+Sudan,729,MICS,7/1/00,5.95
+Sudan,729,IPUMS,7/1/08,5.59
+Sudan,729,MICS,7/1/10,5.72
+Sudan,729,MICS,7/1/14,5.89
+Suriname,740,MICS,7/1/99,3.97
+Suriname,740,DYB,7/1/04,3.94
+Suriname,740,MICS,7/1/06,3.9
+Suriname,740,MICS,7/1/10,3.84
+Suriname,740,IPUMS,7/1/12,3.82
+Suriname,740,MICS,7/1/18,3.86
+Switzerland,756,IPUMS,7/1/70,2.92
+Switzerland,756,IPUMS,7/1/80,2.51
+Switzerland,756,IPUMS,7/1/90,2.32
+Switzerland,756,DYB,7/1/00,2.24
+Switzerland,756,IPUMS,7/1/00,2.21
+Syrian Arab Republic,760,MICS,7/1/06,5.65
+Tajikistan,762,MICS,7/1/00,6.97
+Tajikistan,762,MICS,7/1/05,6.24
+Tajikistan,762,DHS,16/8/12,6.27
+Tajikistan,762,DHS,24/9/17,5.99
+TFYR Macedonia,807,MICS,7/1/05,4.99
+TFYR Macedonia,807,MICS,7/1/11,3.67
+TFYR Macedonia,807,MICS,7/1/18,3.45
+Thailand,764,IPUMS,7/1/70,5.71
+Thailand,764,IPUMS,7/1/80,5.13
+Thailand,764,IPUMS,7/1/90,4.29
+Thailand,764,IPUMS,7/1/00,3.69
+Thailand,764,MICS,7/1/05,3.45
+Thailand,764,DYB,7/1/10,..
+Thailand,764,MICS,7/1/12,3.28
+Thailand,764,MICS,7/1/15,3.21
+Thailand,764,MICS,7/1/19,2.84
+Timor-Leste,626,DYB,7/1/04,4.71
+Timor-Leste,626,DHS,11/6/09,5.84
+Timor-Leste,626,DHS,11/3/16,5.27
+Togo,768,IPUMS,7/1/60,6.3
+Togo,768,IPUMS,7/1/70,5.8
+Togo,768,DHS,29/3/98,5.39
+Togo,768,MICS,7/1/00,5.03
+Togo,768,MICS,7/1/06,4.7
+Togo,768,IPUMS,7/1/10,4.75
+Togo,768,MICS,7/1/10,4.79
+Togo,768,DHS,28/1/14,4.55
+Togo,768,MICS,7/1/17,4.35
+Tokelau,772,DYB,7/1/11,5.24
+Tonga,776,MICS,7/1/19,5.3
+Trinidad and Tobago,780,IPUMS,7/1/70,4.75
+Trinidad and Tobago,780,IPUMS,7/1/80,4.43
+Trinidad and Tobago,780,IPUMS,7/1/90,4.11
+Trinidad and Tobago,780,IPUMS,7/1/00,3.67
+Trinidad and Tobago,780,MICS,7/1/00,3.76
+Trinidad and Tobago,780,MICS,7/1/06,3.36
+Trinidad and Tobago,780,DYB,7/1/11,..
+Trinidad and Tobago,780,IPUMS,7/1/11,3.29
+Trinidad and Tobago,780,MICS,7/1/11,3.21
+Tunisia,788,MICS,7/1/11,4.16
+Tunisia,788,MICS,7/1/18,3.89
+Türkiye,792,IPUMS,7/1/85,4.58
+Türkiye,792,IPUMS,7/1/90,4.56
+Türkiye,792,DHS,20/9/93,4.57
+Türkiye,792,DHS,22/9/98,4.35
+Türkiye,792,DYB,7/1/00,..
+Türkiye,792,IPUMS,7/1/00,4.33
+Türkiye,792,DHS,21/2/04,4.07
+Turkmenistan,795,MICS,7/1/06,5.03
+Turkmenistan,795,MICS,7/1/15,5.1
+Turkmenistan,795,MICS,7/1/19,5.22
+Turks and Caicos Islands,796,MICS,7/1/19,2.37
+Tuvalu,798,MICS,7/1/19,6.05
+Uganda,800,IPUMS,7/1/91,4.87
+Uganda,800,DHS,29/5/95,4.76
+Uganda,800,DHS,20/12/00,4.8
+Uganda,800,DYB,7/1/02,..
+Uganda,800,IPUMS,7/1/02,4.82
+Uganda,800,DHS,21/7/06,4.97
+Uganda,800,DHS,15/12/09,4.75
+Uganda,800,DHS,13/9/11,4.9
+Uganda,800,IPUMS,7/1/14,4.74
+Uganda,800,DHS,31/12/14,4.93
+Uganda,800,DHS,17/9/16,4.53
+Uganda,800,DHS,15/1/19,4.87
+Ukraine,804,IPUMS,7/1/01,2.67
+Ukraine,804,MICS,7/1/05,3.09
+Ukraine,804,DHS,14/9/07,2.46
+Ukraine,804,MICS,7/1/12,2.53
+United Kingdom,826,IPUMS,7/1/91,2.48
+United Kingdom,826,LFS,7/1/01,2.34
+United Kingdom,826,DYB,7/1/11,2.35
+United Kingdom,826,LFS,7/1/11,2.27
+United Republic of Tanzania,834,IPUMS,7/1/88,5.05
+United Republic of Tanzania,834,DHS,1/4/92,5.31
+United Republic of Tanzania,834,DHS,9/7/96,4.9
+United Republic of Tanzania,834,DHS,13/10/99,5.02
+United Republic of Tanzania,834,IPUMS,7/1/02,4.64
+United Republic of Tanzania,834,DHS,29/1/04,4.99
+United Republic of Tanzania,834,DHS,12/11/04,4.87
+United Republic of Tanzania,834,DHS,15/12/07,4.99
+United Republic of Tanzania,834,DHS,3/6/10,4.97
+United Republic of Tanzania,834,DHS,29/2/12,5.12
+United Republic of Tanzania,834,IPUMS,7/1/12,4.74
+United Republic of Tanzania,834,DHS,17/11/15,4.85
+United States of America,840,IPUMS,7/1/60,3.3
+United States of America,840,IPUMS,7/1/70,3.11
+United States of America,840,IPUMS,7/1/80,2.75
+United States of America,840,IPUMS,7/1/90,2.63
+United States of America,840,IPUMS,7/1/00,2.59
+United States of America,840,IPUMS,7/1/05,2.52
+United States of America,840,DYB,7/1/09,..
+United States of America,840,DYB,7/1/10,2.58
+United States of America,840,IPUMS,7/1/10,2.52
+United States of America,840,IPUMS,7/1/15,2.49
+Uruguay,858,IPUMS,7/1/63,3.71
+Uruguay,858,IPUMS,7/1/75,3.42
+Uruguay,858,IPUMS,7/1/85,3.34
+Uruguay,858,IPUMS,7/1/96,3.2
+Uruguay,858,IPUMS,7/1/06,2.97
+Uruguay,858,DYB,7/1/11,2.8
+Uruguay,858,IPUMS,7/1/11,2.78
+Uruguay,858,MICS,7/1/12,3.02
+Uzbekistan,860,DHS,19/8/96,5.24
+Uzbekistan,860,MICS,7/1/00,5.55
+Uzbekistan,860,MICS,7/1/06,5.22
+Vanuatu,548,MICS,7/1/07,5.08
+Venezuela (Bolivarian Republic of),862,IPUMS,7/1/71,5.27
+Venezuela (Bolivarian Republic of),862,IPUMS,7/1/81,5.26
+Venezuela (Bolivarian Republic of),862,IPUMS,7/1/90,4.8
+Venezuela (Bolivarian Republic of),862,MICS,7/1/00,4.45
+Venezuela (Bolivarian Republic of),862,IPUMS,7/1/01,4.33
+Viet Nam,704,IPUMS,7/1/89,4.82
+Viet Nam,704,DHS,18/8/97,4.72
+Viet Nam,704,IPUMS,7/1/99,4.51
+Viet Nam,704,MICS,7/1/00,4.54
+Viet Nam,704,DHS,11/6/02,4.4
+Viet Nam,704,DHS,30/10/05,4.22
+Viet Nam,704,MICS,7/1/06,4.25
+Viet Nam,704,DYB,7/1/09,..
+Viet Nam,704,IPUMS,7/1/09,3.78
+Viet Nam,704,MICS,7/1/10,3.79
+Viet Nam,704,MICS,7/1/13,3.86
+Viet Nam,704,MICS,7/1/20,3.44
+Yemen,887,DHS,16/12/91,6.69
+Yemen,887,MICS,7/1/06,7.27
+Yemen,887,DHS,25/10/13,6.67
+Zambia,894,IPUMS,7/1/90,5.85
+Zambia,894,DHS,20/3/92,5.61
+Zambia,894,DHS,10/12/96,5.38
+Zambia,894,MICS,7/1/99,5.38
+Zambia,894,IPUMS,7/1/00,5.24
+Zambia,894,DHS,20/2/02,5.24
+Zambia,894,DHS,7/6/07,4.88
+Zambia,894,DYB,7/1/10,..
+Zambia,894,IPUMS,7/1/10,5.21
+Zambia,894,DHS,12/10/13,5.13
+Zambia,894,DHS,8/1/18,5
+Zimbabwe,716,DHS,22/9/94,4.69
+Zimbabwe,716,DHS,15/10/99,4.19
+Zimbabwe,716,DHS,12/6/05,4.46
+Zimbabwe,716,MICS,7/1/09,4.55
+Zimbabwe,716,DHS,21/12/10,4.15
+Zimbabwe,716,IPUMS,7/1/12,4.04
+Zimbabwe,716,MICS,7/1/14,4.16
+Zimbabwe,716,DHS,27/9/15,4.08
+Zimbabwe,716,MICS,7/1/19,4.02
