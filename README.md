@@ -1,7 +1,6 @@
 # Demo
 
-Can find working version at:
-[https://generation-raccoon-whorl-hcgl.herokuapp.com/](https://allfed-water-access.herokuapp.com/)
+Can find working version on [heroku](https://allfed-water-access.herokuapp.com/)
 
 ## Running the App
 
