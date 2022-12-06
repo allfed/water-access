@@ -10,6 +10,7 @@ import numpy as np
 from dash import Dash, dcc, html, Output, Input, dash_table  # pip install dash
 import dash_bootstrap_components as dbc  # pip install dash-bootstrap-components
 from jupyter_dash import JupyterDash
+import plotly.figure_factory as ff
 
 
 
@@ -107,10 +108,11 @@ df_input = df_input.set_index("alpha3")
 df = risk_creator(df_input)
 
 # create extra columns for drop down
-df["Population Piped"] = 0
-df["Nat Improved"]= 0 
-df["Nat Unimproved and Surface"]= 0 
+df["Population Piped"] = (df["Nat Piped"]/100) *df["Population"]
+df["Nat Improved"]=df["Nat Piped"]+df["Nat NonPiped"]
+df["Nat Unimproved and Surface"]=100-df["Nat Improved"]
 df["Population Piped Has to Relocate"] = 0 
+
 
 
 df_table = df[
@@ -123,7 +125,7 @@ df_table = df[
         "Urban Agg %",
         "RoadQuality",
         "Km",
-        "Risk",
+        "Risk Score",
     ]
 ]
 ignore_columns_index = 3
@@ -159,7 +161,7 @@ bar = dcc.Graph(figure={})
 bubble = dcc.Graph(figure={})
 dropdown = dcc.Dropdown(
     options=df.columns.values[2:],
-    value="Risk",  # initial value displayed when page first loads
+    value="Risk Score",  # initial value displayed when page first loads
     clearable=False,
 )
 
@@ -362,17 +364,17 @@ def update_graph(
 
     dff = dff[dff[column_name].notnull()]
     ### Sum all of the weighted risk values in to the 'Risk' column of the dataframe
-    dff["Risk"] = dff[risk_cols].sum(axis="columns", skipna=False)
+    dff["Risk Score"] = dff[risk_cols].sum(axis="columns", skipna=False)
 
     ### Normalise for a percentage risk,
 
 
     risk_scale = scaling7/100
-    dff["Risk"] = dff["Risk"] / dff.at["NLD","Risk"]
+    dff["Risk Score"] = dff["Risk Score"] / dff.at["NLD","Risk Score"]
     dff["Population Piped"] = (dff["Nat Piped"]/100) *dff["Population"]
     dff["Nat Improved"]=dff["Nat Piped"]+dff["Nat NonPiped"]
     dff["Nat Unimproved and Surface"]=100-dff["Nat Improved"]
-    dff["Theoretical Population Piped Has to Relocate"] = (dff["Risk"]-1)*dff["Population Piped"]*risk_scale #this bases off netherlands no one having to move. 
+    dff["Theoretical Population Piped Has to Relocate"] = (dff["Risk Score"]-1)*dff["Population Piped"]*risk_scale #this bases off netherlands no one having to move. 
 
     # if pandas value greater than , equals another column value
     locations_over = (dff["Theoretical Population Piped Has to Relocate"]>dff["Population Piped"])
@@ -383,7 +385,7 @@ def update_graph(
 
 
 
-    nancount = dff["Risk"].isnull().sum()
+    nancount = dff["Risk Score"].isnull().sum()
     mysubtitle = f"Displaying {len(df.index)-nancount} countries from a total of {len(df.index)} based on data availability"
 
 
@@ -499,8 +501,6 @@ if __name__ == "__main__":
 # In[10]:
 
 
-import plotly.figure_factory as ff
-import numpy as np
 
 
 
