@@ -258,10 +258,12 @@ class mobility_models:
                     V_guess = 1
 
                 V_un = fsolve(model, V_guess, args=data, full_output=True)
+                # checks if the model was sucesful:
                 if V_un[2] == 1:
                     mr.v_unload_matrix3d[i, j, :] = V_un[0][0]
                 else:
                     mr.v_unload_matrix3d[i, j, :] = np.nan
+                    
 
                 # start loop iterating over loads
                 for k, total_load in enumerate(m_t.flatten()):
