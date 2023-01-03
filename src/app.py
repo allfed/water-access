@@ -13,17 +13,16 @@ from jupyter_dash import JupyterDash
 import plotly.figure_factory as ff
 
 
-
 # Declare server for Heroku deployment. Needed for Procfile.
-
 
 
 # In[2]:
 
+
 def load_data(data_file: str) -> pd.DataFrame:
-    '''
+    """
     Load data from /data directory
-    '''
+    """
     PATH = pathlib.Path(__file__).parent
     DATA_PATH = PATH.joinpath("../data").resolve()
     return pd.read_csv(DATA_PATH.joinpath(data_file))
@@ -108,11 +107,10 @@ df_input = df_input.set_index("alpha3")
 df = risk_creator(df_input)
 
 # create extra columns for drop down
-df["Population Piped"] = (df["Nat Piped"]/100) *df["Population"]
-df["Nat Improved"]=df["Nat Piped"]+df["Nat NonPiped"]
-df["Nat Unimproved and Surface"]=100-df["Nat Improved"]
-df["Population Piped Has to Relocate"] = 0 
-
+df["Population Piped"] = (df["Nat Piped"] / 100) * df["Population"]
+df["Nat Improved"] = df["Nat Piped"] + df["Nat NonPiped"]
+df["Nat Unimproved and Surface"] = 100 - df["Nat Improved"]
+df["Population Piped Has to Relocate"] = 0
 
 
 df_table = df[
@@ -141,7 +139,6 @@ RoadQuality_default = 200
 Terrain_Ruggedness_default = 50
 Urban_default = 100
 Urban_Agg_default = 0
-
 
 
 # In[5]:
@@ -200,7 +197,9 @@ controls = dbc.Card(
         ),
         html.Div(
             [
-                dbc.Label("Terrain Ruggedness",),
+                dbc.Label(
+                    "Terrain Ruggedness",
+                ),
                 dcc.Slider(
                     0,
                     400,
@@ -262,7 +261,7 @@ controls = dbc.Card(
                     tooltip={"placement": "bottom", "always_visible": True},
                 ),
             ]
-        ),        
+        ),
         html.Div(
             [
                 dbc.Label("Risk Scale"),
@@ -279,7 +278,6 @@ controls = dbc.Card(
     ],
     body=True,
 )
-
 
 
 # In[6]:
@@ -332,7 +330,7 @@ app.layout = dbc.Container(
     Input("myslider7", "value"),
 )
 def update_graph(
-    column_name, scaling1, scaling2, scaling3, scaling4, scaling5, scaling6,scaling7
+    column_name, scaling1, scaling2, scaling3, scaling4, scaling5, scaling6, scaling7
 ):  # function arguments come from the component property of the Input
     # ignore_columns_num = 9
 
@@ -368,50 +366,52 @@ def update_graph(
 
     ### Normalise for a percentage risk,
 
-
-    risk_scale = scaling7/100
-    dff["Risk Score"] = dff["Risk Score"] / dff.at["NLD","Risk Score"]
-    dff["Population Piped"] = (dff["Nat Piped"]/100) *dff["Population"]
-    dff["Nat Improved"]=dff["Nat Piped"]+dff["Nat NonPiped"]
-    dff["Nat Unimproved and Surface"]=100-dff["Nat Improved"]
-    dff["Theoretical Population Piped Has to Relocate"] = (dff["Risk Score"]-1)*dff["Population Piped"]*risk_scale #this bases off netherlands no one having to move. 
+    risk_scale = scaling7 / 100
+    dff["Risk Score"] = dff["Risk Score"] / dff.at["NLD", "Risk Score"]
+    dff["Population Piped"] = (dff["Nat Piped"] / 100) * dff["Population"]
+    dff["Nat Improved"] = dff["Nat Piped"] + dff["Nat NonPiped"]
+    dff["Nat Unimproved and Surface"] = 100 - dff["Nat Improved"]
+    dff["Theoretical Population Piped Has to Relocate"] = (
+        (dff["Risk Score"] - 1) * dff["Population Piped"] * risk_scale
+    )  # this bases off netherlands no one having to move.
 
     # if pandas value greater than , equals another column value
-    locations_over = (dff["Theoretical Population Piped Has to Relocate"]>dff["Population Piped"])
-    dff["Population Has to Relocate"] = dff["Theoretical Population Piped Has to Relocate"]
-    dff["Population Has to Relocate"][locations_over] = dff["Population Piped"][locations_over]
-    dff["Percent of Population Has to Relocate"] = (dff["Population Has to Relocate"]/dff["Population"])*100
-
-
-
+    locations_over = (
+        dff["Theoretical Population Piped Has to Relocate"] > dff["Population Piped"]
+    )
+    dff["Population Has to Relocate"] = dff[
+        "Theoretical Population Piped Has to Relocate"
+    ]
+    dff["Population Has to Relocate"][locations_over] = dff["Population Piped"][
+        locations_over
+    ]
+    dff["Percent of Population Has to Relocate"] = (
+        dff["Population Has to Relocate"] / dff["Population"]
+    ) * 100
 
     nancount = dff["Risk Score"].isnull().sum()
     mysubtitle = f"Displaying {len(df.index)-nancount} countries from a total of {len(df.index)} based on data availability"
 
-
-
-    hover_data_list =[
-            "PBO",
-            "Terrain Ruggedness",
-            "Urban %",
-            "RoadQuality",
-            "Km",
-            "Nat Piped",
+    hover_data_list = [
+        "PBO",
+        "Terrain Ruggedness",
+        "Urban %",
+        "RoadQuality",
+        "Km",
+        "Nat Piped",
     ]
-
 
     # https://plotly.com/python/choropleth-maps/
     choro1 = px.choropleth(
-        title=column_name, 
+        title=column_name,
         data_frame=dff,
         locations=dff.index,
         height=600,
         color=column_name,
         hover_name="Entity",
-        hover_data=hover_data_list
+        hover_data=hover_data_list,
     )
-    choro1.layout.coloraxis.colorbar.title = ''
-
+    choro1.layout.coloraxis.colorbar.title = ""
 
     choro2 = px.choropleth(
         title="Percent of Population with Piped Water",
@@ -420,10 +420,9 @@ def update_graph(
         height=600,
         color="Nat Piped",
         hover_name="Entity",
-        hover_data=hover_data_list
+        hover_data=hover_data_list,
     )
-    choro2.layout.coloraxis.colorbar.title = ''
-
+    choro2.layout.coloraxis.colorbar.title = ""
 
     choro3 = px.choropleth(
         title="Percent of Population Has to Relocate",
@@ -432,11 +431,9 @@ def update_graph(
         height=600,
         color="Percent of Population Has to Relocate",
         hover_name="Entity",
-        hover_data=hover_data_list
+        hover_data=hover_data_list,
     )
-    choro3.layout.coloraxis.colorbar.title = ''
-
-
+    choro3.layout.coloraxis.colorbar.title = ""
 
     graph_filter = dff[column_name].notnull()
     fig2 = px.bar(
@@ -475,13 +472,7 @@ def update_graph(
     )  # returned objects are assigned to the component property of the Output
 
 
-
 # In[8]:
-
-
-
-
-
 
 
 # In[9]:
@@ -489,30 +480,25 @@ def update_graph(
 
 # Run app
 if __name__ == "__main__":
-    app.run_server(mode='external')
-    
+    app.run_server(mode="external")
 
 
 # if __name__ == "__main__":
 #     app.run_server(debug=True)
 
 
-
 # In[10]:
 
 
-
-
-
-group_labels = ['Kms to Water']
-colors = ['#333F44', '#37AA9C', '#94F3E4']
+group_labels = ["Kms to Water"]
+colors = ["#333F44", "#37AA9C", "#94F3E4"]
 
 # Create distplot with curve_type set to 'normal'
-fig = ff.create_distplot([df["Km"].dropna()], group_labels, show_hist=False, colors=colors)
+fig = ff.create_distplot(
+    [df["Km"].dropna()], group_labels, show_hist=False, colors=colors
+)
 
 # Add title
-fig.update_layout(title_text='Distribution of Distance to Water Source')
-fig.update_layout(xaxis_type = "log")
+fig.update_layout(title_text="Distribution of Distance to Water Source")
+fig.update_layout(xaxis_type="log")
 fig.show()
-
-
