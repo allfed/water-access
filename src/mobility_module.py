@@ -263,7 +263,6 @@ class mobility_models:
                     mr.v_unload_matrix3d[i, j, :] = V_un[0][0]
                 else:
                     mr.v_unload_matrix3d[i, j, :] = np.nan
-                    
 
                 # start loop iterating over loads
                 for k, total_load in enumerate(m_t.flatten()):
