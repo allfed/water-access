@@ -58,5 +58,3 @@ df = add_alpha_codes(df_original, col)
 
 filename = "fitness_countries"
 df.to_csv(filename + ".csv")
-
-
