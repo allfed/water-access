@@ -128,4 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# plotly creds
+# large files
+data/GIS/

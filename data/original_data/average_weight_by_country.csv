@@ -1,0 +1,178 @@
+,Country,Kgs,alpha3
+0,Micronesia,87.398,FSM
+1,Tonga,87.344,TON
+2,United States,81.928,USA
+3,Samoa,78.544,WSM
+4,Kuwait,77.791,KWT
+5,Australia,77.356,AUS
+6,Malta,76.956,MLT
+7,Qatar,76.866,QAT
+8,Croatia,76.412,HRV
+9,United Kingdom,75.795,GBR
+10,UAE,75.532,ARE
+11,Greece,75.038,GRC
+12,Cyprus,74.802,CYP
+13,Egypt,74.271,EGY
+14,Barbados,73.831,BRB
+15,Belarus,73.663,BLR
+16,Bahrain,73.55,BHR
+17,Germany,73.042,DEU
+18,Solomon Islands,72.797,SLB
+19,Austria,72.743,AUT
+20,Saudi Arabia,72.638,SAU
+21,Iceland,72.584,ISL
+22,Trinidad & Tobago,72.538,TTO
+23,Argentina,72.434,ARG
+24,Bahamas,72.38,BHS
+25,Finland,72.348,FIN
+26,Israel,71.912,ISR
+27,Czech Rep.,71.64,CZE
+28,New Zealand,71.631,NZL
+29,Bulgaria,71.459,BGR
+30,Russia,71.418,RUS
+31,Slovenia,71.2,SVN
+32,Slovakia,71.06,SVK
+33,Albania,71.019,ALB
+34,Bosnia,71.001,BIH
+35,Switzerland,70.987,CHE
+36,Rep. of Moldova,70.978,MDA
+37,Venezuela,70.788,VEN
+38,Chile,70.593,CHL
+39,Georgia,70.561,GEO
+40,Spain,70.556,ESP
+41,Azerbaijan,70.484,AZE
+42,Hungary,70.443,HUN
+43,Libya,70.429,LBY
+44,Luxembourg,70.27,LUX
+45,Tajikistan,70.234,TJK
+46,Portugal,70.193,PRT
+47,Lithuania,70.153,LTU
+48,Grenada,70.139,GRD
+49,Panama,69.939,PAN
+50,Ireland,69.926,IRL
+51,Canada,69.767,CAN
+52,Jordan,69.649,JOR
+53,St Vincent & Grenadines,69.59,VCT
+54,Belize,69.377,BLZ
+55,Poland,69.241,POL
+56,Macedonia,69.209,MKD
+57,Italy,69.205,ITA
+58,Jamaica,69.064,JAM
+59,Sweden,69.064,SWE
+60,Turkey,69.046,TUR
+61,Cuba,69.037,CUB
+62,Mexico,69.023,MEX
+63,Mongolia,68.91,MNG
+64,Uruguay,68.873,URY
+65,Belgium,68.801,BEL
+66,Suriname,68.778,SUR
+67,Latvia,68.778,LVA
+68,Norway,68.774,NOR
+69,Netherlands,68.746,NLD
+70,Ukraine,68.674,UKR
+71,Guatemala,68.579,GTM
+72,Saint Lucia,68.438,LCA
+73,Armenia,68.424,ARM
+74,Nicaragua,68.415,NIC
+75,Vanuatu,68.229,VUT
+76,El Salvador,68.22,SLV
+77,Lebanon,68.17,LBN
+78,Ecuador,68.166,ECU
+79,Fiji,68.048,FJI
+80,Bolivia,68.034,BOL
+81,Dominican Rep.,67.993,DOM
+82,Denmark,67.957,DNK
+83,Costa Rica,67.853,CRI
+84,Tunisia,67.726,TUN
+85,Iran,67.608,IRN
+86,Turkmenistan,67.563,TKM
+87,Paraguay,67.445,PRY
+88,Peru,67.44,PER
+89,Syria,67.422,SYR
+90,Guyana,67.032,GUY
+91,France,66.782,FRA
+92,Estonia,66.732,EST
+93,Equatorial Guinea,66.451,GNQ
+94,Romania,66.401,ROU
+95,Colombia,66.37,COL
+96,Uzbekistan,66.351,UZB
+97,Kazakhstan,66.265,KAZ
+98,Brazil,66.093,BRA
+99,Mauritius,66.052,MUS
+100,Iraq,66.034,IRQ
+101,Lesotho,65.966,LSO
+102,Honduras,65.834,HND
+103,Oman,65.803,OMN
+104,South Africa,65.667,ZAF
+105,Kyrgyzstan,65.413,KGZ
+106,Botswana,65.045,BWA
+107,Cameroon,64.832,CMR
+108,Morocco,64.764,MAR
+109,South Korea,64.392,KOR
+110,Mauritania,64.179,MRT
+111,Algeria,63.639,DZA
+112,Gabon,62.845,GAB
+113,Ghana,62.491,GHA
+114,Cape Verde,62.296,CPV
+115,Papua New Guinea,62.251,PNG
+116,Eswatini,62.097,SWZ
+117,Djibouti,62.015,DJI
+118,Haiti,61.698,HTI
+119,Comoros,61.044,COM
+120,Zimbabwe,61.022,ZWE
+121,Brunei,60.945,BRN
+122,Sierra Leone,60.854,SLE
+123,Nigeria,60.745,NGA
+124,Malaysia,60.682,MYS
+125,China,60.555,CHN
+126,Angola,60.387,AGO
+127,Senegal,60.373,SEN
+128,Benin,60.282,BEN
+129,Mali,60.078,MLI
+130,Yemen,59.802,YEM
+131,Philippines,59.715,PHL
+132,Namibia,59.584,NAM
+133,Sudan,59.407,SDN
+134,Togo,59.28,TGO
+135,Guinea,59.112,GIN
+136,Japan,59.017,JPN
+137,Pakistan,58.976,PAK
+138,Singapore,58.935,SGP
+139,Thailand,58.786,THA
+140,Côte d'Ivoire,58.727,CIV
+141,Laos,58.436,LAO
+142,Chad,58.196,TCD
+143,Niger,57.933,NGA
+144,Maldives,57.647,MDV
+145,São Tomé and Príncipe,57.561,STP
+146,Burkina Faso,57.456,BFA
+147,Congo,57.384,COG
+148,Tanzania,57.293,TZA
+149,Gambia,57.071,GMB
+150,Uganda,57.007,UGA
+151,Afghanistan,56.935,AFG
+152,Malawi,56.681,MWI
+153,Rwanda,56.635,RWA
+154,Myanmar,56.354,MMR
+155,Kenya,56.264,KEN
+156,Guinea-Bissau,56.087,GNB
+157,Mozambique,55.955,MOZ
+158,Central African Rep.,55.946,CAF
+159,Zambia,55.91,ZMB
+160,Cambodia,55.742,KHM
+161,Liberia,55.533,LBR
+162,Somalia,55.375,SOM
+163,Madagascar,55.157,MDG
+164,Burundi,54.127,BDI
+165,Congo,53.501,COG
+166,Ethiopia,53.057,ETH
+167,India,52.943,IND
+168,North Korea,52.589,PRK
+169,Indonesia,52.467,IDN
+170,Eritrea,52.041,ERI
+171,Timor-Leste,51.95,TLS
+172,Bhutan,51.142,BTN
+173,Vietnam,50.725,VNM
+174,Nepal,50.476,NPL
+175,Sri Lanka,50.421,LKA
+176,Bangladesh,49.591,BGD
