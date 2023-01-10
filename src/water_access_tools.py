@@ -3,8 +3,6 @@ import pandas as pd
 import pycountry
 
 
-
-
 def add_alpha_codes(df, col):
     """
     adds a column of alpha3 codes to a dataframe with country name in column 'col'
@@ -46,7 +44,6 @@ def read_road_values_fuzzy(path, col):
     df = add_alpha_codes(df, col)
     df = df.set_index("alpha3")
     return df
-
 
 
 def read_road_values(path):
@@ -166,23 +163,22 @@ def input_data_creator():
     return df_master
 
 
-
 def load_data(data_file: str) -> pd.DataFrame:
-    print 
-    '''
+    print
+    """
     Load data from /data directory
-    '''
+    """
     PATH = pathlib.Path().resolve()
     DATA_PATH = PATH.joinpath("../data").resolve()
     return pd.read_csv(DATA_PATH.joinpath(data_file))
 
 
-def map_values_std_dev(pdseries, power_max = 90.75, power_min = 59.25, scale_factor = 1):
+def map_values_std_dev(pdseries, power_max=90.75, power_min=59.25, scale_factor=1):
     # the function takes a pdseries as input, and returns a mapped pdseries with the same index as the input pdseries
     # power max and min are 1 std dev away from the median, and map to the same std dev away from the median in the new series (with a scaling factor defaulting to 1)
-    lower_std = pdseries.median() - pdseries.std()*scale_factor
-    upper_std = pdseries.median() + pdseries.std()*scale_factor
-    output_series =  (pdseries - lower_std) / (upper_std - lower_std) * (power_max - power_min) + power_min
+    lower_std = pdseries.median() - pdseries.std() * scale_factor
+    upper_std = pdseries.median() + pdseries.std() * scale_factor
+    output_series = (pdseries - lower_std) / (upper_std - lower_std) * (
+        power_max - power_min
+    ) + power_min
     return output_series
-
-
