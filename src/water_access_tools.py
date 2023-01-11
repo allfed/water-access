@@ -24,6 +24,7 @@ def map_values_std_dev(pdseries, power_max=90.75, power_min=59.25, scale_factor=
     ) + power_min
     return output_series
 
+
 def add_alpha_codes(df, col):
     """
     adds a column of alpha3 codes to a dataframe with country name in column 'col'
@@ -182,6 +183,3 @@ def input_data_creator():
         columns={"Urban population (% of total population)": "Urban %"}, inplace=True
     )
     return df_master
-
-
-
