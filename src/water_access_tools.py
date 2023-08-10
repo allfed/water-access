@@ -1,7 +1,7 @@
 # tools.py
 import pandas as pd
+import pathlib39
 import pycountry
-import pathlib
 
 
 def load_data(data_file: str) -> pd.DataFrame:

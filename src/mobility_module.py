@@ -3,17 +3,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
-from matplotlib.widgets import Cursor
 from scipy.optimize import fsolve
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-# import chart_studio
-import chart_studio.plotly as py
-
-# from dotenv import load_dotenv, find_dotenv
-# import os
 
 
 def linspace_creator(max_value_array, min_value, res):
@@ -155,7 +148,7 @@ class mobility_models:
         C = ((m_walk_carry) * mv.g / np.pi) * (3 * mv.g * mv.L / 2) ** (
             1 / 2
         )  # component of walking
-        D = np.pi**2 / (6 * mv.g * mv.L)  # leg component?
+        D = np.pi**2 / (6 * mv.g * mv.L)  # leg component
 
         B1 = (
             m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]
@@ -297,6 +290,20 @@ class mobility_models:
         return mr.v_load_matrix3d, mr.load_matrix3d
 
     def LCDA_solution(p, *data):
+        """
+        
+        LCDA model for solving for velocity given a load and slope
+
+        Args:
+            p: list of parameters to be solved for
+            data: tuple of data to be used in the model
+                m_load: load of the HPV
+                met: metabolic object
+                s: slope of the terrain
+        Returns:
+            velocity of the HPV given the load and slope
+
+        """
         m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45 * 100
@@ -308,6 +315,19 @@ class mobility_models:
         ) * m_load - met.budget_watts
 
     def Lankford_solution(p, *data):
+        '''
+        Lankford model for solving for velocity given a load and slope
+        Lankford, J. W., & Lankford, A. S. (2003). A model for the energy cost of walking and running. Medicine and science in sports and exercise, 35(5), 821-828.
+        
+        Args: 
+            p: list of parameters to be solved for
+            data: tuple of data to be used in the model
+                m_load: mass of the load
+                met: metabolic rate of the user
+                s: slope 
+        Returns:
+            velocity of the HPV given the load and slope
+        '''
         m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45
@@ -505,12 +525,12 @@ class model_results:
                 "Litres * Km": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
-                * self.load_matrix3d[:, slope_scene, load_scene],
+                * self.load_matrix3d[:, slope_scene, load_scene]*mv.t_hours,
                 "Water ration * Km": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
-                / mv.waterration,
+                / mv.waterration*mv.t_hours,
                 "Distance to Water Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
@@ -864,7 +884,7 @@ class plotting_hpv:
         fig = px.bar(
             df,
             x="Load",
-            y="Litres * Km",
+            y="Water ration * Km",
             hover_data=[
                 "Name",
                 "Average Trip Velocity",
