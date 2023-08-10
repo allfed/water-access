@@ -10,7 +10,6 @@ from plotly.subplots import make_subplots
 
 
 def linspace_creator(max_value_array, min_value, res):
-
     """
     creates a linsapce numpy array from the given inputs
     max_value needs to be a numpy array (even if it is a 1x1)
@@ -259,7 +258,6 @@ class mobility_models:
 
                 # start loop iterating over loads
                 for k, total_load in enumerate(m_t.flatten()):
-
                     if mo.model_selection == 2:
                         data = (
                             mv.ro,
@@ -291,7 +289,7 @@ class mobility_models:
 
     def LCDA_solution(p, *data):
         """
-        
+
         LCDA model for solving for velocity given a load and slope
 
         Args:
@@ -315,19 +313,19 @@ class mobility_models:
         ) * m_load - met.budget_watts
 
     def Lankford_solution(p, *data):
-        '''
+        """
         Lankford model for solving for velocity given a load and slope
         Lankford, J. W., & Lankford, A. S. (2003). A model for the energy cost of walking and running. Medicine and science in sports and exercise, 35(5), 821-828.
-        
-        Args: 
+
+        Args:
             p: list of parameters to be solved for
             data: tuple of data to be used in the model
                 m_load: mass of the load
                 met: metabolic rate of the user
-                s: slope 
+                s: slope
         Returns:
             velocity of the HPV given the load and slope
-        '''
+        """
         m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45
@@ -408,7 +406,6 @@ class model_variables:
 
 class model_options:
     def __init__(self):
-
         # model options
         self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
 
@@ -525,12 +522,14 @@ class model_results:
                 "Litres * Km": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
-                * self.load_matrix3d[:, slope_scene, load_scene]*mv.t_hours,
+                * self.load_matrix3d[:, slope_scene, load_scene]
+                * mv.t_hours,
                 "Water ration * Km": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
-                / mv.waterration*mv.t_hours,
+                / mv.waterration
+                * mv.t_hours,
                 "Distance to Water Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
@@ -557,7 +556,6 @@ class model_results:
         return df
 
     def load_results(self, hpv, mv, mo):
-
         self.model_name = mo.model_name
 
         ## Calculate average speed
@@ -589,7 +587,6 @@ Plotting Class
 
 class plotting_hpv:
     def surf_plot(mr, mo, hpv):
-
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         # Make data.
         Z = mr.distance_achievable[mo.surf_plot_index, :, :]
@@ -616,7 +613,6 @@ class plotting_hpv:
         plt.show()
 
     def surf_plotly(mr, mo, hpv):
-
         # # Make data.
         Z = mr.distance_achievable[mo.surf_plot_index, :, :]
         X = mr.load_matrix3d[mo.surf_plot_index, :, :]
@@ -635,7 +631,6 @@ class plotting_hpv:
         fig.show()
 
     def surf_plotly_multi(mr, mo, hpv):
-
         plot_height = 700
         plot_width = 900
         xaxis_title = "Load [kg]"
@@ -686,7 +681,6 @@ class plotting_hpv:
         # py.iplot(fig, filename="3D subplots of HPVs New")
 
     def load_plot_plotly(mr, mo, hpv):
-
         xaxis_title = "Load [kg]"
         yaxis_title = "Speed [m/s]"
 
@@ -716,7 +710,6 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_plot_plotly(mr, mo, hpv):
-
         xaxis_title = "Slope [˚]"
         yaxis_title = "m/s"
         if mo.load_scene == 0:
@@ -752,7 +745,6 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_velcoity_kgs(mr, mo, hpv):
-
         xaxis_title = "Slope [˚]"
         yaxis_title = "Velocity Kgs"
 
@@ -788,7 +780,6 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_velocities(mr, mo, hpv):
-
         HPV = 0
 
         xaxis_title = "Slope [˚]"
@@ -872,7 +863,6 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def bar_plot_loading_distance(mr, mo, hpv, mv):
-
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
         chart_title = "Efficiency at %0.2f degrees, with model %s" % (
             slope_name,

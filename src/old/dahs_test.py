@@ -41,6 +41,7 @@ app.layout = dbc.Container(
     fluid=True,
 )
 
+
 # Callback allows components to interact
 @app.callback(
     Output(mygraph, "figure"),

@@ -309,7 +309,6 @@ def load_matrix_creator(max_load_HPV, minimumViableLoad, res):
 
 
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
-
     max_load_HPV = LoadCapacity
     #### Weight limits
     # Calculate weight limits for hills. There are some heavy loads which humans will not be able to push up certain hills
@@ -326,7 +325,6 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
 
 def walkmodel(param_df, s, m1, P_t, F_max, L, minimumViableLoad, res):
-
     #### constants
     g = 9.81
     pi = 3.1416
@@ -484,7 +482,6 @@ if slope_plot == 1:
     #   # Slope Graph Sensitivity
     fig, ax = plt.subplots(figsize=(20, 10))
     for HPVname in param_df.Name:
-
         x = slope_vector
         y = v_avg_matrix[:, i] * load_vector_matrix[:, i]
         (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.
@@ -523,7 +520,6 @@ elif load_plot == 1:
     #   # Slope Graph Sensitivity
     fig, ax = plt.subplots(figsize=(20, 10))
     for HPVname in param_df.Name:
-
         x = slope_vector
         y = v_avg_matrix[:, i]
         (line,) = ax.plot(x, y, label=HPVname)  # Plot some data on the axes.

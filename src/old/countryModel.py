@@ -221,6 +221,7 @@ app.layout = dbc.Container(
     fluid=True,
 )
 
+
 # Callback allows components to interact
 @app.callback(
     Output(choro, "figure"),

@@ -15,7 +15,6 @@ import os
 
 
 def linspace_creator(max_value_array, min_value, res):
-
     """
     creates a linsapce numpy array from the given inputs
     max_value needs to be a numpy array (even if it is a 1x1)
@@ -265,7 +264,6 @@ class mobility_models:
             for k, load in enumerate(
                 mr.load_vector.reshape(mr.slope_vector_deg.size, 1)
             ):
-
                 v_load, load_matrix = mobility_models.sprott_solution2(
                     hpv, s, load, mv, mo
                 )
@@ -338,7 +336,6 @@ class mobility_models:
         hpv
         # param_df, slope_vector_deg, F_max, g, load_res, m1, MET_budget_watts
     ):
-
         i = 0
         for name in hpv.name:
             j = 0
@@ -459,7 +456,6 @@ class model_variables:
 
 class model_options:
     def __init__(self):
-
         # model options
         self.model_selection = 1  # 1 is sprott, 2 is cycling 3 is lankford
 
@@ -541,7 +537,6 @@ class model_results:
         self.slope_matrix3drads = (self.slope_matrix3d_deg / 360) * (2 * 3.1416)
 
     def create_dataframe_single_scenario(self, hpv, load_scene, slope_scene):
-
         df = pd.DataFrame(
             {
                 "Name": self.hpv_name[0].transpose()[0][0],
@@ -576,7 +571,6 @@ class model_results:
         return df
 
     def load_results(self, hpv, mv, mo):
-
         self.model_name = mo.model_name
 
         ## Calculate average speed
@@ -654,7 +648,6 @@ class plotting_hpv:
         plt.show()
 
     def surf_plot(mr, mo, hpv):
-
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         # Make data.
         Z = mr.distance_achievable[mo.surf_plot_index, :, :]
@@ -701,7 +694,6 @@ class plotting_hpv:
         fig.show()
 
     def surf_plotly_multi(mr, mo, hpv):
-
         plot_height = 700
         plot_width = 900
         xaxis_title = "Load [kg]"
@@ -752,7 +744,6 @@ class plotting_hpv:
         # py.iplot(fig, filename="3D subplots of HPVs New")
 
     def load_plot_plotly(mr, mo, hpv):
-
         xaxis_title = "Load [kg]"
         yaxis_title = "Kms/hour"
         slope_scene = 0
@@ -783,7 +774,6 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_plot_plotly(mr, mo, hpv):
-
         xaxis_title = "Slope [˚]"
         yaxis_title = "Kms/Hour"
         load_name = mr.load_matrix3d.flat[mo.load_scene]
@@ -863,7 +853,6 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def bar_plot_loading_distance(mr, mo, hpv):
-
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
         chart_title = "Efficiency at %0.2f degrees, with model %s" % (
             slope_name,
