@@ -224,8 +224,6 @@ class mobility_models:
                     practical_limit = hpv.practical_limit.flatten()[i]
                     load_vector[load_vector > practical_limit] = practical_limit
 
-                
-
                 m_t = np.array(load_vector + mv.m1 + hpv.m_HPV_only[i])
 
                 ## Determine unloaded velocity of this given slope
@@ -364,9 +362,9 @@ class HPV_variables:
         self.load_limit = np.array(hpv_param_df.LoadLimit).reshape((self.n_hpv, 1))[
             :, np.newaxis, :
         ]
-        self.practical_limit = np.array(hpv_param_df.PracticalLimit).reshape((self.n_hpv, 1))[
-            :, np.newaxis, :
-        ]
+        self.practical_limit = np.array(hpv_param_df.PracticalLimit).reshape(
+            (self.n_hpv, 1)
+        )[:, np.newaxis, :]
 
         self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[
             :, np.newaxis, :
@@ -488,8 +486,8 @@ class model_results:
         self.hpv_name = (hpv.name,)
 
         # create slope vector
-        self.slope_vector_deg = np.array([0,1,2,4.5,20])
-        
+        self.slope_vector_deg = np.array([0, 1, 2, 4.5, 20])
+
         # = linspace_creator(
         #     np.array([mo.slope_end]), mo.slope_start, mo.slope_res
         # )
@@ -916,19 +914,17 @@ if __name__ == "__main__":
     s = [0]
     i = 0
 
-    
-
     data = (
-                            mv.ro,
-                            mv.C_d,
-                            mv.A,
-                            mv.m1 + hpv.m_HPV_only.flatten()[i],  #
-                            hpv.Crr.flatten()[i],  # CRR related to the HPV
-                            mv.eta,
-                            mv.P_t,
-                            mv.g,
-                            s[0] * mo.ulhillpo,  # hill polarity, see model options
-                        )
-    
+        mv.ro,
+        mv.C_d,
+        mv.A,
+        mv.m1 + hpv.m_HPV_only.flatten()[i],  #
+        hpv.Crr.flatten()[i],  # CRR related to the HPV
+        mv.eta,
+        mv.P_t,
+        mv.g,
+        s[0] * mo.ulhillpo,  # hill polarity, see model options
+    )
+
     model = mobility_models.bike_power_solution
     V_r = fsolve(model, V_guess, args=data, full_output=True)
