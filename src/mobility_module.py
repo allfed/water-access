@@ -170,15 +170,6 @@ class mobility_models:
 
         return v_load, load_matrix
 
-    def bike_power_solution(p, *data):
-        ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
-        v_solve = p[0]
-        return (
-            1 / 2 * ro * v_solve**3 * C_d * A
-            + v_solve * m_t * g * Crr
-            + v_solve * m_t * g * s
-        ) / eta - P_t
-
     def numerical_mobility_model(mr, mv, mo, met, hpv):
         """
         1. Takes input of all model variables, mr, mv, mo, met, and hpv
@@ -194,6 +185,8 @@ class mobility_models:
         full_output=True means that a flag is returned to see if the solve was succesful.
         Many solves are not successful if the agent 'rus out of energy' and physicaly can't carry the load up the incline with the energy budget provided, these are handled in the if statement using
         """
+
+        limit_practical_load = True
 
         if mo.model_selection == 2:
             model = mobility_models.bike_power_solution
@@ -225,6 +218,14 @@ class mobility_models:
                 load_vector = linspace_creator(
                     max_load_HPV, mv.minimumViableLoad, mo.load_res
                 ).reshape((mo.load_res, 1))
+
+                if limit_practical_load == True:
+                    # for all load vector is greater than hpv.practical_limit[i] let = hpv.practical_limit[i]
+                    practical_limit = hpv.practical_limit.flatten()[i]
+                    load_vector[load_vector > practical_limit] = practical_limit
+
+                
+
                 m_t = np.array(load_vector + mv.m1 + hpv.m_HPV_only[i])
 
                 ## Determine unloaded velocity of this given slope
@@ -363,6 +364,9 @@ class HPV_variables:
         self.load_limit = np.array(hpv_param_df.LoadLimit).reshape((self.n_hpv, 1))[
             :, np.newaxis, :
         ]
+        self.practical_limit = np.array(hpv_param_df.PracticalLimit).reshape((self.n_hpv, 1))[
+            :, np.newaxis, :
+        ]
 
         self.Pilot = np.array(hpv_param_df.Pilot).reshape((self.n_hpv, 1))[
             :, np.newaxis, :
@@ -484,9 +488,11 @@ class model_results:
         self.hpv_name = (hpv.name,)
 
         # create slope vector
-        self.slope_vector_deg = linspace_creator(
-            np.array([mo.slope_end]), mo.slope_start, mo.slope_res
-        )
+        self.slope_vector_deg = np.array([0,1,2,4.5,20])
+        
+        # = linspace_creator(
+        #     np.array([mo.slope_end]), mo.slope_start, mo.slope_res
+        # )
         self.slope_vector_deg = self.slope_vector_deg.reshape(
             1, self.slope_vector_deg.size
         )
@@ -893,3 +899,36 @@ class plotting_hpv:
         )
         fig.show()
         # py.iplot(fig, filename=chart_title)
+
+
+if __name__ == "__main__":
+    # mr = ModelResults()
+    ######################
+    #### Import Data #####
+    filename = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access/data/mobility-model-parameters.csv"
+    with open(filename) as csv_file:
+        # read the csv file
+        param_df = pd.read_csv(filename)
+    mo = model_options()
+    mv = model_variables()
+    hpv = HPV_variables(param_df, mv)
+    V_guess = 12
+    s = [0]
+    i = 0
+
+    
+
+    data = (
+                            mv.ro,
+                            mv.C_d,
+                            mv.A,
+                            mv.m1 + hpv.m_HPV_only.flatten()[i],  #
+                            hpv.Crr.flatten()[i],  # CRR related to the HPV
+                            mv.eta,
+                            mv.P_t,
+                            mv.g,
+                            s[0] * mo.ulhillpo,  # hill polarity, see model options
+                        )
+    
+    model = mobility_models.bike_power_solution
+    V_r = fsolve(model, V_guess, args=data, full_output=True)

@@ -1,0 +1,465 @@
+Country,TOTALPiped,TOTALNon-piped,Year
+Afghanistan,17,50,2015
+Afghanistan,23,60,2022
+Albania,81,16,2015
+Albania,81,16,2022
+Algeria,75,24,2015
+Algeria,71,28,2022
+American Samoa,98,0,2015
+American Samoa,100,0,2022
+Andorra,100,0,2015
+Andorra,100,0,2022
+Angola,38,28,2015
+Angola,43,24,2022
+Anguilla,97,0,2015
+Anguilla,100,-,2022
+Antigua and Barbuda,98,0,2015
+Antigua and Barbuda,98,0,2022
+Argentina,96,2,2015
+Argentina,-,-,2022
+Armenia,97,3,2015
+Armenia,100,0,2022
+Aruba,94,4,2015
+Aruba,94,4,2022
+Australia,97,3,2015
+Australia,-,-,2022
+Austria,-,-,2015
+Austria,-,-,2022
+Azerbaijan,81,13,2015
+Azerbaijan,94,5,2022
+Bahamas,97,2,2015
+Bahamas,97,2,2022
+Bahrain,100,0,2015
+Bahrain,100,0,2022
+Bangladesh,13,86,2015
+Bangladesh,15,84,2022
+Barbados,99,0,2015
+Barbados,99,0,2022
+Belarus,92,8,2015
+Belarus,97,2,2022
+Belgium,100,0,2015
+Belgium,100,0,2022
+Belize,83,15,2015
+Belize,87,12,2022
+Benin,40,33,2015
+Benin,39,37,2022
+Bermuda,100,0,2015
+Bermuda,100,0,2022
+Bhutan,98,1,2015
+Bhutan,100,0,2022
+Bolivia (Plurinational State of),70,21,2015
+Bolivia (Plurinational State of),67,27,2022
+"Bonaire, Sint Eustatius and Saba",91,9,2015
+"Bonaire, Sint Eustatius and Saba",100,0,2022
+Bosnia and Herzegovina,95,5,2015
+Bosnia and Herzegovina,-,-,2022
+Botswana,91,6,2015
+Botswana,91,6,2022
+Brazil,96,2,2015
+Brazil,99,0,2022
+British Virgin Islands,96,4,2015
+British Virgin Islands,-,-,2022
+Brunei Darussalam,100,0,2015
+Brunei Darussalam,100,0,2022
+Bulgaria,100,0,2015
+Bulgaria,100,0,2022
+Burkina Faso,28,47,2015
+Burkina Faso,32,47,2022
+Burundi,33,46,2015
+Burundi,39,43,2022
+Cabo Verde,85,11,2015
+Cabo Verde,90,7,2022
+Cambodia,25,53,2015
+Cambodia,34,55,2022
+Cameroon,41,37,2015
+Cameroon,42,42,2022
+Canada,100,0,2015
+Canada,100,0,2022
+Cayman Islands,88,7,2015
+Cayman Islands,91,4,2022
+Central African Republic,16,48,2015
+Central African Republic,14,49,2022
+Chad,17,43,2015
+Chad,17,48,2022
+Channel Islands,90,4,2015
+Channel Islands,90,4,2022
+Chile,99,0,2015
+Chile,100,0,2022
+China,76,17,2015
+China,86,12,2022
+"China, Hong Kong SAR",100,0,2015
+"China, Hong Kong SAR",100,0,2022
+"China, Macao SAR",100,0,2015
+"China, Macao SAR",100,0,2022
+Colombia,88,8,2015
+Colombia,89,9,2022
+Comoros,59,32,2015
+Comoros,59,32,2022
+Congo,54,27,2015
+Congo,55,29,2022
+Cook Islands,85,15,2015
+Cook Islands,89,11,2022
+Costa Rica,99,0,2015
+Costa Rica,100,0,2022
+Côte d'Ivoire,47,34,2015
+Côte d'Ivoire,49,32,2022
+Croatia,-,-,2015
+Croatia,-,-,2022
+Cuba,78,18,2015
+Cuba,80,18,2022
+Curaçao,99,0,2015
+Curaçao,99,0,2022
+Cyprus,100,0,2015
+Cyprus,100,0,2022
+Czechia,100,0,2015
+Czechia,100,0,2022
+Democratic People's Republic of Korea,70,26,2015
+Democratic People's Republic of Korea,65,30,2022
+Democratic Republic of the Congo,32,22,2015
+Democratic Republic of the Congo,36,23,2022
+Denmark,100,0,2015
+Denmark,100,0,2022
+Djibouti,81,9,2015
+Djibouti,83,8,2022
+Dominica,94,1,2015
+Dominica,94,1,2022
+Dominican Republic,80,17,2015
+Dominican Republic,80,17,2022
+Ecuador,86,7,2015
+Ecuador,91,4,2022
+Egypt,97,2,2015
+Egypt,99,0,2022
+El Salvador,87,9,2015
+El Salvador,93,6,2022
+Equatorial Guinea,41,27,2015
+Equatorial Guinea,41,27,2022
+Eritrea,52,18,2015
+Eritrea,52,18,2022
+Estonia,96,4,2015
+Estonia,100,0,2022
+Eswatini,57,18,2015
+Eswatini,62,22,2022
+Ethiopia,35,28,2015
+Ethiopia,44,35,2022
+Falkland Islands (Malvinas),90,5,2015
+Falkland Islands (Malvinas),-,-,2022
+Faroe Islands,100,0,2015
+Faroe Islands,100,0,2022
+Fiji,87,9,2015
+Fiji,89,7,2022
+Finland,100,0,2015
+Finland,100,0,2022
+France,100,0,2015
+France,100,0,2022
+French Guiana,88,6,2015
+French Guiana,89,6,2022
+French Polynesia,100,0,2015
+French Polynesia,100,0,2022
+Gabon,86,6,2015
+Gabon,88,6,2022
+Gambia,73,16,2015
+Gambia,79,12,2022
+Georgia,80,17,2015
+Georgia,85,13,2022
+Germany,100,0,2015
+Germany,100,0,2022
+Ghana,52,37,2015
+Ghana,57,38,2022
+Gibraltar,100,0,2015
+Gibraltar,100,0,2022
+Greece,100,0,2015
+Greece,100,0,2022
+Greenland,100,0,2015
+Greenland,100,0,2022
+Grenada,92,4,2015
+Grenada,92,4,2022
+Guadeloupe,100,0,2015
+Guadeloupe,100,0,2022
+Guam,100,0,2015
+Guam,-,-,2022
+Guatemala,77,16,2015
+Guatemala,78,18,2022
+Guinea,23,54,2015
+Guinea,23,61,2022
+Guinea-Bissau,37,34,2015
+Guinea-Bissau,48,29,2022
+Guyana,69,27,2015
+Guyana,70,28,2022
+Haiti,26,48,2015
+Haiti,19,58,2022
+Honduras,88,6,2015
+Honduras,92,5,2022
+Hungary,100,0,2015
+Hungary,100,0,2022
+Iceland,100,0,2015
+Iceland,100,0,2022
+India,45,49,2015
+India,45,53,2022
+Indonesia,22,68,2015
+Indonesia,23,72,2022
+Iran (Islamic Republic of),98,1,2015
+Iran (Islamic Republic of),100,0,2022
+Iraq,82,14,2015
+Iraq,84,16,2022
+Ireland,96,0,2015
+Ireland,96,0,2022
+Isle of Man,98,1,2015
+Isle of Man,100,0,2022
+Israel,100,0,2015
+Israel,100,0,2022
+Italy,98,1,2015
+Italy,-,-,2022
+Jamaica,82,13,2015
+Jamaica,84,13,2022
+Japan,98,1,2015
+Japan,98,0,2022
+Jordan,88,11,2015
+Jordan,86,13,2022
+Kazakhstan,81,16,2015
+Kazakhstan,-,-,2022
+Kenya,33,33,2015
+Kenya,33,38,2022
+Kiribati,36,38,2015
+Kiribati,41,39,2022
+Kuwait,-,-,2015
+Kuwait,-,-,2022
+Kyrgyzstan,84,6,2015
+Kyrgyzstan,94,0,2022
+Lao People's Democratic Republic,28,52,2015
+Lao People's Democratic Republic,32,57,2022
+Latvia,91,8,2015
+Latvia,95,4,2022
+Lebanon,87,11,2015
+Lebanon,90,10,2022
+Lesotho,68,14,2015
+Lesotho,72,12,2022
+Liberia,8,72,2015
+Liberia,5,80,2022
+Libya,75,22,2015
+Libya,78,22,2022
+Liechtenstein,100,0,2015
+Liechtenstein,100,0,2022
+Lithuania,93,3,2015
+Lithuania,96,2,2022
+Luxembourg,100,0,2015
+Luxembourg,100,0,2022
+Madagascar,32,19,2015
+Madagascar,36,22,2022
+Malawi,21,64,2015
+Malawi,21,72,2022
+Malaysia,95,3,2015
+Malaysia,96,2,2022
+Maldives,46,53,2015
+Maldives,52,47,2022
+Mali,43,36,2015
+Mali,53,36,2022
+Malta,100,0,2015
+Malta,100,0,2022
+Marshall Islands,24,74,2015
+Marshall Islands,28,69,2022
+Martinique,100,0,2015
+Martinique,100,0,2022
+Mauritania,50,29,2015
+Mauritania,61,25,2022
+Mauritius,100,0,2015
+Mauritius,100,0,2022
+Mayotte,94,2,2015
+Mayotte,93,4,2022
+Mexico,94,4,2015
+Mexico,98,2,2022
+Micronesia (Federated States of),71,19,2015
+Micronesia (Federated States of),74,16,2022
+Monaco,100,0,2015
+Monaco,100,0,2022
+Mongolia,34,52,2015
+Mongolia,37,54,2022
+Montenegro,89,10,2015
+Montenegro,90,10,2022
+Montserrat,98,0,2015
+Montserrat,98,0,2022
+Morocco,74,10,2015
+Morocco,79,10,2022
+Mozambique,34,25,2015
+Mozambique,42,31,2022
+Myanmar,27,52,2015
+Myanmar,34,49,2022
+Namibia,80,11,2015
+Namibia,84,9,2022
+Nauru,2,95,2015
+Nauru,2,95,2022
+Nepal,49,43,2015
+Nepal,50,45,2022
+Netherlands (Kingdom of the),100,0,2015
+Netherlands (Kingdom of the),100,0,2022
+New Caledonia,96,2,2015
+New Caledonia,100,0,2022
+New Zealand,100,0,2015
+New Zealand,100,0,2022
+Nicaragua,69,14,2015
+Nicaragua,70,13,2022
+Niger,34,26,2015
+Niger,41,27,2022
+Nigeria,14,60,2015
+Nigeria,12,72,2022
+Niue,95,3,2015
+Niue,97,0,2022
+North Macedonia,92,7,2015
+North Macedonia,92,7,2022
+Northern Mariana Islands,91,9,2015
+Northern Mariana Islands,90,10,2022
+Norway,100,0,2015
+Norway,100,0,2022
+Oman,90,9,2015
+Oman,96,4,2022
+Pakistan,29,64,2015
+Pakistan,25,70,2022
+Palau,69,31,2015
+Palau,86,14,2022
+Panama,92,3,2015
+Panama,93,3,2022
+Papua New Guinea,18,27,2015
+Papua New Guinea,16,37,2022
+Paraguay,88,8,2015
+Paraguay,100,0,2022
+Peru,85,6,2015
+Peru,92,3,2022
+Philippines,59,36,2015
+Philippines,66,31,2022
+Poland,90,4,2015
+Poland,90,0,2022
+Portugal,99,0,2015
+Portugal,98,0,2022
+Puerto Rico,99,0,2015
+Puerto Rico,100,0,2022
+Qatar,98,2,2015
+Qatar,100,0,2022
+Republic of Korea,98,2,2015
+Republic of Korea,100,0,2022
+Republic of Moldova,63,27,2015
+Republic of Moldova,77,17,2022
+Réunion,100,0,2015
+Réunion,100,0,2022
+Romania,64,36,2015
+Romania,-,-,2022
+Russian Federation,90,7,2015
+Russian Federation,94,3,2022
+Rwanda,42,37,2015
+Rwanda,45,39,2022
+Saint Barthelemy,100,0,2015
+Saint Barthelemy,100,0,2022
+Saint Helena,98,1,2015
+Saint Helena,98,0,2022
+Saint Kitts and Nevis,98,0,2015
+Saint Kitts and Nevis,98,0,2022
+Saint Lucia,95,2,2015
+Saint Lucia,97,2,2022
+Saint Martin (French part),100,0,2015
+Saint Martin (French part),100,0,2022
+Saint Pierre and Miquelon,91,0,2015
+Saint Pierre and Miquelon,91,0,2022
+Saint Vincent and the Grenadines,94,4,2015
+Saint Vincent and the Grenadines,94,4,2022
+Samoa,87,11,2015
+Samoa,88,11,2022
+San Marino,100,0,2015
+San Marino,100,0,2022
+Sao Tome and Principe,91,3,2015
+Sao Tome and Principe,97,0,2022
+Saudi Arabia,89,10,2015
+Saudi Arabia,89,10,2022
+Senegal,70,12,2015
+Senegal,77,12,2022
+Serbia,91,8,2015
+Serbia,95,5,2022
+Seychelles,92,4,2015
+Seychelles,94,3,2022
+Sierra Leone,23,42,2015
+Sierra Leone,21,52,2022
+Singapore,100,0,2015
+Singapore,100,0,2022
+Sint Maarten (Dutch part),91,5,2015
+Sint Maarten (Dutch part),91,5,2022
+Slovakia,98,2,2015
+Slovakia,-,-,2022
+Slovenia,-,-,2015
+Slovenia,-,-,2022
+Solomon Islands,48,27,2015
+Solomon Islands,-,-,2022
+Somalia,37,35,2015
+Somalia,49,37,2022
+South Africa,88,6,2015
+South Africa,90,7,2022
+South Sudan,6,66,2015
+South Sudan,4,74,2022
+Spain,100,0,2015
+Spain,100,0,2022
+Sri Lanka,43,46,2015
+Sri Lanka,52,39,2022
+State of Palestine,62,34,2015
+State of Palestine,51,49,2022
+Sudan,46,36,2015
+Sudan,59,34,2022
+Suriname,78,19,2015
+Suriname,80,19,2022
+Sweden,87,12,2015
+Sweden,88,12,2022
+Switzerland,100,0,2015
+Switzerland,100,0,2022
+Syrian Arab Republic,80,19,2015
+Syrian Arab Republic,79,21,2022
+Tajikistan,61,18,2015
+Tajikistan,65,19,2022
+Thailand,71,28,2015
+Thailand,86,14,2022
+Timor-Leste,58,19,2015
+Timor-Leste,72,17,2022
+Togo,31,38,2015
+Togo,30,47,2022
+Tokelau,95,4,2015
+Tokelau,95,4,2022
+Tonga,98,1,2015
+Tonga,99,1,2022
+Trinidad and Tobago,91,8,2015
+Trinidad and Tobago,93,7,2022
+Tunisia,89,8,2015
+Tunisia,93,6,2022
+Türkiye,95,3,2015
+Türkiye,95,4,2022
+Turkmenistan,55,44,2015
+Turkmenistan,55,45,2022
+Turks and Caicos Islands,-,-,2015
+Turks and Caicos Islands,45,55,2022
+Tuvalu,98,1,2015
+Tuvalu,100,0,2022
+Uganda,20,57,2015
+Uganda,23,61,2022
+Ukraine,68,31,2015
+Ukraine,63,37,2022
+United Arab Emirates,100,0,2015
+United Arab Emirates,100,0,2022
+United Kingdom,100,0,2015
+United Kingdom,100,0,2022
+United Republic of Tanzania,39,26,2015
+United Republic of Tanzania,41,36,2022
+United States Virgin Islands,47,52,2015
+United States Virgin Islands,47,52,2022
+United States of America,99,0,2015
+United States of America,-,-,2022
+Uruguay,100,0,2015
+Uruguay,100,0,2022
+Uzbekistan,73,24,2015
+Uzbekistan,73,25,2022
+Vanuatu,49,40,2015
+Vanuatu,50,42,2022
+Venezuela (Bolivarian Republic of),81,14,2015
+Venezuela (Bolivarian Republic of),78,15,2022
+Viet Nam,39,54,2015
+Viet Nam,52,46,2022
+Wallis and Futuna Islands,100,0,2015
+Wallis and Futuna Islands,99,0,2022
+Yemen,51,31,2015
+Yemen,57,34,2022
+Zambia,33,35,2015
+Zambia,34,40,2022
+Zimbabwe,31,47,2015
+Zimbabwe,27,50,2022

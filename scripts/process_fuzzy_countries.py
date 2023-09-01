@@ -48,7 +48,7 @@ def read_road_values_fuzzy(path, col):
 iso_num_col = "ISO Code"
 col = "Country"
 # path = "../data/hand_pump_data.csv"
-path = "fitnessglobalalncettables.csv"
+path = "../data/processed/WHO_piped_scratch_float.csv"
 df_original = pd.read_csv(path)
 
 
@@ -56,5 +56,5 @@ df_original = pd.read_csv(path)
 df = add_alpha_codes(df_original, col)
 
 
-filename = "fitness_countries"
+filename = "JMP_countries"
 df.to_csv(filename + ".csv")

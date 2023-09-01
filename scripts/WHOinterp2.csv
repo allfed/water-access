@@ -1,0 +1,214 @@
+alpha3,Unnamed: 0,Country,% urban,TOTALUnimproved,RURALUnimproved,URBANUnimproved,TOTALPiped,TOTALNon-piped,RURALPiped,RURALNon-piped,URBANPiped,URBANNon-piped,Entity,alpha2,region,subregion,borders
+AFG,0,Afghanistan,27.0,10.0,14.0,0.0,23.0,60.0,17.0,61.0,42.0,58.0,Afghanistan,AF,Asia,Southern Asia,"IRN,PAK,TKM,UZB,TJK,CHN"
+ALB,1,Albania,64.0,3.0,4.0,3.0,81.0,16.0,76.0,21.0,84.0,14.0,Albania,AL,Europe,Southern Europe,"MNE,GRC,MKD"
+DZA,2,Algeria,75.0,0.0,0.0,0.0,71.0,28.0,60.0,40.0,75.0,24.0,Algeria,DZ,Africa,Northern Africa,"TUN,LBY,NER,ESH,MRT,MLI,MAR"
+AND,3,Andorra,88.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Andorra,AD,Europe,Southern Europe,"FRA,ESP"
+AGO,4,Angola,68.0,19.0,23.0,18.0,43.0,24.0,8.0,28.0,59.0,22.0,Angola,AO,Africa,Middle Africa,"COG,COD,ZMB,NAM"
+AIA,5,Anguilla,100.0,3.0,7.714285714285714,3.0,100.0,0.0,64.85714285714286,25.571428571428573,100.0,0.0,Anguilla,AI,Americas,Caribbean,
+ATG,6,Antigua and Barbuda,24.0,1.0,1.0,1.0,98.0,0.0,98.0,0.0,98.0,0.0,Antigua and Barbuda,AG,Americas,Caribbean,
+ARG,7,Argentina,92.0,0.0,3.0,0.0,96.0,2.0,82.0,11.0,100.0,0.0,Argentina,AR,Americas,South America,"BOL,BRA,CHL,PRY,URY"
+ARM,8,Armenia,64.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Armenia,AM,Asia,Western Asia,"AZE,GEO,IRN,TUR"
+AUS,9,Australia,86.0,0.0,0.0,0.0,97.0,3.0,87.0,13.0,100.0,0.0,Australia,AU,Oceania,Australia and New Zealand,
+AUT,10,Austria,59.0,0.0,0.0,0.0,99.42857142857143,0.42857142857142855,100.0,0.0,99.4,0.6,Austria,AT,Europe,Western Europe,"CZE,DEU,HUN,ITA,LIE,SVK,SVN,CHE"
+AZE,11,Azerbaijan,57.0,1.0,3.0,0.0,94.0,5.0,86.0,11.0,100.0,0.0,Azerbaijan,AZ,Asia,Western Asia,"ARM,GEO,IRN,RUS,TUR"
+BHR,12,Bahrain,90.0,0.0,1.6923076923076923,0.07142857142857142,100.0,0.0,81.6923076923077,15.923076923076923,89.3076923076923,10.384615384615385,Bahrain,BH,Asia,Western Asia,
+BGD,13,Bangladesh,40.0,0.0,0.0,0.0,15.0,84.0,3.0,96.0,33.0,67.0,Bangladesh,BD,Asia,Southern Asia,"MMR,IND"
+BRB,14,Barbados,31.0,1.0,7.714285714285714,1.8181818181818181,99.0,0.0,64.85714285714286,25.57142857142857,82.63636363636364,15.363636363636363,Barbados,BB,Americas,Caribbean,
+BLR,15,Belarus,80.0,0.0,2.0,0.0,97.0,2.0,89.0,9.0,100.0,0.0,Belarus,BY,Europe,Eastern Europe,"LVA,LTU,POL,RUS,UKR"
+BEL,16,Belgium,98.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Belgium,BE,Europe,Western Europe,"FRA,DEU,LUX,NLD"
+BLZ,17,Belize,46.0,0.0,0.0,0.0,87.0,12.0,79.0,20.0,96.0,4.0,Belize,BZ,Americas,Central America,"GTM,MEX"
+BEN,18,Benin,50.0,22.0,24.0,20.0,39.0,37.0,30.0,42.0,48.0,32.0,Benin,BJ,Africa,Western Africa,"BFA,NER,NGA,TGO"
+BMU,19,Bermuda,100.0,0.0,0.0,0.0,100.0,0.0,97.5,1.5,100.0,0.0,Bermuda,BM,Americas,Northern America,
+BTN,20,Bhutan,44.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Bhutan,BT,Asia,Southern Asia,"CHN,IND"
+BOL,21,Bolivia (Plurinational State of),71.0,1.0,4.0,0.0,67.0,27.0,21.0,60.0,86.0,14.0,Bolivia,BO,Americas,South America,"ARG,BRA,CHL,PRY,PER"
+BES,22,"Bonaire, Sint Eustatius and Saba",75.0,0.0,7.714285714285714,1.8181818181818183,100.0,0.0,64.85714285714286,25.57142857142857,82.63636363636364,15.363636363636365,Bonaire Sint Eustatius and Saba,BQ,Americas,Caribbean,
+BIH,23,Bosnia and Herzegovina,50.0,0.0,0.0,0.0,95.0,5.0,93.0,7.0,98.0,2.0,Bosnia and Herzegovina,BA,Europe,Southern Europe,"HRV,MNE,SRB"
+BWA,24,Botswana,72.0,2.0,3.0,2.0,91.0,6.0,77.0,18.0,97.0,1.0,Botswana,BW,Africa,Southern Africa,"NAM,ZAF,ZMB,ZWE"
+BRA,25,Brazil,88.0,0.0,2.0,0.0,99.0,0.0,90.0,8.0,100.0,0.0,Brazil,BR,Americas,South America,"ARG,BOL,COL,GUF,GUY,PRY,PER,SUR,URY,VEN"
+VGB,26,British Virgin Islands,49.0,0.0,7.7142857142857135,1.8181818181818181,96.0,4.0,64.85714285714286,25.571428571428573,82.63636363636364,15.363636363636363,British Virgin Islands,VG,Americas,Caribbean,
+BRN,27,Brunei Darussalam,79.0,0.0,9.0,0.0,100.0,0.0,83.0,8.0,100.0,0.0,Brunei,BN,Asia,South-Eastern Asia,MYS
+BGR,28,Bulgaria,76.0,0.0,3.0,0.0,100.0,0.0,97.0,0.0,100.0,0.0,Bulgaria,BG,Europe,Eastern Europe,"GRC,MKD,ROU,SRB,TUR"
+BFA,29,Burkina Faso,32.0,21.0,28.0,5.0,32.0,47.0,10.0,61.0,78.0,17.0,Burkina Faso,BF,Africa,Western Africa,"BEN,CIV,GHA,MLI,NER,TGO"
+BDI,30,Burundi,14.0,15.0,17.0,1.0,39.0,43.0,30.0,49.0,91.0,8.0,Burundi,BI,Africa,Eastern Africa,"COD,RWA,TZA"
+CPV,31,Cabo Verde,68.0,3.0,8.0,0.0,90.0,7.0,77.0,15.0,96.0,4.0,Cape Verde,CV,Africa,Western Africa,
+KHM,32,Cambodia,25.0,3.0,4.0,0.0,34.0,55.0,20.0,66.0,77.0,23.0,Cambodia,KH,Asia,South-Eastern Asia,"LAO,THA,VNM"
+CMR,33,Cameroon,59.0,12.0,23.0,4.0,42.0,42.0,17.0,51.0,59.0,35.0,Cameroon,CM,Africa,Middle Africa,"CAF,TCD,COG,GNQ,GAB,NGA"
+CAN,34,Canada,82.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Canada,CA,Americas,Northern America,USA
+CYM,35,Cayman Islands,100.0,4.0,7.7142857142857135,4.0,91.0,4.0,64.85714285714286,25.57142857142857,91.0,4.0,Cayman Islands,KY,Americas,Caribbean,
+CAF,36,Central African Republic,43.0,34.0,47.0,16.0,14.0,49.0,0.0,47.0,31.0,52.0,Central African Republic,CF,Africa,Middle Africa,"CMR,TCD,COD,COG,SSD,SDN"
+TCD,37,Chad,24.0,28.0,35.0,8.0,17.0,48.0,7.0,49.0,47.0,45.0,Chad,TD,Africa,Middle Africa,"CMR,CAF,LBY,NER,NGA,SSD"
+CHL,38,Chile,88.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Chile,CL,Americas,South America,"ARG,BOL,PER"
+CHN,39,China,64.0,2.0,3.0,1.0,86.0,12.0,72.0,25.0,94.0,5.0,China,CN,Asia,Eastern Asia,"AFG,BTN,MMR,HKG,IND,KAZ,PRK,KGZ,LAO,MAC,MNG,PAK,RUS,TJK,VNM"
+HKG,40,"China, Hong Kong SAR",100.0,0.0,3.0,0.0,100.0,0.0,72.0,25.0,100.0,0.0,Hong Kong,HK,Asia,Eastern Asia,CHN
+MAC,41,"China, Macao SAR",100.0,0.0,3.0,0.0,100.0,0.0,72.0,25.0,100.0,0.0,Macao,MO,Asia,Eastern Asia,CHN
+COL,42,Colombia,82.0,0.0,3.0,0.0,89.0,9.0,60.0,27.0,95.0,5.0,Colombia,CO,Americas,South America,"BRA,ECU,PAN,PER,VEN"
+COK,43,Cook Islands,76.0,0.0,0.0,0.0,89.0,11.0,95.8,3.4,98.0,2.0,Cook Islands,CK,Oceania,Polynesia,
+CRI,44,Costa Rica,82.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Costa Rica,CR,Americas,Central America,"NIC,PAN"
+CIV,45,Côte d'Ivoire,53.0,13.0,21.0,6.0,49.0,32.0,29.0,42.0,66.0,24.0,Cote d'Ivoire,CI,Africa,Western Africa,"BFA,GHA,GIN,LBR,MLI"
+HRV,46,Croatia,58.0,0.0,0.5,0.0,95.0,5.0,89.75,9.5,98.0,2.0,Croatia,HR,Europe,Southern Europe,"BIH,HUN,MNE,SRB,SVN"
+CUB,47,Cuba,77.0,2.0,2.0,2.0,80.0,18.0,57.0,40.0,87.0,11.0,Cuba,CU,Americas,Caribbean,
+CYP,48,Cyprus,67.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Cyprus,CY,Europe,Southern Europe,GBR
+CZE,49,Czechia,74.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Czechia,CZ,Europe,Eastern Europe,"AUT,DEU,POL,SVK"
+PRK,50,Democratic People's Republic of Korea,63.0,5.0,11.0,2.0,65.0,30.0,50.0,39.0,74.0,24.0,North Korea,KP,Asia,Eastern Asia,"CHN,KOR,RUS"
+COD,51,Democratic Republic of the Congo,47.0,33.0,54.0,9.0,36.0,23.0,8.0,24.0,67.0,22.0,Democratic Republic of Congo,CD,Africa,Middle Africa,"AGO,BDI,CAF,COG,RWA,SSD,TZA,UGA,ZMB"
+DNK,52,Denmark,88.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Denmark,DK,Europe,Northern Europe,DEU
+DJI,53,Djibouti,78.0,7.0,31.0,0.0,83.0,8.0,26.0,33.0,100.0,0.0,Djibouti,DJ,Africa,Eastern Africa,"ERI,ETH,SOM"
+DOM,54,Dominican Republic,84.0,1.0,0.0,1.0,80.0,17.0,66.0,27.0,83.0,15.0,Dominican Republic,DO,Americas,Caribbean,HTI
+ECU,55,Ecuador,65.0,3.0,7.0,0.0,91.0,4.0,75.0,12.0,100.0,0.0,Ecuador,EC,Americas,South America,"COL,PER"
+EGY,56,Egypt,43.0,0.0,1.0,0.0,99.0,0.0,99.0,0.0,99.0,0.0,Egypt,EG,Africa,Northern Africa,"ISR,LBY,SDN"
+SLV,57,El Salvador,75.0,0.0,0.0,0.0,93.0,6.0,84.0,12.0,96.0,4.0,El Salvador,SV,Americas,Central America,"GTM,HND"
+EST,58,Estonia,70.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Estonia,EE,Europe,Northern Europe,"LVA,RUS"
+SWZ,59,Eswatini,25.0,7.0,10.0,0.0,62.0,22.0,51.0,27.0,95.0,4.0,Eswatini,SZ,Africa,Southern Africa,"MOZ,ZAF"
+ETH,60,Ethiopia,23.0,16.0,20.0,1.0,44.0,35.0,32.0,42.0,85.0,12.0,Ethiopia,ET,Africa,Eastern Africa,"DJI,ERI,KEN,SOM,SSD,SDN"
+FLK,61,Falkland Islands (Malvinas),79.0,5.0,22.0,0.0,90.0,5.0,56.0,22.0,100.0,0.0,Falkland Islands,FK,Americas,South America,
+FRO,62,Faroe Islands,43.0,0.0,1.0,0.5,100.0,0.0,94.9,4.0,98.2,1.1,Faeroe Islands,FO,Europe,Northern Europe,
+FJI,63,Fiji,58.0,2.0,4.0,0.0,89.0,7.0,77.0,16.0,98.0,0.0,Fiji,FJ,Oceania,Melanesia,
+FIN,64,Finland,86.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Finland,FI,Europe,Northern Europe,"NOR,SWE,RUS"
+FRA,65,France,82.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,France,FR,Europe,Western Europe,"AND,BEL,DEU,ITA,LUX,MCO,ESP,CHE"
+GUF,66,French Guiana,86.0,6.0,1.0,0.0,89.0,6.0,77.0,21.0,94.5,5.5,French Guiana,GF,Americas,South America,"BRA,SUR"
+PYF,67,French Polynesia,62.0,0.0,0.0,0.0,100.0,0.0,95.8,3.4,98.0,2.0,French Polynesia,PF,Oceania,Polynesia,
+GAB,68,Gabon,91.0,3.0,17.0,2.0,88.0,6.0,30.0,38.0,94.0,3.0,Gabon,GA,Africa,Middle Africa,"CMR,COG,GNQ"
+GMB,69,Gambia,64.0,8.0,11.0,7.0,79.0,12.0,71.0,18.0,84.0,9.0,Gambia,GM,Africa,Western Africa,SEN
+GEO,70,Georgia,60.0,2.0,5.0,0.0,85.0,13.0,66.0,29.0,97.0,2.0,Georgia,GE,Asia,Western Asia,"ARM,AZE,RUS,TUR"
+DEU,71,Germany,78.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Germany,DE,Europe,Western Europe,"AUT,BEL,CZE,DNK,FRA,LUX,NLD,POL,CHE"
+GHA,72,Ghana,59.0,2.0,4.0,0.0,57.0,38.0,34.0,52.0,73.0,27.0,Ghana,GH,Africa,Western Africa,"BFA,CIV,TGO"
+GIB,73,Gibraltar,100.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Gibraltar,GI,Europe,Southern Europe,ESP
+GRC,74,Greece,80.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Greece,GR,Europe,Southern Europe,"ALB,BGR,TUR,MKD"
+GRL,75,Greenland,88.0,0.0,0.0,0.0,100.0,0.0,97.5,1.5,100.0,0.0,Greenland,GL,Americas,Northern America,
+GLP,76,Guadeloupe,99.0,0.0,7.714285714285714,1.8181818181818181,100.0,0.0,64.85714285714285,25.571428571428573,82.63636363636364,15.363636363636362,Guadeloupe,GP,Americas,Caribbean,
+GUM,77,Guam,95.0,0.0,15.333333333333334,3.0,100.0,0.0,17.0,67.33333333333333,64.0,32.666666666666664,Guam,GU,Oceania,Micronesia,
+GTM,78,Guatemala,53.0,3.0,4.0,2.0,78.0,18.0,65.0,27.0,89.0,9.0,Guatemala,GT,Americas,Central America,"BLZ,SLV,HND,MEX"
+GIN,79,Guinea,38.0,8.0,13.0,2.0,23.0,61.0,8.0,67.0,47.0,51.0,Guinea,GN,Africa,Western Africa,"CIV,GNB,LBR,MLI,SEN,SLE"
+GNB,80,Guinea-Bissau,45.0,22.0,34.0,8.0,48.0,29.0,32.0,32.0,67.0,25.0,Guinea-Bissau,GW,Africa,Western Africa,"GIN,SEN"
+GUY,81,Guyana,27.0,0.0,1.0,0.0,70.0,28.0,65.0,33.0,84.0,16.0,Guyana,GY,Americas,South America,"BRA,SUR,VEN"
+HTI,82,Haiti,59.0,23.0,44.0,8.0,19.0,58.0,24.0,32.0,15.0,77.0,Haiti,HT,Americas,Caribbean,DOM
+HND,83,Honduras,60.0,3.0,8.0,0.0,92.0,5.0,86.0,6.0,96.0,4.0,Honduras,HN,Americas,Central America,"GTM,SLV,NIC"
+HUN,84,Hungary,73.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Hungary,HU,Europe,Eastern Europe,"AUT,HRV,ROU,SRB,SVK,SVN,UKR"
+ISL,85,Iceland,94.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Iceland,IS,Europe,Northern Europe,
+IND,86,India,36.0,2.0,2.0,1.0,45.0,53.0,33.0,64.0,66.0,33.0,India,IN,Asia,Southern Asia,"AFG,BGD,BTN,MMR,CHN,NPL,PAK,LKA"
+IDN,87,Indonesia,58.0,4.0,9.0,0.0,23.0,72.0,14.0,76.0,30.0,69.0,Indonesia,ID,Asia,South-Eastern Asia,"TLS,MYS,PNG"
+IRN,88,Iran (Islamic Republic of),77.0,0.0,1.0,0.0,100.0,0.0,97.0,2.0,100.0,0.0,Iran,IR,Asia,Southern Asia,"AFG,ARM,AZE,IRQ,PAK,TUR,TKM"
+IRQ,89,Iraq,71.0,0.0,0.0,0.0,84.0,16.0,72.0,25.0,88.0,12.0,Iraq,IQ,Asia,Western Asia,"IRN,JOR,KWT,SAU,SYR,TUR"
+IRL,90,Ireland,64.0,4.0,3.0,5.0,96.0,0.0,97.0,0.0,95.0,0.0,Ireland,IE,Europe,Northern Europe,GBR
+IMN,91,Isle of Man,53.0,0.0,1.0,0.5,100.0,0.0,94.9,4.0,98.2,1.0999999999999999,Isle of Man,IM,Europe,Northern Europe,
+ISR,92,Israel,93.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Israel,IL,Asia,Western Asia,"EGY,JOR,LBN,SYR"
+ITA,93,Italy,72.0,0.0,0.7083333333333334,0.25,98.0,1.0,92.64583333333333,6.625,97.91666666666667,1.8333333333333333,Italy,IT,Europe,Southern Europe,"AUT,FRA,SMR,SVN,CHE,VAT"
+JAM,94,Jamaica,57.0,2.0,3.0,1.0,84.0,13.0,73.0,21.0,92.0,7.0,Jamaica,JM,Americas,Caribbean,
+JPN,95,Japan,92.0,0.0,6.4,0.6,98.0,0.0,54.8,35.6,83.6,15.6,Japan,JP,Asia,Eastern Asia,
+JOR,96,Jordan,92.0,0.0,2.0,0.0,86.0,13.0,80.0,18.0,87.0,13.0,Jordan,JO,Asia,Western Asia,"IRQ,ISR,SAU,SYR"
+KAZ,97,Kazakhstan,58.0,3.0,7.0,0.0,81.0,16.0,59.0,33.0,98.0,2.0,Kazakhstan,KZ,Asia,Central Asia,"CHN,KGZ,RUS,TKM,UZB"
+KEN,98,Kenya,29.0,9.0,12.0,4.0,33.0,38.0,22.0,42.0,60.0,30.0,Kenya,KE,Africa,Eastern Africa,"ETH,SOM,SSD,TZA,UGA"
+KIR,99,Kiribati,57.0,20.0,38.0,6.0,41.0,39.0,15.0,47.0,61.0,33.0,Kiribati,KI,Oceania,Micronesia,
+KWT,100,Kuwait,100.0,0.0,0.5,0.0,94.5,5.0,90.5,9.0,95.5,4.5,Kuwait,KW,Asia,Western Asia,"IRN,SAU"
+KGZ,101,Kyrgyzstan,37.0,2.0,3.0,0.0,94.0,0.0,90.0,0.0,100.0,0.0,Kyrgyzstan,KG,Asia,Central Asia,"CHN,KAZ,TJK,UZB"
+LAO,102,Lao People's Democratic Republic,38.0,10.0,15.0,3.0,32.0,57.0,14.0,70.0,62.0,35.0,Laos,LA,Asia,South-Eastern Asia,"MMR,KHM,CHN,THA,VNM"
+LVA,103,Latvia,69.0,0.0,1.0,0.0,95.0,4.0,88.0,11.0,98.0,1.0,Latvia,LV,Europe,Northern Europe,"BLR,EST,LTU,RUS"
+LBN,104,Lebanon,89.0,0.0,0.0,0.0,90.0,10.0,85.5,14.5,93.0,7.0,Lebanon,LB,Asia,Western Asia,"ISR,SYR"
+LSO,105,Lesotho,30.0,10.0,13.0,4.0,72.0,12.0,64.0,15.0,91.0,5.0,Lesotho,LS,Africa,Southern Africa,ZAF
+LBR,106,Liberia,53.0,5.0,6.0,4.0,5.0,80.0,0.0,74.0,10.0,86.0,Liberia,LR,Africa,Western Africa,"GIN,CIV,SLE"
+LBY,107,Libya,81.0,0.0,7.8,0.2,78.0,22.0,67.8,24.0,89.8,9.2,Libya,LY,Africa,Northern Africa,"DZA,TCD,EGY,NER,SDN,TUN"
+LIE,108,Liechtenstein,15.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,99.7,0.3,Liechtenstein,LI,Europe,Western Europe,"AUT,CHE"
+LTU,109,Lithuania,68.0,2.0,6.0,0.0,96.0,2.0,87.0,7.0,100.0,0.0,Lithuania,LT,Europe,Northern Europe,"BLR,LVA,POL,RUS"
+LUX,110,Luxembourg,92.0,0.0,1.0,0.0,100.0,0.0,97.0,1.0,100.0,0.0,Luxembourg,LU,Europe,Western Europe,"BEL,FRA,DEU"
+MDG,111,Madagascar,40.0,31.0,43.0,12.0,36.0,22.0,16.0,22.0,66.0,21.0,Madagascar,MG,Africa,Eastern Africa,
+MWI,112,Malawi,18.0,5.0,6.0,4.0,21.0,72.0,8.0,84.0,77.0,19.0,Malawi,MW,Africa,Eastern Africa,"MOZ,TZA,ZMB"
+MYS,113,Malaysia,78.0,2.0,9.0,0.0,96.0,2.0,83.0,8.0,100.0,0.0,Malaysia,MY,Asia,South-Eastern Asia,"BRN,IDN,THA"
+MDV,114,Maldives,42.0,0.0,0.0,0.0,52.0,47.0,19.0,81.0,100.0,0.0,Maldives,MV,Asia,Southern Asia,
+MLI,115,Mali,45.0,11.0,20.0,0.0,53.0,36.0,27.0,51.0,83.0,17.0,Mali,ML,Africa,Western Africa,"DZA,BFA,GIN,CIV,MRT,NER,SEN"
+MLT,116,Malta,95.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Malta,MT,Europe,Southern Europe,
+MHL,117,Marshall Islands,79.0,4.0,8.0,3.0,28.0,69.0,7.0,85.0,33.0,64.0,Marshall Islands,MH,Oceania,Micronesia,
+MTQ,118,Martinique,89.0,0.0,7.714285714285714,1.8181818181818181,100.0,0.0,64.85714285714286,25.571428571428573,82.63636363636364,15.363636363636363,Martinique,MQ,Americas,Caribbean,
+MRT,119,Mauritania,57.0,13.0,30.0,0.0,61.0,25.0,43.0,27.0,75.0,24.0,Mauritania,MR,Africa,Western Africa,"DZA,MLI,SEN,ESH"
+MUS,120,Mauritius,41.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Mauritius,MU,Africa,Eastern Africa,
+MYT,121,Mayotte,45.0,4.0,19.0,3.357142857142857,93.0,4.0,26.428571428571427,44.857142857142854,76.14285714285714,19.142857142857142,Mayotte,YT,Africa,Eastern Africa,
+MEX,122,Mexico,81.0,0.0,2.0,0.0,98.0,2.0,92.0,6.0,100.0,0.0,Mexico,MX,Americas,Central America,"BLZ,GTM,USA"
+MCO,123,Monaco,100.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Monaco,MC,Europe,Western Europe,FRA
+MNG,124,Mongolia,69.0,4.0,12.0,0.0,37.0,54.0,8.0,64.0,50.0,49.0,Mongolia,MN,Asia,Eastern Asia,"CHN,RUS"
+MNE,125,Montenegro,68.0,0.0,2.0,0.0,90.0,10.0,75.0,23.0,96.0,4.0,Montenegro,ME,Europe,Southern Europe,"ALB,BIH,HRV,MKD"
+MSR,126,Montserrat,9.0,2.0,7.714285714285715,1.8181818181818183,98.0,0.0,64.85714285714286,25.571428571428573,82.63636363636363,15.363636363636363,Montserrat,MS,Americas,Caribbean,
+MAR,127,Morocco,65.0,11.0,29.0,1.0,79.0,10.0,53.0,19.0,94.0,5.0,Morocco,MA,Africa,Northern Africa,"DZA,ESH,ESP"
+MOZ,128,Mozambique,38.0,17.0,24.0,5.0,42.0,31.0,20.0,41.0,77.0,16.0,Mozambique,MZ,Africa,Eastern Africa,"MWI,ZAF,SWZ,TZA,ZMB,ZWE"
+MMR,129,Myanmar,32.0,6.0,8.0,1.0,34.0,49.0,18.0,60.0,67.0,26.0,Myanmar,MM,Asia,South-Eastern Asia,"BGD,CHN,IND,LAO,THA"
+NAM,130,Namibia,54.0,4.0,7.0,0.0,84.0,9.0,68.0,18.0,97.0,2.0,Namibia,,Africa,Southern Africa,"AGO,BWA,ZAF,ZMB"
+NPL,131,Nepal,21.0,3.0,3.0,6.0,50.0,45.0,50.0,46.0,52.0,41.0,Nepal,NP,Asia,Southern Asia,"CHN,IND"
+NLD,132,Netherlands (Kingdom of the),93.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Netherlands,NL,Europe,Western Europe,"BEL,DEU"
+NCL,133,New Caledonia,72.0,0.0,17.5,2.5,100.0,0.0,41.25,32.75,75.0,19.75,New Caledonia,NC,Oceania,Melanesia,
+NZL,134,New Zealand,87.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,New Zealand,NZ,Oceania,Australia and New Zealand,
+NGA,135,Niger,17.0,29.0,34.0,2.0,41.0,27.0,31.0,32.0,93.0,4.0,Nigeria,NG,Africa,Western Africa,"BEN,CMR,TCD,NER"
+NGA,136,Nigeria,54.0,11.0,21.0,3.0,12.0,72.0,9.0,61.0,15.0,81.0,Nigeria,NG,Africa,Western Africa,"BEN,CMR,TCD,NER"
+NIU,137,Niue,48.0,3.0,0.0,0.0,97.0,0.0,95.8,3.4,98.0,2.0,Niue,NU,Oceania,Polynesia,
+MKD,138,North Macedonia,59.0,0.0,0.0,0.0,92.0,7.0,82.0,17.0,99.0,0.0,North Macedonia,MK,Europe,Southern Europe,"ALB,BGR,GRC,SRB"
+MNP,139,Northern Mariana Islands,92.0,0.0,15.333333333333334,3.0,90.0,10.0,17.0,67.33333333333333,64.0,32.666666666666664,Northern Mariana Islands,MP,Oceania,Micronesia,
+NOR,140,Norway,84.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Norway,NO,Europe,Northern Europe,"FIN,SWE,RUS"
+OMN,141,Oman,88.0,0.0,2.0,0.0,96.0,4.0,84.0,13.0,97.0,3.0,Oman,OM,Asia,Western Asia,"SAU,ARE,YEM"
+PAK,142,Pakistan,38.0,4.0,5.0,2.0,25.0,70.0,17.0,77.0,39.0,58.0,Pakistan,PK,Asia,Southern Asia,"AFG,CHN,IND,IRN"
+PLW,143,Palau,82.0,0.0,0.0,0.0,86.0,14.0,29.0,70.0,98.0,1.0,Palau,PW,Oceania,Micronesia,
+PAN,144,Panama,69.0,2.0,7.0,0.0,93.0,3.0,81.0,8.0,99.0,1.0,Panama,PA,Americas,Central America,"COL,CRI"
+PNG,145,Papua New Guinea,14.0,26.0,29.0,6.0,16.0,37.0,10.0,37.0,53.0,34.0,Papua New Guinea,PG,Oceania,Melanesia,IDN
+PRY,146,Paraguay,63.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Paraguay,PY,Americas,South America,"ARG,BOL,BRA"
+PER,147,Peru,79.0,3.0,8.0,2.0,92.0,3.0,80.0,6.0,95.0,3.0,Peru,PE,Americas,South America,"BOL,BRA,CHL,COL,ECU"
+PHL,148,Philippines,48.0,2.0,4.0,0.0,66.0,31.0,53.0,43.0,81.0,18.0,Philippines,PH,Asia,South-Eastern Asia,
+POL,149,Poland,60.0,10.0,18.0,4.0,90.0,0.0,82.0,0.0,96.0,0.0,Poland,PL,Europe,Eastern Europe,"BLR,CZE,DEU,LTU,RUS,SVK,UKR"
+PRT,150,Portugal,67.0,0.0,2.0,0.0,98.0,0.0,96.0,2.0,100.0,0.0,Portugal,PT,Europe,Southern Europe,ESP
+PRI,151,Puerto Rico,94.0,0.0,7.714285714285714,1.8181818181818183,100.0,0.0,64.85714285714285,25.57142857142857,82.63636363636363,15.36363636363636,Puerto Rico,PR,Americas,Caribbean,
+QAT,152,Qatar,99.0,0.0,0.0,0.0,100.0,0.0,84.0,16.0,91.0,9.0,Qatar,QA,Asia,Western Asia,SAU
+KOR,153,Republic of Korea,81.0,0.0,11.0,2.0,100.0,0.0,50.0,39.0,74.0,24.0,South Korea,KR,Asia,Eastern Asia,PRK
+MDA,154,Republic of Moldova,43.0,6.0,11.0,0.0,77.0,17.0,63.0,26.0,94.0,5.0,Moldova,MD,Europe,Eastern Europe,"ROU,UKR"
+REU,155,Réunion,100.0,0.0,19.0,3.357142857142857,100.0,0.0,26.42857142857143,44.85714285714286,76.14285714285714,19.142857142857142,Reunion,RE,Africa,Eastern Africa,
+ROU,156,Romania,54.0,0.0,0.0,0.0,64.0,36.0,35.0,65.0,90.0,10.0,Romania,RO,Europe,Eastern Europe,"BGR,HUN,MDA,SRB,UKR"
+RUS,157,Russian Federation,75.0,2.0,7.0,0.0,94.0,3.0,85.0,8.0,97.0,2.0,Russia,RU,Europe,Eastern Europe,"AZE,BLR,CHN,EST,FIN,GEO,KAZ,PRK,LVA,LTU,MNG,NOR,POL,UKR"
+RWA,158,Rwanda,18.0,10.0,12.0,3.0,45.0,39.0,38.0,44.0,82.0,13.0,Rwanda,RW,Africa,Eastern Africa,"BDI,COD,TZA,UGA"
+BLM,159,Saint Barthelemy,65.47058823529412,0.0,7.714285714285715,0.0,100.0,0.0,64.85714285714286,25.57142857142857,100.0,0.0,Saint Barthelem,BL,Americas,Caribbean,
+SHN,160,Saint Helena,40.0,0.0,20.333333333333332,4.611111111111111,98.0,0.0,30.11111111111111,43.05555555555556,61.388888888888886,33.44444444444444,Saint Helena,SH,Africa,Western Africa,
+LCA,161,Saint Lucia,19.0,1.0,1.0,0.0,97.0,2.0,96.0,2.0,98.0,0.0,Saint Lucia,LC,Americas,Caribbean,
+MAF,162,Saint Martin (French part),65.47058823529412,0.0,7.714285714285715,0.0,100.0,0.0,64.85714285714285,25.57142857142857,100.0,0.0,Saint Martin (French part),MF,Americas,Caribbean,
+WSM,163,Samoa,18.0,0.0,0.0,0.0,88.0,11.0,87.0,12.0,94.0,6.0,Samoa,WS,Oceania,Polynesia,
+SMR,164,San Marino,98.0,0.0,0.7083333333333334,0.25,100.0,0.0,92.64583333333333,6.625,97.91666666666667,1.8333333333333333,San Marino,SM,Europe,Southern Europe,ITA
+STP,165,Sao Tome and Principe,76.0,0.0,2.0,0.0,97.0,0.0,87.0,4.0,100.0,0.0,Sao Tome and Principe,ST,Africa,Middle Africa,
+SAU,166,Saudi Arabia,85.0,0.0,0.0,0.0,89.0,10.0,84.0,16.0,91.0,9.0,Saudi Arabia,SA,Asia,Western Asia,"IRQ,JOR,KWT,OMN,QAT,ARE,YEM"
+SEN,167,Senegal,49.0,11.0,18.0,3.0,77.0,12.0,67.0,15.0,88.0,9.0,Senegal,SN,Africa,Western Africa,"GMB,GIN,GNB,MLI,MRT"
+SRB,168,Serbia,57.0,0.0,0.0,0.0,95.0,5.0,91.0,8.0,98.0,2.0,Serbia,RS,Europe,Eastern Europe,"HUN,ROU,BGR,MKD,HRV,BIH,MNE,ALB"
+SYC,169,Seychelles,58.0,4.0,19.0,3.3571428571428577,94.0,3.0,26.42857142857143,44.85714285714286,76.14285714285714,19.142857142857142,Seychelles,SC,Africa,Eastern Africa,
+SLE,170,Sierra Leone,44.0,17.0,24.0,8.0,21.0,52.0,13.0,46.0,31.0,60.0,Sierra Leone,SL,Africa,Western Africa,"GIN,LBR"
+SGP,171,Singapore,100.0,0.0,7.3,0.0,100.0,0.0,46.1,43.6,100.0,0.0,Singapore,SG,Asia,South-Eastern Asia,
+SVK,172,Slovakia,54.0,0.0,0.0,0.0,98.0,2.0,100.0,0.0,97.0,3.0,Slovakia,SK,Europe,Eastern Europe,"AUT,CZE,HUN,POL,UKR"
+SVN,173,Slovenia,56.0,0.0,0.30208333333333337,0.0625,98.10714285714286,1.6071428571428572,95.59895833333333,4.03125,98.82916666666667,1.1083333333333334,Slovenia,SI,Europe,Southern Europe,"AUT,HRV,ITA,HUN"
+SLB,174,Solomon Islands,26.0,19.0,34.0,4.0,48.0,27.0,38.0,28.0,71.0,24.0,Solomon Islands,SB,Oceania,Melanesia,
+SOM,175,Somalia,47.0,12.0,20.0,2.0,49.0,37.0,23.0,54.0,79.0,19.0,Somalia,SO,Africa,Eastern Africa,"DJI,ETH,KEN"
+ZAF,176,South Africa,68.0,1.0,3.0,0.0,90.0,7.0,74.0,18.0,98.0,2.0,South Africa,ZA,Africa,Southern Africa,"BWA,LSO,MOZ,NAM,SWZ,ZWE"
+SSD,177,South Sudan,21.0,14.0,14.0,11.0,4.0,74.0,3.0,73.0,10.0,78.0,South Sudan,SS,Africa,Middle Africa,"CAF,COD,ETH,KEN,SDN,UGA"
+ESP,178,Spain,81.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Spain,ES,Europe,Southern Europe,"AND,FRA,GIB,PRT,MAR"
+LKA,179,Sri Lanka,19.0,7.0,8.0,1.0,52.0,39.0,46.0,44.0,81.0,18.0,Sri Lanka,LK,Asia,Southern Asia,IND
+PSE,180,State of Palestine,77.0,0.0,0.0,0.0,51.0,49.0,89.0,11.0,40.0,60.0,Palestine,PS,Asia,Western Asia,"ISR,JOR,EGY"
+SDN,181,Sudan,36.0,4.0,6.0,0.0,59.0,34.0,47.0,44.0,82.0,17.0,Sudan,SD,Africa,Northern Africa,"CAF,TCD,EGY,ERI,ETH,LBY,SSD"
+SUR,182,Suriname,66.0,0.0,0.0,0.0,80.0,19.0,64.0,34.0,89.0,11.0,Suriname,SR,Americas,South America,"BRA,GUF,FRA,GUY"
+SWE,183,Sweden,88.0,0.0,0.0,0.0,88.0,12.0,77.0,22.0,89.0,10.0,Sweden,SE,Europe,Northern Europe,"FIN,NOR"
+CHE,184,Switzerland,74.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Switzerland,CH,Europe,Western Europe,"AUT,FRA,ITA,LIE,DEU"
+SYR,185,Syrian Arab Republic,57.0,0.0,0.0,0.0,79.0,21.0,71.0,29.0,86.0,14.0,Syria,SY,Asia,Western Asia,"IRQ,ISR,JOR,LBN,TUR"
+TJK,186,Tajikistan,28.0,3.0,4.0,2.0,65.0,19.0,56.0,24.0,90.0,7.0,Tajikistan,TJ,Asia,Central Asia,"AFG,CHN,KGZ,UZB"
+THA,187,Thailand,53.0,0.0,0.0,0.0,86.0,14.0,79.0,21.0,93.0,7.0,Thailand,TH,Asia,South-Eastern Asia,"MMR,KHM,LAO,MYS"
+TLS,188,Timor-Leste,32.0,8.0,12.0,0.0,72.0,17.0,66.0,18.0,84.0,16.0,Timor,TL,Asia,South-Eastern Asia,IDN
+TGO,189,Togo,44.0,13.0,15.0,10.0,30.0,47.0,21.0,47.0,43.0,47.0,Togo,TG,Africa,Western Africa,"BEN,BFA,GHA"
+TKL,190,Tokelau,0.0,0.0,0.0,0.0,95.0,4.0,95.0,4.0,98.0,2.0,Tokelau,TK,Oceania,Polynesia,
+TON,191,Tonga,23.0,0.0,0.0,0.0,99.0,1.0,98.0,1.0,100.0,0.0,Tonga,TO,Oceania,Polynesia,
+TTO,192,Trinidad and Tobago,53.0,0.0,7.714285714285716,1.8181818181818181,93.0,7.0,64.85714285714285,25.57142857142857,82.63636363636364,15.363636363636362,Trinidad and Tobago,TT,Americas,Caribbean,
+TUN,193,Tunisia,70.0,1.0,3.0,0.0,93.0,6.0,80.0,17.0,99.0,0.0,Tunisia,TN,Africa,Northern Africa,"DZA,LBY"
+TUR,194,Türkiye,77.0,0.0,0.0,0.0,95.0,4.0,86.0,13.0,98.0,0.0,Turkey,TR,Asia,Western Asia,"ARM,AZE,BGR,GEO,GRC,IRN,IRQ,SYR"
+TKM,195,Turkmenistan,53.0,0.0,0.0,0.0,55.0,45.0,22.0,78.0,84.0,16.0,Turkmenistan,TM,Asia,Central Asia,"AFG,IRN,KAZ,UZB"
+TCA,196,Turks and Caicos Islands,94.0,0.0,3.0,0.0,45.0,55.0,40.0,57.0,45.0,55.0,Turks and Caicos Islands,TC,Americas,Caribbean,
+TUV,197,Tuvalu,66.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Tuvalu,TV,Oceania,Polynesia,
+UGA,198,Uganda,26.0,11.0,13.0,6.0,23.0,61.0,13.0,68.0,52.0,41.0,Uganda,UG,Africa,Eastern Africa,"COD,KEN,RWA,SSD,TZA"
+UKR,199,Ukraine,70.0,0.0,0.0,0.0,63.0,37.0,31.0,69.0,76.0,23.0,Ukraine,UA,Europe,Eastern Europe,"BLR,HUN,MDA,POL,ROU,RUS,SVK"
+ARE,200,United Arab Emirates,88.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,United Arab Emirates,AE,Asia,Western Asia,"OMN,SAU"
+GBR,201,United Kingdom,84.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,United Kingdom,GB,Europe,Northern Europe,IRL
+TZA,202,United Republic of Tanzania,37.0,11.0,17.0,0.0,41.0,36.0,28.0,37.0,63.0,33.0,Tanzania,TZ,Africa,Eastern Africa,"BDI,COD,KEN,MWI,MOZ,RWA,UGA,ZMB"
+USA,203,United States of America,83.0,0.0,0.0,0.0,99.0,0.0,95.0,3.0,100.0,0.0,United States,US,Americas,Northern America,"CAN,MEX"
+URY,204,Uruguay,96.0,0.0,0.0,0.0,100.0,0.0,100.0,0.0,100.0,0.0,Uruguay,UY,Americas,South America,"ARG,BRA"
+UZB,205,Uzbekistan,50.0,0.0,0.0,0.0,73.0,25.0,60.0,37.0,85.0,14.0,Uzbekistan,UZ,Asia,Central Asia,"AFG,KAZ,KGZ,TJK,TKM"
+VUT,206,Vanuatu,26.0,2.0,3.0,0.0,50.0,42.0,40.0,50.0,78.0,21.0,Vanuatu,VU,Oceania,Melanesia,
+VEN,207,Venezuela (Bolivarian Republic of),88.0,6.0,2.0,0.0,78.0,15.0,71.66666666666667,22.666666666666668,93.0,7.0,Venezuela,VE,Americas,South America,"BRA,COL,GUY"
+VNM,208,Viet Nam,39.0,2.0,3.0,0.0,52.0,46.0,31.0,66.0,86.0,13.0,Vietnam,VN,Asia,South-Eastern Asia,"KHM,CHN,LAO"
+WLF,209,Wallis and Futuna Islands,0.0,0.0,0.0,0.0,99.0,0.0,99.0,0.0,98.0,2.0,Wallis and Futuna,WF,Oceania,Polynesia,
+YEM,210,Yemen,39.0,6.0,10.0,1.0,57.0,34.0,44.0,42.0,77.0,22.0,Yemen,YE,Asia,Western Asia,"OMN,SAU"
+ZMB,211,Zambia,46.0,19.0,28.0,7.0,34.0,40.0,5.0,54.0,69.0,23.0,Zambia,ZM,Africa,Eastern Africa,"AGO,BWA,COD,MWI,MOZ,NAM,TZA,ZWE"
+ZWE,212,Zimbabwe,32.0,16.0,23.0,2.0,27.0,50.0,9.0,58.0,65.0,33.0,Zimbabwe,ZW,Africa,Eastern Africa,"BWA,MOZ,ZAF,ZMB"
