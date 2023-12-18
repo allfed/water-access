@@ -16,6 +16,7 @@ dependencies:
   - dash
   - scipy
   - pyinterpolate
+  - weightedstats
   - pip:
     - plotly
     - kaleido
