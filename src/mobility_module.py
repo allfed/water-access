@@ -1,12 +1,22 @@
+# Importing NumPy for numerical operations.
 import numpy as np
+
+# Importing pandas for data manipulation and analysis.
 import pandas as pd
+
+# Importing matplotlib for plotting and visualization.
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
+
+# Importing scipy for scientific computing and optimization.
 from scipy.optimize import fsolve
+
+# Importing Plotly for interactive plotting.
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
 
 
 def linspace_creator(max_value_array, min_value, res):
@@ -903,10 +913,15 @@ if __name__ == "__main__":
     # mr = ModelResults()
     ######################
     #### Import Data #####
-    filename = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access/data/mobility-model-parameters.csv"
-    with open(filename) as csv_file:
-        # read the csv file
-        param_df = pd.read_csv(filename)
+
+
+    file_path_params = "../data/lookup tables/mobility-model-parameters.csv"
+    param_df = pd.read_csv(file_path_params)
+
+
+
+
+
     mo = model_options()
     mv = model_variables()
     hpv = HPV_variables(param_df, mv)
