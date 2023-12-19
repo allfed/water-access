@@ -18,7 +18,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-
 def linspace_creator(max_value_array, min_value, res):
     """
     creates a linsapce numpy array from the given inputs
@@ -914,13 +913,8 @@ if __name__ == "__main__":
     ######################
     #### Import Data #####
 
-
     file_path_params = "../data/lookup tables/mobility-model-parameters.csv"
     param_df = pd.read_csv(file_path_params)
-
-
-
-
 
     mo = model_options()
     mv = model_variables()
