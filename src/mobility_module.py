@@ -116,6 +116,70 @@ class mobility_models:
             + v_solve * m_t * g * s
         ) / eta - P_t
 
+
+
+    def single_bike_run(mv, mo, hpv, slope, load_attempted):
+
+        model = mobility_models.bike_power_solution
+  
+        s = (slope / 360) * (2 * np.pi)  # determine slope in radians
+
+        # determine safe loading for hilly scenarios
+        max_load_HPV = max_safe_load(
+            hpv.m_HPV_only, hpv.load_capacity, mv.F_max, s, mv.g
+        )  # find maximum pushing load
+        if max_load_HPV > hpv.load_capacity:
+            max_load_HPV = hpv.load_capacity.flatten() # see if load of HPV or load of pushing is the limitng factor.
+        if max_load_HPV > load_attempted:
+            max_load_HPV = load_attempted
+                        
+        data = (
+            mv.ro,
+            mv.C_d,
+            mv.A,
+            mv.m1 + hpv.m_HPV_only.flatten(),  #
+            hpv.Crr.flatten(),  # CRR related to the HPV
+            mv.eta,
+            mv.P_t,
+            mv.g,
+            s * mo.ulhillpo,  # hill polarity, see model options
+        )
+        V_guess = 12
+    
+        V_un = fsolve(model, V_guess, args=data, full_output=True)
+        # checks if the model was sucesful:
+        if V_un[2] == 1:
+            unloaded_velocity = V_un[0][0]
+        else:
+            unloaded_velocity = np.nan
+
+        data = (
+            mv.ro,
+            mv.C_d,
+            mv.A,
+            mv.m1 + hpv.m_HPV_only.flatten() + max_load_HPV,  #
+            hpv.Crr.flatten(),  # CRR related to the HPV
+            mv.eta,
+            mv.P_t,
+            mv.g,
+            s * mo.ulhillpo,  # hill polarity, see model options
+        )
+        V_guess = 12
+
+        
+        V_load = fsolve(model, V_guess, args=data, full_output=True)
+        # checks if the model was sucesful:
+        if V_un[2] == 1:
+            loaded_velocity = V_load[0][0]
+        else:
+            loaded_velocity = np.nan
+
+
+        return loaded_velocity, unloaded_velocity, max_load_HPV
+
+
+
+
     def sprott_solution(hpv, s, mv, mo):
         """
         takes in the HPV dataframe, the slope, the model variables, and model options
