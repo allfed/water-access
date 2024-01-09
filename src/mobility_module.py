@@ -116,8 +116,6 @@ class mobility_models:
             + v_solve * m_t * g * s
         ) / eta - P_t
 
-
-
     def single_lankford_run(mv, mo, met, hpv, slope, load_attempted):
         """
         Perform a single run of the Lankford model for a given HPV, slope, and load.
@@ -143,7 +141,7 @@ class mobility_models:
         max_load_HPV = min(hpv.load_capacity.flatten()[0], load_attempted)
 
         # Calculate unloaded velocity
-        data_unloaded = (mv.m1 , met, s)
+        data_unloaded = (mv.m1, met, s)
         V_guess = 1  # Initial guess for velocity
         V_un = fsolve(model, V_guess, args=data_unloaded, full_output=True)
         unloaded_velocity = V_un[0][0] if V_un[2] == 1 else np.nan
@@ -154,12 +152,11 @@ class mobility_models:
         V_load = fsolve(model, V_guess, args=data_loaded, full_output=True)
         loaded_velocity = V_load[0][0] if V_load[2] == 1 else np.nan
 
-        return loaded_velocity, unloaded_velocity, max_load_HPV        
+        return loaded_velocity, unloaded_velocity, max_load_HPV
 
     def single_bike_run(mv, mo, hpv, slope, load_attempted):
-
         model = mobility_models.bike_power_solution
-  
+
         s = (slope / 360) * (2 * np.pi)  # determine slope in radians
 
         # determine safe loading for hilly scenarios
@@ -167,10 +164,12 @@ class mobility_models:
             hpv.m_HPV_only, hpv.load_capacity, mv.F_max, s, mv.g
         )  # find maximum pushing load
         if max_load_HPV > hpv.load_capacity:
-            max_load_HPV = hpv.load_capacity.flatten() # see if load of HPV or load of pushing is the limitng factor.
+            max_load_HPV = (
+                hpv.load_capacity.flatten()
+            )  # see if load of HPV or load of pushing is the limitng factor.
         if max_load_HPV > load_attempted:
             max_load_HPV = load_attempted
-                        
+
         data = (
             mv.ro,
             mv.C_d,
@@ -183,7 +182,7 @@ class mobility_models:
             s * mo.ulhillpo,  # hill polarity, see model options
         )
         V_guess = 1
-    
+
         V_un = fsolve(model, V_guess, args=data, full_output=True)
         # checks if the model was sucesful:
         if V_un[2] == 1:
@@ -204,7 +203,6 @@ class mobility_models:
         )
         V_guess = 1
 
-        
         V_load = fsolve(model, V_guess, args=data, full_output=True)
         # checks if the model was sucesful:
         if V_un[2] == 1:
@@ -212,11 +210,7 @@ class mobility_models:
         else:
             loaded_velocity = np.nan
 
-
         return loaded_velocity, unloaded_velocity, max_load_HPV
-
-
-
 
     def sprott_solution(hpv, s, mv, mo):
         """
