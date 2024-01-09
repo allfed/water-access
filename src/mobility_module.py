@@ -116,6 +116,102 @@ class mobility_models:
             + v_solve * m_t * g * s
         ) / eta - P_t
 
+    def single_lankford_run(mv, mo, met, hpv, slope, load_attempted):
+        """
+        Perform a single run of the Lankford model for a given HPV, slope, and load.
+
+        Args:
+            mv: Model variables
+            mo: Model options
+            met: Metabolic values
+            hpv: HPV variables
+            slope: Slope of the terrain
+            load_attempted: Load attempted to be carried
+
+        Returns:
+            loaded_velocity: Velocity with load
+            unloaded_velocity: Velocity without load
+            max_load_HPV: Maximum load the HPV can carry
+        """
+        model = mobility_models.Lankford_solution
+
+        s = (slope / 360) * (2 * np.pi)  # Convert slope to radians
+
+        # Determine the maximum safe load
+        max_load_HPV = min(hpv.load_capacity.flatten()[0], load_attempted)
+
+        # Calculate unloaded velocity
+        data_unloaded = (mv.m1, met, s)
+        V_guess = 1  # Initial guess for velocity
+        V_un = fsolve(model, V_guess, args=data_unloaded, full_output=True)
+        unloaded_velocity = V_un[0][0] if V_un[2] == 1 else np.nan
+
+        # Calculate loaded velocity
+        total_load = mv.m1 + max_load_HPV
+        data_loaded = (total_load, met, s)
+        V_load = fsolve(model, V_guess, args=data_loaded, full_output=True)
+        loaded_velocity = V_load[0][0] if V_load[2] == 1 else np.nan
+
+        return loaded_velocity, unloaded_velocity, max_load_HPV
+
+    def single_bike_run(mv, mo, hpv, slope, load_attempted):
+        model = mobility_models.bike_power_solution
+
+        s = (slope / 360) * (2 * np.pi)  # determine slope in radians
+
+        # determine safe loading for hilly scenarios
+        max_load_HPV = max_safe_load(
+            hpv.m_HPV_only, hpv.load_capacity, mv.F_max, s, mv.g
+        )  # find maximum pushing load
+        if max_load_HPV > hpv.load_capacity:
+            max_load_HPV = (
+                hpv.load_capacity.flatten()
+            )  # see if load of HPV or load of pushing is the limitng factor.
+        if max_load_HPV > load_attempted:
+            max_load_HPV = load_attempted
+
+        data = (
+            mv.ro,
+            mv.C_d,
+            mv.A,
+            mv.m1 + hpv.m_HPV_only.flatten(),  #
+            hpv.Crr,  # CRR related to the HPV
+            mv.eta,
+            mv.P_t,
+            mv.g,
+            s * mo.ulhillpo,  # hill polarity, see model options
+        )
+        V_guess = 1
+
+        V_un = fsolve(model, V_guess, args=data, full_output=True)
+        # checks if the model was sucesful:
+        if V_un[2] == 1:
+            unloaded_velocity = V_un[0][0]
+        else:
+            unloaded_velocity = np.nan
+
+        data = (
+            mv.ro,
+            mv.C_d,
+            mv.A,
+            mv.m1 + hpv.m_HPV_only.flatten() + max_load_HPV,  #
+            hpv.Crr,  # CRR related to the HPV
+            mv.eta,
+            mv.P_t,
+            mv.g,
+            s * mo.ulhillpo,  # hill polarity, see model options
+        )
+        V_guess = 1
+
+        V_load = fsolve(model, V_guess, args=data, full_output=True)
+        # checks if the model was sucesful:
+        if V_un[2] == 1:
+            loaded_velocity = V_load[0][0]
+        else:
+            loaded_velocity = np.nan
+
+        return loaded_velocity, unloaded_velocity, max_load_HPV
+
     def sprott_solution(hpv, s, mv, mo):
         """
         takes in the HPV dataframe, the slope, the model variables, and model options
@@ -319,11 +415,11 @@ class mobility_models:
             + 0.24 * v_solve**4
             + 0.34 * (1 - 1.05 ** (1 - 1.1 ** (G + 32)))
         ) * m_load - met.budget_watts
+        
 
     def Lankford_solution(p, *data):
         """
         Lankford model for solving for velocity given a load and slope
-        Lankford, J. W., & Lankford, A. S. (2003). A model for the energy cost of walking and running. Medicine and science in sports and exercise, 35(5), 821-828.
 
         Args:
             p: list of parameters to be solved for
@@ -346,6 +442,7 @@ class mobility_models:
             + (0.00320 * v_solve * G**3)
             - (met.budget_VO2 / m_load)
         )
+        # add in rolling resistance stuff...
 
 
 class HPV_variables:
