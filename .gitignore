@@ -128,5 +128,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# large files
-data/GIS/
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
