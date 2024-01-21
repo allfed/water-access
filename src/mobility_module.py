@@ -415,7 +415,6 @@ class mobility_models:
             + 0.24 * v_solve**4
             + 0.34 * (1 - 1.05 ** (1 - 1.1 ** (G + 32)))
         ) * m_load - met.budget_watts
-        
 
     def Lankford_solution(p, *data):
         """
