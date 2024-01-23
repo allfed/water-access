@@ -89,23 +89,6 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
 
 class mobility_models:
-    def sprott_model(hpv, mv, mo, mr):
-        """
-        takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity
-        """
-
-        # define extra vars
-        pi = np.pi
-
-        ## loop over all of the different slopes. Dimensions for results: 0 = HPV, 1 = slope, 2 = load
-        i = 0
-        for slope in mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1):
-            s = (slope / 360) * (2 * pi)
-            v_load, load_matrix = mobility_models.sprott_solution(hpv, s, mv, mo)
-            mr.v_load_matrix3d[:, i, :] = v_load.reshape(hpv.n_hpv, mo.load_res)
-            mr.load_matrix3d[:, i, :] = load_matrix.reshape(hpv.n_hpv, mo.load_res)
-            i += 1
-        return mr.v_load_matrix3d, mr.load_matrix3d
 
     def bike_power_solution(p, *data):
         ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
@@ -212,68 +195,6 @@ class mobility_models:
 
         return loaded_velocity, unloaded_velocity, max_load_HPV
 
-    def sprott_solution(hpv, s, mv, mo):
-        """
-        takes in the HPV dataframe, the slope, the model variables, and model options
-        returns the velocity of walking based on the energetics of walking model outlined by Sprott
-        https://sprott.physics.wisc.edu/technote/Walkrun.htm
-
-        """
-
-        max_safe_load_HPV = max_safe_load(
-            hpv.m_HPV_only, hpv.load_capacity, mv.F_max, s, mv.g
-        )
-        # function to calaculate the max saffe loads due to hill
-        max_load_HPV = np.minimum(
-            hpv.load_capacity, max_safe_load_HPV.reshape(hpv.load_capacity.shape)
-        )
-
-        load_matrix = linspace_creator(max_load_HPV, mv.minimumViableLoad, mo.load_res)
-
-        #### Derivations of further mass variables
-        m_HPV_pilot = np.array(
-            mv.m1 * hpv.Pilot + hpv.m_HPV_only.reshape((hpv.Pilot.shape))
-        ).reshape(
-            (hpv.n_hpv, 1)
-        )  # create vector with extra weights to add
-        m_HPV_load_pilot = (
-            load_matrix + m_HPV_pilot
-        )  # weight of the HPV plus the rider (if any) plus the load
-        m_walk_carry = (
-            mv.m1
-            + m_HPV_load_pilot
-            * (np.array(hpv.GroundContact).reshape((hpv.n_hpv, 1)) - 1)
-            * -1
-        )  # negative 1 is to make the wheeled = 0 and the walking = 1
-        # m_HPV_load = load_matrix + np.array(m_HPV_only).reshape((n_hpv, 1))
-        # weight of the mass being 'walked', i.e the wieght of the human plus anything they are carrying (not pushing or riding)
-
-        #### Constants from polynomial equation analysis
-        C = ((m_walk_carry) * mv.g / np.pi) * (3 * mv.g * mv.L / 2) ** (
-            1 / 2
-        )  # component of walking
-        D = np.pi**2 / (6 * mv.g * mv.L)  # leg component
-
-        B1 = (
-            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]
-        )  # rolling resistance component
-        B2 = m_HPV_load_pilot * np.sin(np.arctan(s))  # slope component
-        B = B1 + B2
-
-        ##### velocities
-        v_load = (-B + np.sqrt(B**2 + (2 * C * D * mv.P_t) / hpv.n[:, 0, :])) / (
-            C * D / hpv.n[:, 0, :]
-        )
-        # loaded velocity
-
-        # if loaded speed is greater than unloaded avg speed, make equal to avg unloaded speed
-        i = 0
-        for maxval in hpv.v_no_load[:, 0, :]:
-            indeces = v_load[i] > maxval
-            v_load[i, indeces] = maxval
-            i += 1
-
-        return v_load, load_matrix
 
     def numerical_mobility_model(mr, mv, mo, met, hpv):
         """
@@ -293,12 +214,10 @@ class mobility_models:
 
         limit_practical_load = True
 
-        if mo.model_selection == 2:
+        if mo.model_selection == 1:
             model = mobility_models.bike_power_solution
-        elif mo.model_selection == 3:
+        elif mo.model_selection == 2:
             model = mobility_models.Lankford_solution
-        elif mo.model_selection == 4:
-            model = mobility_models.LCDA_solution
         else:
             print("Unrecognised Model Selection Number")
             exit()
@@ -332,7 +251,7 @@ class mobility_models:
                 m_t = np.array(load_vector + mv.m1 + hpv.m_HPV_only[i])
 
                 ## Determine unloaded velocity of this given slope
-                if mo.model_selection == 2:
+                if mo.model_selection == 1:
                     data = (
                         mv.ro,
                         mv.C_d,
@@ -344,7 +263,7 @@ class mobility_models:
                         mv.g,
                         s[0] * mo.ulhillpo,  # hill polarity, see model options
                     )
-                    V_guess = 12
+                    V_guess = 5
                 else:
                     data = (
                         mv.m1 + hpv.m_HPV_only.flatten()[i],
@@ -362,7 +281,7 @@ class mobility_models:
 
                 # start loop iterating over loads
                 for k, total_load in enumerate(m_t.flatten()):
-                    if mo.model_selection == 2:
+                    if mo.model_selection == 1:
                         data = (
                             mv.ro,
                             mv.C_d,
@@ -390,31 +309,6 @@ class mobility_models:
                         mr.load_matrix3d[i, j, k] = load_vector[k]
 
         return mr.v_load_matrix3d, mr.load_matrix3d
-
-    def LCDA_solution(p, *data):
-        """
-
-        LCDA model for solving for velocity given a load and slope
-
-        Args:
-            p: list of parameters to be solved for
-            data: tuple of data to be used in the model
-                m_load: load of the HPV
-                met: metabolic object
-                s: slope of the terrain
-        Returns:
-            velocity of the HPV given the load and slope
-
-        """
-        m_load, met, s = data
-        v_solve = p[0]
-        G = (s * 360 / (2 * np.pi)) / 45 * 100
-        return (
-            1.44
-            + 1.94 * v_solve**0.43
-            + 0.24 * v_solve**4
-            + 0.34 * (1 - 1.05 ** (1 - 1.1 ** (G + 32)))
-        ) * m_load - met.budget_watts
 
     def Lankford_solution(p, *data):
         """
@@ -514,8 +408,7 @@ class model_variables:
 class model_options:
     def __init__(self):
         # model options
-        self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
-
+        self.model_selection = 2  # 1 is cycling 2 is lankford
         #  0 = min load, 1 = max load, >1 = linear space between min and max
         self.load_res = 15
         #  0 = min slope only, 1 = max slope only, >1 = linear space between min and max
@@ -538,17 +431,6 @@ class model_options:
         )
         self.surf_plot_index = 0  # this one counts the HPVs (as you can only plot one per surf usually, so 0 is the first HPV in the list, -1 will be the last in the list)
 
-        # # name the model
-        # if self.model_selection == 1:
-        #     self.model_name = "Sprott"
-        # elif self.model_selection == 2:
-        #     self.model_name = "Cycling"
-        # elif self.model_selection == 3:
-        #     self.model_name = "Lankford"
-        # elif self.model_selection == 4:
-        #     self.model_name = "LCDA"
-        # else:
-        #     self.model_name = "Unknown"
 
         if self.load_res <= 1:
             self.n_load_scenes = 1
@@ -558,13 +440,9 @@ class model_options:
     @property
     def model_name(self):
         if self.model_selection == 1:
-            return "Sprott"
-        elif self.model_selection == 2:
             return "Cycling"
-        elif self.model_selection == 3:
+        elif self.model_selection == 2:
             return "Lankford"
-        elif self.model_selection == 4:
-            return "LCDA"
         else:
             return "Unknown"
 
