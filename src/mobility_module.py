@@ -570,10 +570,10 @@ class model_options:
 
 
 class MET_values:
-    def __init__(self, mv):
+    def __init__(self, mv, met=3.3):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
-            4  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
+            met  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
         )
         self.MET_VO2_conversion = 3.5  # milliliters per minute per kilogram body mass
         self.MET_watt_conversion = 1.162  # watts per kg body mass

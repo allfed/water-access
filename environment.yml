@@ -18,6 +18,7 @@ dependencies:
   - scipy
   - pyinterpolate
   - weightedstats
+  - pytest==8.0.2
   - pip:
     - plotly
     - kaleido
