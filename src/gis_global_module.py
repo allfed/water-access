@@ -309,6 +309,10 @@ def extract_slope_crr(df_zones):
 
 
 def run_bicycle_model(mv, mo, hpv, slope_zones, Crr_values, load_attempt):
+    # Adjust the project root and import mobility module as needed
+    project_root = Path().resolve().parent
+    sys.path.append(str(project_root))
+    import src.mobility_module as mm
     n_runs = len(slope_zones)
     results = np.zeros((n_runs, 3))
     for i, (slope, crr) in enumerate(zip(slope_zones, Crr_values)):
@@ -342,15 +346,15 @@ def process_and_save_results(df_zones, results, export_file_location, velocity_t
     output_csv_filename = f"{export_file_location}{velocity_type}_velocity_by_zone.csv"
 
     # only save the newly created cols in the csv
-    df_zones[
-        [
-            "fid",
-            "loaded_velocity_bicycle",
-            "unloaded_velocity_bicycle",
-            "average_velocity_bicycle",
-            "max_load_bicycle",
-        ]
-    ].to_csv(output_csv_filename)
+    # df_zones[
+    #     [
+    #         "fid",
+    #         "loaded_velocity_bicycle",
+    #         "unloaded_velocity_bicycle",
+    #         "average_velocity_bicycle",
+    #         "max_load_bicycle",
+    #     ]
+    # ].to_csv(output_csv_filename)
 
     return df_zones
 
@@ -389,6 +393,10 @@ def calculate_and_merge_bicycle_distance(
 
 
 def run_walking_model(mv, mo, met, hpv, slope_zones, load_attempt):
+    # Adjust the project root and import mobility module as needed
+    project_root = Path().resolve().parent
+    sys.path.append(str(project_root))
+    import src.mobility_module as mm
     n_runs = len(slope_zones)
     results = np.zeros((n_runs, 3))
     for i, slope in enumerate(slope_zones):
@@ -716,18 +724,19 @@ def run_global_analysis(
     practical_limit_bicycle,
     practical_limit_buckets,
     met,
+    calculate_distance=True,
     plot=False,
 ):
     df_zones = preprocess_data(crr_adjustment=crr_adjustment)
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,
-        calculate_distance=False,
+        calculate_distance=calculate_distance,
         export_file_location=EXPORT_FILE_LOCATION,
         practical_limit_bicycle=practical_limit_bicycle,
     )
     df_zones = calculate_and_merge_walking_distance(
         df_zones,
-        calculate_distance=False,
+        calculate_distance=calculate_distance,
         export_file_location=EXPORT_FILE_LOCATION,
         practical_limit_buckets=practical_limit_buckets,
         met=met,
@@ -749,5 +758,6 @@ if __name__ == "__main__":
         practical_limit_bicycle=40,
         practical_limit_buckets=20,
         met=3.3,
+        calculate_distance=True,
         plot=True,
     )
