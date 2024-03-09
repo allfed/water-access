@@ -9,8 +9,14 @@ from pathlib import Path
 
 
 def weighted_mean(var, wts):
-    """Calculates the weighted mean"""
-    return np.average(var, weights=wts)
+    if len(var) == 0 or len(wts) == 0:
+        return 0
+    elif len(var) != len(wts):
+        raise TypeError("Shapes of var and wts must be the same.")
+    elif np.sum(wts) == 0:
+        raise ZeroDivisionError("Weights sum to zero, can't be normalized.")
+    else:
+        return np.average(var, weights=wts)
 
 
 def weighted_median_series(val, weight):
@@ -95,7 +101,20 @@ CRR_FILE = "./data/lookup tables/Crr.csv"
 
 
 # Function to load data
+import pandas as pd
+
 def load_data(urb_data_file, country_data_file):
+    """
+    Load data from CSV files.
+
+    Parameters:
+    - urb_data_file (str): The file path of the urban data CSV file.
+    - country_data_file (str): The file path of the country data CSV file.
+
+    Returns:
+    - df_zones_input (pandas.DataFrame): The loaded urban data as a DataFrame.
+    - df_input (pandas.DataFrame): The loaded country data as a DataFrame.
+    """
     try:
         df_zones_input = pd.read_csv(urb_data_file)
         df_input = pd.read_csv(country_data_file)
@@ -107,6 +126,18 @@ def load_data(urb_data_file, country_data_file):
 
 # Function for managing urban/rural data
 def manage_urban_rural(df_zones_input):
+    """
+    Converts the 'dtw_1' column from meters to kilometers and creates a new binary column
+    'urban_rural' based on the 'URBAN_1' column. Rural values are below 15, while urban values
+    are above 15.
+
+    Args:
+        df_zones_input (pandas.DataFrame): Input DataFrame containing the 'dtw_1' and 'URBAN_1' columns.
+
+    Returns:
+        pandas.DataFrame: DataFrame with the 'dtw_1' column converted to kilometers and a new 'urban_rural'
+        column indicating whether a zone is urban (1) or rural (0).
+    """
     # Convert dtw_1 from meters to kilometers
     df_zones_input["dtw_1"] /= 1000
     # Manage Urban / Rural Data
@@ -119,7 +150,15 @@ def manage_urban_rural(df_zones_input):
 
 # Function for managing slope
 def manage_slope(df_zones_input):
-    # Degrees from earthenv dataset
+    """
+    Perform slope management on the input DataFrame.
+
+    Args:
+        df_zones_input (pandas.DataFrame): The input DataFrame containing the slope data.
+
+    Returns:
+        pandas.DataFrame: The modified DataFrame after performing slope management.
+    """
     df_zones_input["slope_1"].hist(bins=100, log=False)
     df_zones_input["slope_1"].quantile(np.arange(0, 1, 0.05))
     return df_zones_input
@@ -727,6 +766,21 @@ def run_global_analysis(
     calculate_distance=True,
     plot=False,
 ):
+    """
+    Runs the global analysis for water access.
+
+    Args:
+        crr_adjustment (float): The adjustment factor for calculating the Coefficient of Rolling Resistance (CRR).
+        time_gathering_water (float): The time taken to gather water in minutes.
+        practical_limit_bicycle (float): The practical limit for distance traveled by bicycle in kilometers.
+        practical_limit_buckets (float): The practical limit for distance traveled by carrying buckets in kilometers.
+        met (str): metabolic equivalent of task.
+        calculate_distance (bool, optional): Whether to calculate distance or not. Defaults to True.
+        plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
+
+    Returns:
+        pandas.DataFrame: The processed data for each country.
+    """
     df_zones = preprocess_data(crr_adjustment=crr_adjustment)
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,
