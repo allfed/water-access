@@ -8,6 +8,7 @@ from tqdm import tqdm
 import pickle
 import numpy as np
 from scipy.stats import norm
+import os
 
 # # Resolve project root and update sys.path
 project_root = Path().resolve().parent
@@ -97,15 +98,15 @@ def run_simulation(
         practical_limit_bicycle=practical_limit_bicycle,
         practical_limit_buckets=practical_limit_buckets,
         met=met,
-        calculate_distance=True,
+        calculate_distance=calculate_distance,
         plot=False,
     )
     return result
 
 
-def process_mc_results(simulation_results, plot=False):
+def process_mc_results(simulation_results, plot=False, output_dir='results'):
     """
-    Process the Monte Carlo simulation results. Calculate the median, mean, 90th percentile, 5th percentile, max, and min values and plot the results.
+    Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
 
     Args:
         simulation_results (list): A list of DataFrames containing simulation results.
@@ -115,39 +116,60 @@ def process_mc_results(simulation_results, plot=False):
         None
     """
 
-    # Step 1: Calculate the median, mean, 90th percentile, and 5th percentile of "percent_with_water" for each DataFrame
-    medians = [df["percent_with_water"].median() for df in simulation_results]
-    means = [df["percent_with_water"].mean() for df in simulation_results]
-    percentile_90 = [df["percent_with_water"].quantile(0.9) for df in simulation_results]
-    percentile_5 = [df["percent_with_water"].quantile(0.05) for df in simulation_results]
+    # Step 1: Calculate the median, 95th percentile, and 5th percentile of "percent_with_water" for each DataFrame
+    # -1 because of zero-based indexing
+    ordered_results = sorted(simulation_results, key=lambda df: df["percent_with_water"].median())
+    median_index = round(len(ordered_results) / 2) - 1
+    percentile_5_index = round(len(ordered_results) / 20) - 1
+    percentile_95_index = round(len(ordered_results) - len(ordered_results) / 20) - 1
 
-    # Step 2: Identify the DataFrames for max, min, median, mean, 90th percentile, and 5th percentile values
-    max_df = simulation_results[medians.index(max(medians))]
-    min_df = simulation_results[medians.index(min(medians))]
-    median_df = simulation_results[medians.index(np.median(medians))]
-    mean_df = simulation_results[means.index(np.mean(means))]
-    percentile_90_df = simulation_results[percentile_90.index(np.percentile(percentile_90, 90))]
-    percentile_5_df = simulation_results[percentile_5.index(np.percentile(percentile_5, 5))]
+    median_df = ordered_results[median_index]
+    percentile_5_df = ordered_results[percentile_5_index]
+    percentile_95_df = ordered_results[percentile_95_index]
+    min_df = ordered_results[0]
+    max_df = ordered_results[-1]
 
-    # Step 3: Plot the chloropleth maps for max, min, median, mean, 90th percentile, and 5th percentile if plot argument is True
+    # Step 2: Plot the chloropleth maps for max, min, median, 95th percentile, and 5th percentile if plot argument is True
     if plot:
         gis.plot_chloropleth(max_df)
         gis.plot_chloropleth(min_df)
         gis.plot_chloropleth(median_df)
-        gis.plot_chloropleth(mean_df)
-        gis.plot_chloropleth(percentile_90_df)
+        gis.plot_chloropleth(percentile_95_df)
+        gis.plot_chloropleth(percentile_5_df)
+
+    # Step 3: Save the results to the results folder
+    median_df.to_csv("results/median_results.csv")
+    min_df.to_csv("results/min_results.csv")
+    max_df.to_csv("results/max_results.csv")
+    percentile_95_df.to_csv("results/95th_percentile_results.csv")
+    percentile_5_df.to_csv("results/5th_percentile_results.csv")
+
+    # Step 4: Pickle the simulation results
+    with open('results/simulation_results.pkl', 'wb') as f:
+        pickle.dump(simulation_results, f)
+
+    print("Simulation results have been processed and saved to the results folder.")
+
+    # Step 3: Plot the chloropleth maps for max, min, median, mean, 95th percentile, and 5th percentile if plot argument is True
+    if plot:
+        gis.plot_chloropleth(max_df)
+        gis.plot_chloropleth(min_df)
+        gis.plot_chloropleth(median_df)
+        gis.plot_chloropleth(percentile_95_df)
         gis.plot_chloropleth(percentile_5_df)
 
     # Step 4: Save the results to the results folder
-    median_df.to_csv("results/median_results.csv")
-    mean_df.to_csv("results/mean_results.csv")
-    min_df.to_csv("results/min_results.csv")
-    max_df.to_csv("results/max_results.csv")
-    percentile_90_df.to_csv("results/90th_percentile_results.csv")
-    percentile_5_df.to_csv("results/5th_percentile_results.csv")
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Step 5: Pickle the simulation results
-    with open('results/simulation_results.pkl', 'wb') as f:
+    # Use os.path.join to create the full file paths
+    median_df.to_csv(os.path.join(output_dir, "median_results.csv"))
+    min_df.to_csv(os.path.join(output_dir, "min_results.csv"))
+    max_df.to_csv(os.path.join(output_dir, "max_results.csv"))
+    percentile_95_df.to_csv(os.path.join(output_dir, "95th_percentile_results.csv"))
+    percentile_5_df.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
+
+    with open(os.path.join(output_dir, 'simulation_results.pkl'), 'wb') as f:
         pickle.dump(simulation_results, f)
 
     print("Simulation results have been processed and saved to the results folder.")
