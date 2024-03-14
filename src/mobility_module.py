@@ -18,47 +18,68 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
+import numpy as np
+
 def linspace_creator(max_value_array, min_value, res):
     """
-    creates a linsapce numpy array from the given inputs
-    max_value needs to be a numpy array (even if it is a 1x1)
-    min value is to be an int or float
-    resolution to be an int
-    returns
-    res = resoltuion, also used as a flag to set minimum/maxmum single load scearios
-    Output is an N1 * N2 matrix where N1 = the number of hpvs and N2 = the resolution.
+    Creates a linspace numpy array from the given inputs.
+
+    Parameters:
+    - max_value_array: numpy array
+        The maximum values for each HPV (Human-Powered Vehicle).
+    - min_value: int or float
+        The minimum viable load of HPV.
+    - res: int
+        The resolution or number of data points in the linspace array.
+
+    Returns:
+    - load_matrix: numpy array
+        An N1 * N2 matrix where N1 is the number of HPVs and N2 is the resolution.
+        The matrix contains the linspace values for each HPV.
+
+    Notes:
+    - If res = 1, the function calculates the max load of HPV.
+    - If res = 0, the function calculates the min viable load of HPV.
+    - If res > 1, the function creates a linspace array between min_value and max_value for each HPV.
+
+    Example usage:
+    max_values = np.array([10, 20, 30])
+    min_value = 5
+    resolution = 5
+    result = linspace_creator(max_values, min_value, resolution)
+    print(result)
     """
-    if res == 1:  # if res =1 , calculate for max load of HPV
-        load_matrix = np.zeros((len(max_value_array), res))  # initilaise numpy matrix
+    assert res >= 0, "Resolution must be a positive integer."
+    if res == 1:
+        # if res =1 , calculate for max load of HPV
+        load_matrix = np.zeros((len(max_value_array), res))
         load_matrix = max_value_array
-    elif (
-        res == 0
-    ):  # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
-        load_matrix = (
-            np.zeros((len(max_value_array), 1)) + min_value
-        )  # initilaise numpy matrix
+    elif res == 0:
+        # if res =0 , calculate for min viable load of HPV (trick: use this to set custom load)
+        load_matrix = np.zeros((len(max_value_array), 1)) + min_value
         load_matrix = load_matrix
     elif res > 1:
-        load_matrix = np.zeros(
-            (len(max_value_array), res)
-        )  # initilaise numpy matrix, numbers of rows = hpvs, cols = resolution
-
+        load_matrix = np.zeros((len(max_value_array), res))
         #### Create linear space of weights
         # creates a vector for each of the HPVs, an equal number of elements spaced
         # evenly between the minimum viable load and the maximum load for that HPV
-        i = 0  # initliase index
-        for maxval in np.nditer(max_value_array):  # iterate through numpy array
+        i = 0
+        for maxval in np.nditer(max_value_array):
             minval = min_value
             load_vector = np.linspace(
-                start=minval,  # define linear space of weights
-                stop=maxval,  # define maximum value for linear space
-                num=res,  # how many data points?
+                # define linear space of weights
+                start=minval,
+                # define maximum value for linear space
+                stop=maxval,
+                # how many data points?
+                num=res,
                 endpoint=True,
                 retstep=False,
                 dtype=None,
             )
-            load_matrix[i:] = load_vector  # place the vector in to a matrix
-            i += 1  # increment index
+            # place the vector in to a matrix
+            load_matrix[i:] = load_vector
+            i += 1
     else:
         print("Error: unexpected loading resolution, setting default")
         load_matrix = max_value_array
@@ -67,13 +88,28 @@ def linspace_creator(max_value_array, min_value, res):
 
 
 def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
+    """
+    Calculate the maximum safe load that can be carried by an HPV (Human Powered Vehicle) based on weight limits.
+
+    Args:
+        m_HPV_only (array-like): The mass of the HPV.
+        LoadCapacity (array-like): The load capacity of the HPV.
+        F_max (float): The maximum force that a person can push up a hill.
+        s (float): The slope of the hill.
+        g (float): The acceleration due to gravity.
+
+    Returns:
+        array-like: The maximum safe load that can be carried by the HPV.
+
+    Notes:
+        This function calculates the weight limits for hills, taking into account the mass of the HPV, the load capacity of the HPV,
+        the maximum force that a person can push up a hill, the slope of the hill, and the acceleration due to gravity.
+        There are some heavy loads which humans will not be able to push up certain hills
+        This is for average slopes etc. This will be innacurate (i.e one VERY hilly section could render the whole thing impossible, this isn't accounted for here)
+
+    """
     max_load_HPV = LoadCapacity
-    """
-    #### Weight limits
-    Takes in the mass of the HPV (array), the load capacity of the HPV (array), max force that a person can push up a hill, the slope, and gravity
-    # Calculate weight limits for hills. There are some heavy loads which humans will not be able to push up certain hills
-    # Note that this is for average slopes etc. This will be innacurate (i.e one VERY hilly section could render the whole thing impossible, this isn't accounted for here)
-    """
+
     if s != 0:  # requires check to avoid divide by zero
         max_pushable_weight = F_max / (np.sin(s) * g)
         i = 0
@@ -89,9 +125,31 @@ def max_safe_load(m_HPV_only, LoadCapacity, F_max, s, g):
 
 
 class mobility_models:
+    """
+    A collection of mobility models for calculating velocity and load in different scenarios.
+
+    Methods:
+    - sprott_model(hpv, mv, mo, mr)
+    - bike_power_solution(p, *data)
+    - single_lankford_run(mv, mo, met, hpv, slope, load_attempted)
+    - single_bike_run(mv, mo, hpv, slope, load_attempted)
+    - sprott_solution(hpv, s, mv, mo)
+    - numerical_mobility_model(mr, mv, mo, met, hpv)
+    """
     def sprott_model(hpv, mv, mo, mr):
         """
-        takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity
+        Takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity.
+        https://sprott.physics.wisc.edu/technote/Walkrun.htm
+
+        Parameters:
+        - hpv (object): The hpv data object.
+        - mv (object): The model variables object.
+        - mo (object): The model options object.
+        - mr (object): The model results object.
+
+        Returns:
+        - v_load_matrix3d (ndarray): The velocity matrix with dimensions [HPV, Slope, Load].
+        - load_matrix3d (ndarray): The load matrix with dimensions [HPV, Slope, Load].
         """
 
         # define extra vars
@@ -108,6 +166,26 @@ class mobility_models:
         return mr.v_load_matrix3d, mr.load_matrix3d
 
     def bike_power_solution(p, *data):
+        """
+        Calculate the power required to maintain a given velocity on a bike.
+
+        Parameters:
+        p (float): The velocity at which the power is calculated.
+        data (tuple): A tuple containing the following parameters:
+            ro (float): Air density.
+            C_d (float): Drag coefficient.
+            A (float): Cross-sectional area.
+            m_t (float): Total mass.
+            Crr (float): Coefficient of rolling resistance.
+            eta (float): Efficiency.
+            P_t (float): Total power.
+            g (float): Gravity.
+            s (float): Slope.
+
+        Returns:
+        float: The power required to maintain the given velocity.
+
+        """
         ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
         v_solve = p[0]
         return (
@@ -155,6 +233,19 @@ class mobility_models:
         return loaded_velocity, unloaded_velocity, max_load_HPV
 
     def single_bike_run(mv, mo, hpv, slope, load_attempted):
+        """
+        Calculates the loaded and unloaded velocities of a bike run and the maximum safe load for hilly scenarios.
+
+        Args:
+            mv (object): Object containing bike parameters such as ro, C_d, A, m1, eta, P_t, and g.
+            mo (object): Object containing mobility options.
+            hpv (object): Object containing HPV parameters such as m_HPV_only, load_capacity, and Crr.
+            slope (float): Slope of the terrain.
+            load_attempted (float): Load attempted to be pushed.
+
+        Returns:
+            tuple: A tuple containing the loaded velocity, unloaded velocity, and maximum safe load for the bike run.
+        """
         model = mobility_models.bike_power_solution
 
         s = (slope / 360) * (2 * np.pi)  # determine slope in radians
@@ -184,7 +275,7 @@ class mobility_models:
         V_guess = 1
 
         V_un = fsolve(model, V_guess, args=data, full_output=True)
-        # checks if the model was sucesful:
+        # checks if the model was successful:
         if V_un[2] == 1:
             unloaded_velocity = V_un[0][0]
         else:
@@ -204,7 +295,7 @@ class mobility_models:
         V_guess = 1
 
         V_load = fsolve(model, V_guess, args=data, full_output=True)
-        # checks if the model was sucesful:
+        # checks if the model was successful:
         if V_un[2] == 1:
             loaded_velocity = V_load[0][0]
         else:
@@ -214,10 +305,20 @@ class mobility_models:
 
     def sprott_solution(hpv, s, mv, mo):
         """
-        takes in the HPV dataframe, the slope, the model variables, and model options
-        returns the velocity of walking based on the energetics of walking model outlined by Sprott
-        https://sprott.physics.wisc.edu/technote/Walkrun.htm
+        Calculate the velocity of walking based on the energetics of walking model outlined by Sprott.
 
+        Args:
+            hpv (DataFrame): The HPV dataframe.
+            s (float): The slope.
+            mv (object): The model variables.
+            mo (object): The model options.
+
+        Returns:
+            tuple: A tuple containing the velocity of walking and the load matrix.
+
+        References:
+            - Sprott, J. C. (1991). Walkrun. Retrieved from https://sprott.physics.wisc.edu/technote/Walkrun.htm
+            - https://sprott.physics.wisc.edu/technote/
         """
 
         max_safe_load_HPV = max_safe_load(
@@ -277,6 +378,20 @@ class mobility_models:
 
     def numerical_mobility_model(mr, mv, mo, met, hpv):
         """
+        Calculates the velocity and load matrix for different HPVs, slopes, and loads.
+
+        Parameters:
+        - mr (object): Model results object
+        - mv (object): Model variables object
+        - mo (object): Model options object
+        - met (float): Metabolic/energy input
+        - hpv (object): HPV object
+
+        Returns:
+        - v_load_matrix3d (numpy.ndarray): Velocity matrix for different HPVs, slopes, and loads
+        - load_matrix3d (numpy.ndarray): Load matrix for different HPVs, slopes, and loads
+
+        Detailed description:
         1. Takes input of all model variables, mr, mv, mo, met, and hpv
         2. Selects the model to use based on the model options
         3. Creates 3 for loops, looping over 1) HPVs, 2) Slope, 3) load
@@ -505,10 +620,10 @@ class model_variables:
         self.L = 1  # leg length
         self.A = 0.51  # cross sectional area
         self.C_d = 0.9  # constant for wind
-        self.ro = 1.225
-        self.eta = 0.92
-        self.g = 9.81
-        self.waterration = 15
+        self.ro = 1.225 # air density
+        self.eta = 0.92 # efficienct
+        self.g = 9.81 # gravity
+        self.waterration = 15 # water ration in litres
 
 
 class model_options:
@@ -570,6 +685,17 @@ class model_options:
 
 
 class MET_values:
+    """
+    Represents the MET (Metabolic Equivalent of Task) values for a person.
+
+    Attributes:
+        MET_of_sustainable_excercise (float): The MET value for sustainable exercise.
+        MET_VO2_conversion (float): Conversion factor for VO2 (oxygen consumption) in milliliters per minute per kilogram body mass.
+        MET_watt_conversion (float): Conversion factor for watts per kilogram body mass.
+        budget_VO2 (float): VO2 budget for a person based on the MET value and body mass.
+        budget_watts (float): Watts budget for a person based on the MET value and body mass.
+    """
+
     def __init__(self, mv, met=3.3):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
@@ -620,37 +746,38 @@ class model_results:
         self.slope_matrix3drads = (self.slope_matrix3d_deg / 360) * (2 * 3.1416)
 
     def create_dataframe_single_scenario(self, hpv, mv, load_scene, slope_scene):
+        """
+        Create a pandas DataFrame containing various metrics for a single scenario.
+
+        Args:
+            hpv (object): The HPV object.
+            mv (object): The MV object.
+            load_scene (int): The index of the load scene.
+            slope_scene (int): The index of the slope scene.
+
+        Returns:
+            pandas.DataFrame: The DataFrame containing the metrics.
+
+        """
         df = pd.DataFrame(
             {
                 "Name": self.hpv_name[0].transpose()[0][0],
                 "Load": self.load_matrix3d[:, slope_scene, load_scene],
                 "Slope": self.slope_matrix3d_deg[:, slope_scene, load_scene],
-                "Average Trip Velocity": self.v_avg_matrix3d[
-                    :, slope_scene, load_scene
-                ],
-                "Litres * Km": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Average Trip Velocity": self.v_avg_matrix3d[:, slope_scene, load_scene],
+                "Litres * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 * mv.t_hours,
-                "Water ration * Km": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Water ration * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 / mv.waterration
                 * mv.t_hours,
-                "Distance to Water Achievable": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Distance to Water Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * mv.t_hours
                 / 2,
-                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * mv.t_hours,
-                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
-                    :, slope_scene, load_scene
-                ]
+                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[:, slope_scene, load_scene]
                 * self.load_matrix3d[:, slope_scene, load_scene],
                 "Loaded Velocity": self.v_load_matrix3d[:, slope_scene, load_scene],
                 "Unloaded Velocity": hpv.v_no_load.transpose()[0][0],
@@ -665,6 +792,18 @@ class model_results:
         return df
 
     def load_results(self, hpv, mv, mo):
+        """
+        Calculate various results related to load and mobility.
+
+        Args:
+            hpv: An object representing the human-powered vehicle.
+            mv: An object representing the mobility vehicle.
+            mo: An object representing the mobility options.
+
+        Returns:
+            None
+        """
+
         self.model_name = mo.model_name
 
         ## Calculate average speed
@@ -696,6 +835,17 @@ Plotting Class
 
 class plotting_hpv:
     def surf_plot(mr, mo, hpv):
+        """
+        Plots a 3D surface graph of distance achievable based on load, slope, and velocity.
+
+       Args:
+            mr (object): The mobility results object.
+            mo (object): The mobility options object.
+            hpv (object): The human-powered vehicle object.
+
+        Returns:
+            None
+        """
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         # Make data.
         Z = mr.distance_achievable[mo.surf_plot_index, :, :]
@@ -722,7 +872,18 @@ class plotting_hpv:
         plt.show()
 
     def surf_plotly(mr, mo, hpv):
-        # # Make data.
+        """
+        Creates a 3D surface plot using Plotly.
+
+        Args:
+            mr (object): The mobility results object.
+            mo (object): The mobility options object.
+            hpv (object): The human-powered vehicle object.
+
+        Returns:
+            None
+        """
+        # Make data.
         Z = mr.distance_achievable[mo.surf_plot_index, :, :]
         X = mr.load_matrix3d[mo.surf_plot_index, :, :]
         Y = mr.slope_matrix3d_deg[mo.surf_plot_index, :, :]
@@ -740,11 +901,25 @@ class plotting_hpv:
         fig.show()
 
     def surf_plotly_multi(mr, mo, hpv):
+        """
+        Creates a 3D surface plot using Plotly for multiple HPVs (Human-Powered Vehicles).
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): HPV data
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         plot_height = 700
         plot_width = 900
         xaxis_title = "Load [kg]"
         yaxis_title = "Slope [˚]"
-        zaxis_title = "Distannce [km]"
+        zaxis_title = "Distance [km]"
+
         # create list for plot specs based on number of hpvs
         specs_list = []
         spec_single = [{"type": "surface"}]
@@ -790,6 +965,17 @@ class plotting_hpv:
         # py.iplot(fig, filename="3D subplots of HPVs New")
 
     def load_plot_plotly(mr, mo, hpv):
+        """
+        Generate a plot using Plotly library to visualize speed with different loads.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): HPV data
+
+        Returns:
+            None
+        """
         xaxis_title = "Load [kg]"
         yaxis_title = "Speed [m/s]"
 
@@ -810,7 +996,7 @@ class plotting_hpv:
 
         # Update the title
         fig.update_layout(title=dict(text=chart_title))
-        # Update te axis label (valid for 2d graphs using graph object)
+        # Update the axis label (valid for 2d graphs using graph object)
         fig.update_xaxes(title_text=xaxis_title)
         fig.update_yaxes(title_text=yaxis_title)
         # fig.update_yaxes(range = [2,5.5])
@@ -819,6 +1005,17 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_plot_plotly(mr, mo, hpv):
+        """
+        Generates a plot using Plotly library to visualize the relationship between slope and velocity.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+
+        Returns:
+            None
+        """
         xaxis_title = "Slope [˚]"
         yaxis_title = "m/s"
         if mo.load_scene == 0:
@@ -854,6 +1051,17 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_velcoity_kgs(mr, mo, hpv):
+        """
+        Plot the velocity in kilograms per second (Kgs) with different slopes.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+
+        Returns:
+            None
+        """
         xaxis_title = "Slope [˚]"
         yaxis_title = "Velocity Kgs"
 
@@ -889,6 +1097,17 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def slope_velocities(mr, mo, hpv):
+        """
+        Plot the velocities with different slopes.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+
+        Returns:
+            None
+        """
         HPV = 0
 
         xaxis_title = "Slope [˚]"
@@ -917,6 +1136,18 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def time_sensitivity_plotly_grouped(mr, mo, hpv):
+        """
+        Generates a grouped bar plot using Plotly to visualize the distance achievable per HPV
+        given different time to collect water.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+
+        Returns:
+            None
+        """
         t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
         load_scene = -1
 
@@ -941,6 +1172,18 @@ class plotting_hpv:
         fig.show()
 
     def bar_plot_loading(mr, mo, hpv, mv):
+        """
+        Generate a bar plot showing the load velocity for different loads.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+            mv (object): model variables
+
+        Returns:
+            None
+        """
         t_hours_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
@@ -972,6 +1215,18 @@ class plotting_hpv:
         # py.iplot(fig, filename=chart_title)
 
     def bar_plot_loading_distance(mr, mo, hpv, mv):
+        """
+        Generate a bar plot showing the efficiency of water collection at a specific slope angle.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+            mv (object): model variables
+
+        Returns:
+            None
+        """
         slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
         chart_title = "Efficiency at %0.2f degrees, with model %s" % (
             slope_name,

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import pytest
+import os
 
 class TestSampleNormal:
 
@@ -114,3 +115,63 @@ class TestRunSimulation:
 
 
 from src.gis_monte_carlo import process_mc_results
+
+class TestProcessMCResults:
+
+    def test_process_mc_results_saves_results_to_output_dir(self):
+        # Arrange
+        simulation_results = [pd.DataFrame({'percent_with_water': [0.5, 0.6, 0.7]}),
+                              pd.DataFrame({'percent_with_water': [0.4, 0.3, 0.2]})]
+        output_dir = 'test_results'
+
+        # Act
+        process_mc_results(simulation_results, plot=False, output_dir=output_dir)
+
+        # Assert
+        assert os.path.exists(os.path.join(output_dir, 'median_results.csv'))
+        assert os.path.exists(os.path.join(output_dir, 'min_results.csv'))
+        assert os.path.exists(os.path.join(output_dir, 'max_results.csv'))
+        assert os.path.exists(os.path.join(output_dir, '95th_percentile_results.csv'))
+        assert os.path.exists(os.path.join(output_dir, '5th_percentile_results.csv'))
+        assert os.path.exists(os.path.join(output_dir, 'simulation_results.pkl'))
+
+    def test_process_mc_results_plots_chloropleth_maps_when_plot_is_true(self, mocker):
+        # Arrange
+        simulation_results = [pd.DataFrame({'percent_with_water': [0.5, 0.6, 0.7]}),
+                              pd.DataFrame({'percent_with_water': [0.4, 0.3, 0.2]})]
+        mocker.patch('src.gis_monte_carlo.gis.plot_chloropleth')
+
+        # Act
+        process_mc_results(simulation_results, plot=True)
+
+        # Assert
+        assert src.gis_monte_carlo.gis.plot_chloropleth.call_count == 5
+
+    def test_process_mc_results_does_not_plot_chloropleth_maps_when_plot_is_false(self, mocker):
+        # Arrange
+        simulation_results = [pd.DataFrame({'percent_with_water': [0.5, 0.6, 0.7]}),
+                              pd.DataFrame({'percent_with_water': [0.4, 0.3, 0.2]})]
+        mocker.patch('src.gis_monte_carlo.gis.plot_chloropleth')
+
+        # Act
+        process_mc_results(simulation_results, plot=False)
+
+        # Assert
+        assert src.gis_monte_carlo.gis.plot_chloropleth.call_count == 0
+
+    def test_process_mc_results_raises_error_when_simulation_results_is_not_list(self):
+        # Arrange
+        simulation_results = 'invalid_results'
+
+        # Act & Assert
+        with pytest.raises(TypeError):
+            process_mc_results(simulation_results, plot=False)
+
+    def test_process_mc_results_raises_error_when_output_dir_is_not_string(self):
+        # Arrange
+        simulation_results = [pd.DataFrame({'percent_with_water': [0.5, 0.6, 0.7]})]
+        output_dir = 123
+
+        # Act & Assert
+        with pytest.raises(TypeError):
+            process_mc_results(simulation_results, plot=False, output_dir=output_dir)
