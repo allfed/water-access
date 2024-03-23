@@ -20,6 +20,7 @@ from plotly.subplots import make_subplots
 
 import numpy as np
 
+
 def linspace_creator(max_value_array, min_value, res):
     """
     Creates a linspace numpy array from the given inputs.
@@ -136,6 +137,7 @@ class mobility_models:
     - sprott_solution(hpv, s, mv, mo)
     - numerical_mobility_model(mr, mv, mo, met, hpv)
     """
+
     def sprott_model(hpv, mv, mo, mr):
         """
         Takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity.
@@ -620,10 +622,10 @@ class model_variables:
         self.L = 1  # leg length
         self.A = 0.51  # cross sectional area
         self.C_d = 0.9  # constant for wind
-        self.ro = 1.225 # air density
-        self.eta = 0.92 # efficienct
-        self.g = 9.81 # gravity
-        self.waterration = 15 # water ration in litres
+        self.ro = 1.225  # air density
+        self.eta = 0.92  # efficienct
+        self.g = 9.81  # gravity
+        self.waterration = 15  # water ration in litres
 
 
 class model_options:
@@ -717,7 +719,7 @@ class model_results:
         self.hpv_name = (hpv.name,)
 
         # create slope vector
-        self.slope_vector_deg = np.array([0, 1, 2, 4.5, 20])
+        self.slope_vector_deg = np.arange(0, 13)
 
         # = linspace_creator(
         #     np.array([mo.slope_end]), mo.slope_start, mo.slope_res
@@ -764,20 +766,32 @@ class model_results:
                 "Name": self.hpv_name[0].transpose()[0][0],
                 "Load": self.load_matrix3d[:, slope_scene, load_scene],
                 "Slope": self.slope_matrix3d_deg[:, slope_scene, load_scene],
-                "Average Trip Velocity": self.v_avg_matrix3d[:, slope_scene, load_scene],
-                "Litres * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Average Trip Velocity": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ],
+                "Litres * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 * mv.t_hours,
-                "Water ration * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Water ration * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 / mv.waterration
                 * mv.t_hours,
-                "Distance to Water Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Distance to Water Achievable": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * mv.t_hours
                 / 2,
-                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * mv.t_hours,
-                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[:, slope_scene, load_scene]
+                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene],
                 "Loaded Velocity": self.v_load_matrix3d[:, slope_scene, load_scene],
                 "Unloaded Velocity": hpv.v_no_load.transpose()[0][0],
@@ -790,6 +804,9 @@ class model_results:
             }
         )
         return df
+
+    def filter_slope_vector_deg(self, value):
+        return self.slope_vector_deg[self.slope_vector_deg == value]
 
     def load_results(self, hpv, mv, mo):
         """
@@ -836,15 +853,15 @@ Plotting Class
 class plotting_hpv:
     def surf_plot(mr, mo, hpv):
         """
-        Plots a 3D surface graph of distance achievable based on load, slope, and velocity.
+         Plots a 3D surface graph of distance achievable based on load, slope, and velocity.
 
-       Args:
-            mr (object): The mobility results object.
-            mo (object): The mobility options object.
-            hpv (object): The human-powered vehicle object.
+        Args:
+             mr (object): The mobility results object.
+             mo (object): The mobility options object.
+             hpv (object): The human-powered vehicle object.
 
-        Returns:
-            None
+         Returns:
+             None
         """
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         # Make data.
@@ -1004,7 +1021,7 @@ class plotting_hpv:
         fig.show()
         # py.iplot(fig, filename=chart_title)
 
-    def slope_plot_plotly(mr, mo, hpv):
+    def slope_line_plot_plotly(mr, mo, hpv):
         """
         Generates a plot using Plotly library to visualize the relationship between slope and velocity.
 
@@ -1039,6 +1056,55 @@ class plotting_hpv:
             x = mr.slope_matrix3d_deg[i, :, mo.load_scene]
             i += 1
             fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
+
+        # Update the title
+        fig.update_layout(title=dict(text=chart_title))
+        # Update te axis label (valid for 2d graphs using graph object)
+        fig.update_xaxes(title_text=xaxis_title)
+        fig.update_yaxes(title_text=yaxis_title)
+        # fig.update_yaxes(range=[0, 15])
+
+        fig.show()
+        # py.iplot(fig, filename=chart_title)
+
+    def slope_plot_plotly(mr, mo, hpv):
+        """
+        Generates a plot using Plotly library to visualize the relationship between slope and velocity.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+
+        Returns:
+            None
+        """
+        xaxis_title = "HPV Type"
+        yaxis_title = "Water Ration * Distance [km]"
+        if mo.load_scene == 0:
+            load_name = mr.load_matrix3d.flat[mo.load_scene]
+        elif mo.load_scene == -1:
+            load_name = "maximum"
+        else:
+            load_name = "variable"
+
+        chart_title = f"Water Ration * Distance with different slopes, {load_name} kg load, model {mr.model_name}"
+
+        i = 0
+        fig = go.Figure()
+        for HPVname in mr.hpv_name[0].transpose()[0][0]:
+            # y = mr.distance_achievable[
+            #     i, :, mo.load_scene
+            # ] * mr.water_ration_matrix3d[i, :, mo.load_scene]
+            y = mr.v_load_matrix3d[i, :, mo.load_scene]
+            x = HPVname
+            color = mr.slope_matrix3d_deg[i, :, mo.load_scene]
+            i += 1
+            fig.add_trace(
+                go.Scatter(
+                    x=x, y=y, mode="markers", marker=dict(color=color), name=HPVname
+                )
+            )
 
         # Update the title
         fig.update_layout(title=dict(text=chart_title))
@@ -1257,6 +1323,268 @@ class plotting_hpv:
         )
         fig.show()
         # py.iplot(fig, filename=chart_title)
+
+    def bar_plot_hpvs(mr, mo, hpv, mv):
+        """
+        Generate a bar plot showing the efficiency of water collection for different hpvs.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+            mv (object): model variables
+
+        Returns:
+            None
+        """
+
+        df = mr.create_dataframe_single_scenario(hpv, mv, mo.load_scene, mo.slope_scene)
+
+        # filter df to slope = 0
+        df = df[df["Slope"] == 0]
+
+        # Truncate the Viridis colormap to remove the last 20% of colors
+        truncated_viridis = px.colors.sequential.Viridis[
+            : -int(len(px.colors.sequential.Viridis) * 0.4)
+        ]
+
+        fig = px.bar(
+            df,
+            x="Name",
+            y="Water ration * Km",
+            hover_data=[
+                "Name",
+                "Average Trip Velocity",
+                "Loaded Velocity",
+                "Unloaded Velocity",
+                "Distance to Water Achievable",
+                "Total Round trip Distance Achievable",
+                "Load",
+                "Slope",
+                "Hours Collecting Water Max",
+                "Hours Spent Collecting Single Person Water",
+            ],
+            color="Water ration * Km",
+            labels={
+                "Name": "Human-Powered Vehicle",
+                "Water ration * Km": "Performance [15L.km.hr⁻¹]",
+            },
+            color_continuous_scale=truncated_viridis,
+        )
+
+        # Order from lowest to highest
+        fig.update_xaxes(categoryorder="total ascending")
+        fig.update_traces(showlegend=False)
+        fig.update_coloraxes(showscale=False)
+
+        fig.update_layout(
+            width=1500,
+            height=1000,
+            font=dict(size=30),
+            xaxis_tickangle=-45,
+            yaxis=dict(tickfont=dict(size=30)),
+            title=dict(font=dict(size=20)),
+        )
+
+        fig.update_layout(
+            margin=dict(l=100, r=30, t=30, b=165),
+        )
+        # save as tiff
+        fig.write_image("../results/hpv_performance.png")
+
+        fig.show()
+
+    def new_slope_plot(mr, mo, hpv, mv):
+        """
+        Generate a bar plot showing the efficiency of water collection for different hpvs.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+            mv (object): model variables
+
+        Returns:
+            None
+        """
+
+        # run mr.load_results(hpv, mv, mo)  for mo.slope_scene between 0 and 20
+        df = pd.DataFrame()
+
+        for slope_scene in range(0, 13):
+            mo.slope_scene = slope_scene
+            mr.load_results(hpv, mv, mo)
+            new_df = mr.create_dataframe_single_scenario(
+                hpv, mv, mo.load_scene, mo.slope_scene
+            )
+            df = df.append(new_df)
+
+        # Truncate the Viridis colormap to remove the last 20% of colors
+        truncated_viridis = px.colors.sequential.Viridis[
+            : -int(len(px.colors.sequential.Viridis) * 0.1)
+        ]
+
+        fig = px.scatter(
+            df,
+            x="Name",
+            y="Water ration * Km",
+            hover_data=[
+                "Name",
+                "Average Trip Velocity",
+                "Loaded Velocity",
+                "Unloaded Velocity",
+                "Distance to Water Achievable",
+                "Total Round trip Distance Achievable",
+                "Load",
+                "Slope",
+                "Hours Collecting Water Max",
+                "Hours Spent Collecting Single Person Water",
+            ],
+            color="Slope",
+            labels={
+                "Name": "Human-Powered Vehicle",
+                "Water ration * Km": "Performance [15L.km.hr⁻¹]",
+            },
+            # opacity=0.8,
+            # labels={
+            #     "Name": "Human-Powered Vehicle",
+            #     "Water ration * Km": "Performance [15L.km.hr⁻¹]",
+            # },
+            color_continuous_scale=truncated_viridis,
+        )
+
+        # Order from lowest to highest
+        fig.update_xaxes(categoryorder="total ascending")
+        # fig.update_traces(marker={"size": 7})
+
+        fig.update_layout(
+            width=1500,
+            height=1000,
+            font=dict(size=30),
+            xaxis_tickangle=-45,
+            yaxis=dict(tickfont=dict(size=30)),
+            title=dict(font=dict(size=20)),
+        )
+
+        fig.update_layout(
+            margin=dict(l=170, r=30, t=30, b=290),
+            coloraxis_colorbar=dict(title=dict(text="Slope [degrees]", side="right")),
+        )
+
+        fig.update_traces(
+            marker=dict(
+                size=15, opacity=0.7, line=dict(width=1, color="rgba(0, 0, 0, 0.4)")
+            )
+        )
+
+        # save as tiff
+        fig.write_image("../results/hpv_performance_slope.png")
+
+        fig.update_xaxes(title_standoff=40)
+        fig.update_yaxes(title_standoff=40)
+
+        fig.show()
+
+    def scatter_plot_loading_distance(mr, mo, hpv, mv):
+        """
+        Generate a bar plot showing the efficiency of water collection at a specific slope angle.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+            mv (object): model variables
+
+        Returns:
+            None
+        """
+        slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
+        chart_title = "Efficiency at %0.2f degrees, with model %s" % (
+            slope_name,
+            mr.model_name,
+        )
+
+        df = mr.create_dataframe_single_scenario(hpv, mv, mo.load_scene, mo.slope_scene)
+
+        fig = px.scatter(
+            df,
+            x="Load",
+            y="Water ration * Km",
+            hover_data=[
+                "Name",
+                "Average Trip Velocity",
+                "Loaded Velocity",
+                "Unloaded Velocity",
+                "Distance to Water Achievable",
+                "Total Round trip Distance Achievable",
+                "Load",
+                "Slope",
+                "Hours Collecting Water Max",
+                "Hours Spent Collecting Single Person Water",
+            ],
+            color="Name",
+            labels={
+                "Name": "",
+                "Water ration * Km": "Performance [15L.km.hr⁻¹]",
+                "Load": "Load [kg]",
+            },
+            # add Dark2 colorscale
+            color_discrete_sequence=px.colors.qualitative.Dark2,
+        )
+        # for trace in fig.data:
+        #     trace.marker = dict(size=12, line=dict(width=1, color="rgba(0, 0, 0, 0.4)"))
+
+        # Order from lowest to highest
+        # fig.update_traces(marker={"size": 20})
+        fig.update_traces(
+            marker=dict(
+                size=15, opacity=0.7, line=dict(width=1, color="rgba(0, 0, 0, 0.4)")
+            )
+        )
+        fig.update_layout(
+            width=1500,
+            height=1000,
+            font=dict(size=30),
+            xaxis_tickangle=-45,
+            yaxis=dict(tickfont=dict(size=30)),
+            title=dict(font=dict(size=20)),
+        )
+        fig.update_layout(
+            margin=dict(l=150, r=30, t=30, b=130),
+            # coloraxis_colorbar=dict(title=dict(text="Slope [degrees]", side="right")),
+        )
+
+        # Get the data for the points you want to annotate
+        bicycle_data = df[df["Name"] == "Bicycle"].iloc[0]
+        cycle_rickshaw_data = df[df["Name"] == "Cycle Rickshaw"].iloc[0]
+        stretcher_data = df[df["Name"] == "Stretcher"].iloc[0]
+
+        # Add annotations
+        fig.add_annotation(
+            x=bicycle_data["Load"],
+            y=bicycle_data["Water ration * Km"],
+            text="Bicycle",
+            showarrow=True,
+            arrowhead=1,
+        )
+        fig.add_annotation(
+            x=cycle_rickshaw_data["Load"],
+            y=cycle_rickshaw_data["Water ration * Km"],
+            text="Cycle Rickshaw",
+            showarrow=True,
+            arrowhead=1,
+        )
+        fig.add_annotation(
+            x=stretcher_data["Load"],
+            y=stretcher_data["Water ration * Km"],
+            text="Stretcher",
+            showarrow=True,
+            arrowhead=1,
+        )
+
+        # save as tiff
+        fig.write_image("../results/hpv_load_performance.png")
+        fig.show()
 
 
 if __name__ == "__main__":
