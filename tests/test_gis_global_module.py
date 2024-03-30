@@ -29,6 +29,7 @@ from src.gis_global_module import (
     run_bicycle_model,
     process_and_save_results,
     clean_up_data,
+    map_hill_polarity,
 )
 
 
@@ -831,3 +832,40 @@ class TestProcessCountryData:
         captured = capsys.readouterr()
         assert "Countries removed from analysis due to being further than Libya's median:" in captured.out
         assert "Countries removed manually:" in captured.out
+
+class TestMapHillPolarity:
+    def test_map_hill_polarity_returns_correct_result(self):
+        hill_polarity = "uphill_downhill"
+        result = map_hill_polarity(hill_polarity)
+        expected_result = (1, -1)
+        assert result == expected_result
+
+    def test_map_hill_polarity_returns_correct_result_for_downhill_uphill(self):
+        hill_polarity = "downhill_uphill"
+        result = map_hill_polarity(hill_polarity)
+        expected_result = (-1, 1)
+        assert result == expected_result
+
+    def test_map_hill_polarity_returns_correct_result_for_uphill_flat(self):
+        hill_polarity = "uphill_flat"
+        result = map_hill_polarity(hill_polarity)
+        expected_result = (1, 0)
+        assert result == expected_result
+
+    def test_map_hill_polarity_returns_correct_result_for_flat_uphill(self):
+        hill_polarity = "flat_uphill"
+        result = map_hill_polarity(hill_polarity)
+        expected_result = (0, 1)
+        assert result == expected_result
+
+    def test_map_hill_polarity_returns_correct_result_for_downhill_flat(self):
+        hill_polarity = "downhill_flat"
+        result = map_hill_polarity(hill_polarity)
+        expected_result = (-1, 0)
+        assert result == expected_result
+
+    def test_map_hill_polarity_returns_correct_result_for_flat_downhill(self):
+        hill_polarity = "flat_downhill"
+        result = map_hill_polarity(hill_polarity)
+        expected_result = (0, -1)
+        assert result == expected_result

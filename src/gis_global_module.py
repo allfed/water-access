@@ -508,9 +508,37 @@ def process_and_save_results(df_zones, results, export_file_location, velocity_t
 
     return df_zones
 
+# function to map hill polarity strings to integers for lhillpo and ulhillpo, using a dictionary for the mapping
+def map_hill_polarity(hill_polarity):
+    """
+    Maps the hill polarity string to integers for the unloaded trip (ulhillpo) and the loaded trip back (lhillpo).
+
+    Args:
+        hill_polarity (str): The hill polarity string.
+
+    Returns:
+        int, int: The integer values for ulhillpo and lhillpo.
+    """
+    hill_polarity_mapping = {
+        "uphill_downhill": (1, -1),
+        "downhill_uphill": (-1, 1),
+        "uphill_flat": (1, 0),
+        "flat_uphill": (0, 1),
+        "downhill_flat": (-1, 0),
+        "flat_downhill": (0, -1),
+    }
+    ulhillpo, lhillpo = hill_polarity_mapping[hill_polarity]
+
+    return ulhillpo, lhillpo
 
 def calculate_and_merge_bicycle_distance(
-    df_zones, calculate_distance, export_file_location, practical_limit_bicycle=40
+    df_zones, 
+    calculate_distance, 
+    export_file_location, 
+    practical_limit_bicycle=40, 
+    watts=75, 
+    human_mass=62,
+    hill_polarity="flat_uphill"
 ):
     """
     Calculates and merges bicycle distance for each zone in the given dataframe.
@@ -536,12 +564,17 @@ def calculate_and_merge_bicycle_distance(
         file_path_params = "./data/lookup tables/mobility-model-parameters.csv"
         param_df = load_hpv_parameters(file_path_params, "Bicycle")
 
+        # Overwrite practical limit with the function inputs
         param_df["PracticalLimit"] = practical_limit_bicycle
 
-        mo = mm.model_options()
+        # Get integer values for hill polarity
+        ulhillpo, lhillpo = map_hill_polarity(hill_polarity)
+
+        # Initialise mobility model options, using updated hill polarities
+        mo = mm.model_options(ulhillpo=ulhillpo, lhillpo=lhillpo)
         mo.model_selection = 2  # Cycling model
-        mv = mm.model_variables()
-        met = mm.MET_values(mv)
+        mv = mm.model_variables(P_t=watts, m1=human_mass)
+        # met = mm.MET_values(mv)
         hpv = mm.HPV_variables(param_df, mv)
 
         slope_zones, Crr_values = extract_slope_crr(df_zones)
@@ -592,7 +625,9 @@ def calculate_and_merge_walking_distance(
     calculate_distance,
     export_file_location,
     practical_limit_buckets=20,
-    met=3.3,
+    met=4.5,
+    human_mass=62,
+    hill_polarity="flat_uphill",
 ):
     """
     Calculate and merge walking distance for zones.
@@ -615,11 +650,17 @@ def calculate_and_merge_walking_distance(
 
         file_path_params = "./data/lookup tables/mobility-model-parameters.csv"
         param_df = load_hpv_parameters(file_path_params, "Buckets")
+
+        # Overwrite practical limit with the function inputs
         param_df["PracticalLimit"] = practical_limit_buckets
 
-        mo = mm.model_options()
+        # Get integer values for hill polarity
+        ulhillpo, lhillpo = map_hill_polarity(hill_polarity)
+
+        # Initialise mobility model options, using updated hill polarities
+        mo = mm.model_options(ulhillpo=ulhillpo, lhillpo=lhillpo)
         mo.model_selection = 3  # Lankford model
-        mv = mm.model_variables()
+        mv = mm.model_variables(m1=human_mass)
         met = mm.MET_values(mv, met=met)
         hpv = mm.HPV_variables(param_df, mv)
 
@@ -752,7 +793,7 @@ def calculate_water_rations(df_zones):
 
     The function calculates the water rations achievable by dividing the water ration distance (water_ration_kms)
     by the distance to water source (dtw_1) for each zone. It then calculates the number of bikes in each zone
-    by dividing the population of the zone by the average household size and multiplying it by the PBO (Personal Bike Ownership) factor.
+    by dividing the population of the zone by the average household size and multiplying it by the PBO (Percent Bike Ownership) factor.
     Finally, it calculates the total water rations achievable in each zone by multiplying the number of bikes in the zone
     by the water rations per bike.
 
@@ -987,18 +1028,23 @@ def run_global_analysis(
     practical_limit_bicycle,
     practical_limit_buckets,
     met,
+    watts,
+    human_mass,
+    hill_polarity,
     calculate_distance=True,
     plot=False,
 ):
     """
-    Runs the global analysis for water access.
+    Runs one run of the global analysis for water access.
 
     Args:
         crr_adjustment (float): The adjustment factor for calculating the Coefficient of Rolling Resistance (CRR).
         time_gathering_water (float): The time taken to gather water in minutes.
         practical_limit_bicycle (float): The practical limit for distance traveled by bicycle in kilometers.
         practical_limit_buckets (float): The practical limit for distance traveled by carrying buckets in kilometers.
-        met (str): metabolic equivalent of task.
+        met (str): metabolic equivalent of task (energy for walking).
+        watts (float): The power output in watts (energy for cycling).
+        human_mass (float): The mass of an average human carrying water in kilograms.
         calculate_distance (bool, optional): Whether to calculate distance or not. Defaults to True.
         plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
 
@@ -1011,6 +1057,9 @@ def run_global_analysis(
         calculate_distance=calculate_distance,
         export_file_location=EXPORT_FILE_LOCATION,
         practical_limit_bicycle=practical_limit_bicycle,
+        watts=watts, 
+        human_mass=human_mass,
+        hill_polarity=hill_polarity,
     )
     df_zones = calculate_and_merge_walking_distance(
         df_zones,
@@ -1018,6 +1067,8 @@ def run_global_analysis(
         export_file_location=EXPORT_FILE_LOCATION,
         practical_limit_buckets=practical_limit_buckets,
         met=met,
+        human_mass=human_mass,
+        hill_polarity=hill_polarity,
     )
     df_zones = process_zones_for_water_access(
         df_zones, time_gathering_water=time_gathering_water
@@ -1035,7 +1086,10 @@ if __name__ == "__main__":
         time_gathering_water=6,
         practical_limit_bicycle=40,
         practical_limit_buckets=20,
-        met=3.3,
+        met=4.5,
+        watts=75,
+        human_mass=62,
+        hill_polarity="flat_uphill",
         calculate_distance=True,
         plot=True,
     )

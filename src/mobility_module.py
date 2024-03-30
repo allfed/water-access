@@ -278,6 +278,8 @@ class mobility_models:
         # checks if the model was successful:
         if V_un[2] == 1:
             unloaded_velocity = V_un[0][0]
+            # Limit velocity to a maximum of 7m/s
+            unloaded_velocity = min(unloaded_velocity, 7)
         else:
             unloaded_velocity = np.nan
 
@@ -290,7 +292,7 @@ class mobility_models:
             mv.eta,
             mv.P_t,
             mv.g,
-            s * mo.ulhillpo,  # hill polarity, see model options
+            s * mo.lhillpo,  # hill polarity, see model options
         )
         V_guess = 1
 
@@ -298,6 +300,9 @@ class mobility_models:
         # checks if the model was successful:
         if V_un[2] == 1:
             loaded_velocity = V_load[0][0]
+
+            # Limit velocity to a maximum of 7m/s
+            loaded_velocity = min(loaded_velocity, 7)
         else:
             loaded_velocity = np.nan
 
@@ -471,7 +476,11 @@ class mobility_models:
                 V_un = fsolve(model, V_guess, args=data, full_output=True)
                 # checks if the model was sucesful:
                 if V_un[2] == 1:
-                    mr.v_unload_matrix3d[i, j, :] = V_un[0][0]
+                    v_unload = V_un[0][0]
+
+                    # limit to max 7m/s
+                    v_unload = min(v_unload, 7)
+                    mr.v_unload_matrix3d[i, j, :] = v_unload
                 else:
                     mr.v_unload_matrix3d[i, j, :] = np.nan
 
@@ -496,10 +505,11 @@ class mobility_models:
 
                     V_r = fsolve(model, V_guess, args=data, full_output=True)
                     if V_r[2] == 1:
-                        mr.v_load_matrix3d[i, j, k] = V_r[0][0]
-                        mr.load_matrix3d[i, j, k] = load_vector[
-                            k
-                        ]  # amount of water carried
+                        v_load = V_r[0][0]
+                        # limit to max 7m/s
+                        v_load = min(v_load, 7)
+                        mr.v_load_matrix3d[i, j, k] = v_load
+                        mr.load_matrix3d[i, j, k] = load_vector[k] # amount of water carried
                     else:
                         mr.v_load_matrix3d[i, j, k] = np.nan
                         mr.load_matrix3d[i, j, k] = load_vector[k]
@@ -553,7 +563,7 @@ class mobility_models:
             + (-0.05372 * G)
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
-            + (0.00320 * v_solve * G**3)
+            + (0.000320 * v_solve * G**3) # this was previously 0.00320 - bug?
             - (met.budget_VO2 / m_load)
         )
         # add in rolling resistance stuff...
@@ -608,7 +618,7 @@ class HPV_variables:
 
 
 class model_variables:
-    def __init__(self):
+    def __init__(self, P_t = 75, m1 = 62):
         #### variables (changeable)
         self.s_deg = 0  # slope in degrees (only used for loading scenario, is overriden in variable slope scenario)
         self.m1 = 62  # mass of rider/person
@@ -616,7 +626,7 @@ class model_variables:
         self.F_max = 300  # maximum force exertion for pushing up a hill for a short amount of time
         self.L = 1  # leg length
         self.minimumViableLoad = 0  # in kg, the minimum useful load for such a trip
-        self.t_hours = 8  # number of hours to gather water
+        self.t_hours = 8  # number of hours to gather water (ONLY used in mobility and sensitivity notebooks. Defined separately in global analysis)
         self.L = 1  # leg length
         self.A = 0.51  # cross sectional area
         self.C_d = 0.9  # constant for wind
@@ -627,7 +637,7 @@ class model_variables:
 
 
 class model_options:
-    def __init__(self):
+    def __init__(self, ulhillpo=0, lhillpo=1):
         # model options
         self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
 
@@ -641,8 +651,8 @@ class model_options:
         self.slope_end = 10  # slope max degrees
 
         # is it uphill or downhill? -1 is downhill, +1 is uphill. Any value between 0 to 1 will lesson the impact of the "effective hill", useful for exploring/approximating braking on bikes for donwhill (otherwise we get up to 60km/h on an unloaded bike pleting down a 10 deg hill!)
-        self.lhillpo = 1  # loaded hill polarity
-        self.ulhillpo = 1  # unloaded hill polarity
+        self.lhillpo = lhillpo  # loaded hill polarity
+        self.ulhillpo = ulhillpo  # unloaded hill polarity
 
         # for plotting of single scenarios, likle on surf plots
         self.slope_scene = (
@@ -696,7 +706,7 @@ class MET_values:
         budget_watts (float): Watts budget for a person based on the MET value and body mass.
     """
 
-    def __init__(self, mv, met=3.3):
+    def __init__(self, mv, met=4.5):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
             met  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task

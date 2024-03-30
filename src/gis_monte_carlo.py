@@ -29,7 +29,8 @@ def sample_normal(low, high, n):
     numpy.ndarray: An array of random samples from the normal distribution.
     """
     mean = np.mean([high, low])
-    stdev = (high - mean) / 1.645
+    # 1.645 for 90% CI, 1.96 for 95% CI, 2.575 for 99% CI
+    stdev = (high - mean) / 2.575
     samples = np.abs(norm.rvs(loc=mean, scale=stdev, size=n))
 
     return samples
@@ -52,7 +53,8 @@ def sample_lognormal(low, high, n):
     logLow = np.log(low)
 
     mean = np.mean([logHigh, logLow])
-    stdev = (logHigh - logLow) / (2 * 1.645)
+    # 1.645 for 90% CI, 1.96 for 95% CI, 2.575 for 99% CI
+    stdev = (logHigh - logLow) / (2 * 2.575)
     scale = np.exp(mean)
     samples = np.abs(lognorm.rvs(s=stdev, scale=scale, size=n))
 
@@ -65,6 +67,9 @@ def run_simulation(
     practical_limit_bicycle,
     practical_limit_buckets,
     met,
+    watts,
+    human_mass,
+    hill_polarity,
     calculate_distance=True,
 ):
     """
@@ -91,6 +96,9 @@ def run_simulation(
     assert isinstance(practical_limit_bicycle, (int, float)), "Practical limit bicycle must be a number."
     assert isinstance(practical_limit_buckets, (int, float)), "Practical limit buckets must be a number."
     assert isinstance(met, (int, float)), "MET must be a number."
+    assert isinstance(watts, (int, float)), "Watts must be a number."
+    assert isinstance(human_mass, (int, float)), "Human mass must be a number."
+    assert isinstance(hill_polarity, str), "Hill polarity must be a string."
 
     result = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
@@ -98,6 +106,9 @@ def run_simulation(
         practical_limit_bicycle=practical_limit_bicycle,
         practical_limit_buckets=practical_limit_buckets,
         met=met,
+        watts=watts,
+        human_mass=human_mass,
+        hill_polarity=hill_polarity,
         calculate_distance=calculate_distance,
         plot=False,
     )
