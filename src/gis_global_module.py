@@ -423,12 +423,15 @@ def extract_slope_crr(df_zones):
                Crr_values: The series containing Crr values.
     """
     df_zones["Crr"] = df_zones["Crr"].astype(float)
+    # TODO add country specific body mass (done?)
+    # TODO update test to use country specific body mass
+    country_average_weights = df_zones["Average Weight"]
     slope_zones = df_zones["slope_1"]
     Crr_values = df_zones["Crr"]
-    return slope_zones, Crr_values
+    return slope_zones, Crr_values, country_average_weights
 
 
-def run_bicycle_model(mv, mo, hpv, slope_zones, Crr_values, load_attempt):
+def run_bicycle_model(mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt):
     """
     Runs a bicycle model for different slope zones and Crr values.
 
@@ -449,11 +452,21 @@ def run_bicycle_model(mv, mo, hpv, slope_zones, Crr_values, load_attempt):
     import src.mobility_module as mm
     n_runs = len(slope_zones)
     results = np.zeros((n_runs, 3))
-    for i, (slope, crr) in enumerate(zip(slope_zones, Crr_values)):
+    # TODO update the loop below to use the country-specific body mass (done?)
+    # TODO update test to include country_average_weight
+    for i, (slope, crr, country_average_weight) in enumerate(zip(slope_zones, Crr_values, country_average_weights)):
         hpv.Crr = crr
+        mv.m1 = country_average_weight
         results[i] = mm.mobility_models.single_bike_run(
+            # need to modify single_bike_run function to take country_average_weight instead of m1 
+            # (done by updated mv to take country_average_weight as m1)
             mv, mo, hpv, slope, load_attempt
         )
+    # for i, (slope, crr) in enumerate(zip(slope_zones, Crr_values)):
+    #     hpv.Crr = crr
+    #     results[i] = mm.mobility_models.single_bike_run(
+    #         mv, mo, hpv, slope, load_attempt
+    #     )
     return results
 
 
@@ -526,6 +539,7 @@ def map_hill_polarity(hill_polarity):
         "flat_uphill": (0, 1),
         "downhill_flat": (-1, 0),
         "flat_downhill": (0, -1),
+        "flat_flat": (0, 0),
     }
     ulhillpo, lhillpo = hill_polarity_mapping[hill_polarity]
 
@@ -573,13 +587,16 @@ def calculate_and_merge_bicycle_distance(
         # Initialise mobility model options, using updated hill polarities
         mo = mm.model_options(ulhillpo=ulhillpo, lhillpo=lhillpo)
         mo.model_selection = 2  # Cycling model
-        mv = mm.model_variables(P_t=watts, m1=human_mass)
-        # met = mm.MET_values(mv)
+
+        #TODO update for country average weight (done?)
+        slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
+
+        #TODO update for country average weight here? (i think no, because done in run_bicycle_model function)
+        mv = mm.model_variables(P_t=watts)
         hpv = mm.HPV_variables(param_df, mv)
 
-        slope_zones, Crr_values = extract_slope_crr(df_zones)
         results = run_bicycle_model(
-            mv, mo, hpv, slope_zones, Crr_values, load_attempt=25
+            mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt=25
         )
         process_and_save_results(df_zones, results, export_file_location, "bicycle")
     else:
@@ -590,7 +607,7 @@ def calculate_and_merge_bicycle_distance(
     return df_zones
 
 
-def run_walking_model(mv, mo, met, hpv, slope_zones, load_attempt):
+def run_walking_model(mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt):
     """
     Run the walking model for multiple slope zones.
 
@@ -613,9 +630,12 @@ def run_walking_model(mv, mo, met, hpv, slope_zones, load_attempt):
     import src.mobility_module as mm
     n_runs = len(slope_zones)
     results = np.zeros((n_runs, 3))
-    for i, slope in enumerate(slope_zones):
+    #TODO update the loop below to use the country-specific body mass
+    for i, (slope, country_average_weight) in enumerate(zip(slope_zones, country_average_weights)):
+        mv.m1 = country_average_weight
+        met_values = mm.MET_values(mv, country_weight=country_average_weight, met=met, use_country_specific_weights=True)
         results[i] = mm.mobility_models.single_lankford_run(
-            mv, mo, met, hpv, slope, load_attempt
+            mv, mo, met_values, hpv, slope, load_attempt
         )
     return results
 
@@ -661,11 +681,12 @@ def calculate_and_merge_walking_distance(
         mo = mm.model_options(ulhillpo=ulhillpo, lhillpo=lhillpo)
         mo.model_selection = 3  # Lankford model
         mv = mm.model_variables(m1=human_mass)
-        met = mm.MET_values(mv, met=met)
+        #TODO update mets here to take country-specific body mass (removed and defined inside run_walking_model function instead)
         hpv = mm.HPV_variables(param_df, mv)
 
-        slope_zones, Crr_values = extract_slope_crr(df_zones)
-        results = run_walking_model(mv, mo, met, hpv, slope_zones, load_attempt=20)
+        # TODO update for country average weight (done?)
+        slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
+        results = run_walking_model(mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt=20)
         process_and_save_results(df_zones, results, export_file_location, "walk")
     else:
         df_zones_walking = pd.read_csv(

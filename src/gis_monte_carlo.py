@@ -91,7 +91,9 @@ def run_simulation(
     - AssertionError: If any of the input parameters are of incorrect type.
 
     """
-    assert isinstance(crr_adjustment, int), "CRR adjustment must be an integer."
+    #print type of crr_adjustment
+    print(type(crr_adjustment))
+    assert isinstance(crr_adjustment, (int, np.integer)), "CRR adjustment must be an integer."
     assert isinstance(time_gathering_water, (int, float)), "Time gathering water must be a number."
     assert isinstance(practical_limit_bicycle, (int, float)), "Practical limit bicycle must be a number."
     assert isinstance(practical_limit_buckets, (int, float)), "Practical limit buckets must be a number."

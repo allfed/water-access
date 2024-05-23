@@ -361,7 +361,7 @@ class mobility_models:
         D = np.pi**2 / (6 * mv.g * mv.L)  # leg component
 
         B1 = (
-            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]
+            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :] # add g?
         )  # rolling resistance component
         B2 = m_HPV_load_pilot * np.sin(np.arctan(s))  # slope component
         B = B1 + B2
@@ -554,6 +554,7 @@ class mobility_models:
         Returns:
             velocity of the HPV given the load and slope
         """
+        #TODO See if we need to update mets calculation here too
         m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45
@@ -621,8 +622,8 @@ class model_variables:
     def __init__(self, P_t = 75, m1 = 62):
         #### variables (changeable)
         self.s_deg = 0  # slope in degrees (only used for loading scenario, is overriden in variable slope scenario)
-        self.m1 = 62  # mass of rider/person
-        self.P_t = 75  # power output of person (steady state average)
+        self.m1 = m1  # mass of rider/person
+        self.P_t = P_t  # power output of person (steady state average)
         self.F_max = 300  # maximum force exertion for pushing up a hill for a short amount of time
         self.L = 1  # leg length
         self.minimumViableLoad = 0  # in kg, the minimum useful load for such a trip
@@ -706,7 +707,7 @@ class MET_values:
         budget_watts (float): Watts budget for a person based on the MET value and body mass.
     """
 
-    def __init__(self, mv, met=4.5):
+    def __init__(self, mv, country_weight, met=4.5, use_country_specific_weights=True):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
             met  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
@@ -714,12 +715,20 @@ class MET_values:
         self.MET_VO2_conversion = 3.5  # milliliters per minute per kilogram body mass
         self.MET_watt_conversion = 1.162  # watts per kg body mass
         # so 75 Watts output (from Marks textbook) is probably equivalent to about 6 METs
-        self.budget_VO2 = (
-            self.MET_VO2_conversion * self.MET_of_sustainable_excercise * mv.m1
-        )  # vo2 budget for a person
-        self.budget_watts = (
-            self.MET_watt_conversion * self.MET_of_sustainable_excercise * mv.m1
-        )  # vo2 budget for a person
+        if use_country_specific_weights == True:
+            self.budget_VO2 = (
+            self.MET_VO2_conversion * self.MET_of_sustainable_excercise * country_weight
+            )  # vo2 budget for a person
+            self.budget_watts = (
+                self.MET_watt_conversion * self.MET_of_sustainable_excercise * country_weight
+            )  # vo2 budget for a person
+        else:
+            self.budget_VO2 = (
+                self.MET_VO2_conversion * self.MET_of_sustainable_excercise * mv.m1
+            )  # vo2 budget for a person
+            self.budget_watts = (
+                self.MET_watt_conversion * self.MET_of_sustainable_excercise * mv.m1
+            )  # vo2 budget for a person
 
 
 class model_results:
