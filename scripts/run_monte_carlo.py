@@ -8,6 +8,7 @@ from tqdm import tqdm
 import pickle
 import numpy as np
 from scipy.stats import norm
+import time
 
 # # Resolve project root and update sys.path
 project_root = Path().resolve().parent
@@ -16,7 +17,7 @@ import src.gis_global_module as gis
 import src.gis_monte_carlo as mc
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Monte Carlo parameters
     num_iterations = 3  # Number of simulations to run
 
@@ -28,9 +29,14 @@ if __name__ == '__main__':
     watts_values = mc.sample_normal(50, 100, num_iterations)
     human_masses = mc.sample_lognormal(55.2, 99.4, num_iterations)
 
-    polarity_options = ["uphill_downhill", "uphill_flat", "flat_uphill", "downhill_uphill"]
+    polarity_options = [
+        "uphill_downhill",
+        "uphill_flat",
+        "flat_uphill",
+        "downhill_uphill",
+    ]
     hill_polarities = np.random.choice(polarity_options, num_iterations)
-    
+
     print(crr_adjustments)
     print(time_gatherings)
     print(practical_limits_bicycle)
@@ -40,6 +46,9 @@ if __name__ == '__main__':
     print(hill_polarities)
 
     simulation_results = []
+
+    # Record the start time
+    start_time = time.time()
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
         # Submit all simulations to the executor
@@ -68,7 +77,11 @@ if __name__ == '__main__':
         ]
 
         # Initialize tqdm progress bar
-        futures_progress = tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Simulating")
+        futures_progress = tqdm(
+            concurrent.futures.as_completed(futures),
+            total=len(futures),
+            desc="Simulating",
+        )
 
         # Collect results as they complete
         for future in concurrent.futures.as_completed(futures):
@@ -77,3 +90,8 @@ if __name__ == '__main__':
 
     futures_progress.close()  # Close the progress bar
     mc.process_mc_results(simulation_results)
+
+    # Record the end time
+    end_time = time.time()
+    # Calculate and print the time taken by the simulations
+    print(f"The simulations took {end_time - start_time} seconds.")
