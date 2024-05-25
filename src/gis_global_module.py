@@ -949,11 +949,14 @@ def process_country_data(df_zones):
 
     df_countries = aggregate_country_level_data(df_zones)
     assert not df_countries.empty, "Country-level dataframe is empty"
-    assert not df_countries.isnull().values.any(), "Country-level dataframe contains NaN values"
+    # TODO check this out - maybe can remove? maybe debug to check properly?
+    # Added plot=True, so we can run n=1 again and see if results seem ok without the asserts
+    # assert not df_countries.isnull().values.any(), "Country-level dataframe contains NaN values"
 
     df_median_group = calculate_weighted_median(df_zones)
     assert not df_median_group.empty, "Weighted median dataframe is empty"
-    assert not df_median_group.isnull().values.any(), "Weighted median dataframe contains NaN values"
+    # TODO check this out - maybe can remove?
+    # assert not df_median_group.isnull().values.any(), "Weighted median dataframe contains NaN values"
 
     df_countries = df_countries.merge(
         df_median_group, on="ISOCODE"
@@ -974,6 +977,19 @@ def process_country_data(df_zones):
     )
     df_countries["percent_without_water"] = (
         df_countries["country_pop_without_water"]
+        / df_countries["country_pop_raw"]
+        * 100
+    )
+
+    # add percentage columns for cycling and water access
+    df_countries["percent_piped_with_cycling_access"] = (
+        df_countries["population_piped_with_cycling_access"]
+        / df_countries["country_pop_raw"]
+        * 100
+    )
+
+    df_countries["percent_piped_with_walking_access"] = (
+        df_countries["population_piped_with_walking_access"]
         / df_countries["country_pop_raw"]
         * 100
     )

@@ -18,7 +18,7 @@ import src.gis_monte_carlo as mc
 
 if __name__ == '__main__':
     # Monte Carlo parameters
-    num_iterations = 5  # Number of simulations to run
+    num_iterations = 3  # Number of simulations to run
 
     crr_adjustments = np.random.randint(-1, 2, size=num_iterations)
     time_gatherings = mc.sample_normal(4, 10, num_iterations)

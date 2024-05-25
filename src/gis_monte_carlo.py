@@ -112,7 +112,7 @@ def run_simulation(
         human_mass=human_mass,
         hill_polarity=hill_polarity,
         calculate_distance=calculate_distance,
-        plot=False,
+        plot=True,
     )
     return result
 
@@ -142,6 +142,15 @@ def process_mc_results(simulation_results, plot=False, output_dir='results'):
     min_df = ordered_results[0]
     max_df = ordered_results[-1]
 
+    # Calculate the mean results for each country for all cols
+    all_means = pd.concat(ordered_results).groupby("ISOCODE").mean().reset_index()
+    # Calculate the median results for each country for all cols
+    all_medians = pd.concat(ordered_results).groupby("ISOCODE").median().reset_index()
+    # Calculate the 95th percentile results for each country for all cols
+    all_percentile_95s = pd.concat(ordered_results).groupby("ISOCODE").quantile(0.95).reset_index()
+    # Calculate the 5th percentile results for each country for all cols
+    all_percentile_5s = pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
+
     # Step 2: Plot the chloropleth maps for max, min, median, 95th percentile, and 5th percentile if plot argument is True
     if plot:
         gis.plot_chloropleth(max_df)
@@ -151,37 +160,23 @@ def process_mc_results(simulation_results, plot=False, output_dir='results'):
         gis.plot_chloropleth(percentile_5_df)
 
     # Step 3: Save the results to the results folder
-    median_df.to_csv("results/median_results.csv")
-    min_df.to_csv("results/min_results.csv")
-    max_df.to_csv("results/max_results.csv")
-    percentile_95_df.to_csv("results/95th_percentile_results.csv")
-    percentile_5_df.to_csv("results/5th_percentile_results.csv")
-
-    # Step 4: Pickle the simulation results
-    with open('results/simulation_results.pkl', 'wb') as f:
-        pickle.dump(simulation_results, f)
-
-    print("Simulation results have been processed and saved to the results folder.")
-
-    # Step 3: Plot the chloropleth maps for max, min, median, mean, 95th percentile, and 5th percentile if plot argument is True
-    if plot:
-        gis.plot_chloropleth(max_df)
-        gis.plot_chloropleth(min_df)
-        gis.plot_chloropleth(median_df)
-        gis.plot_chloropleth(percentile_95_df)
-        gis.plot_chloropleth(percentile_5_df)
-
-    # Step 4: Save the results to the results folder
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    # Use os.path.join to create the full file paths
+    # Use os.path.join to create the full file paths and save
     median_df.to_csv(os.path.join(output_dir, "median_results.csv"))
     min_df.to_csv(os.path.join(output_dir, "min_results.csv"))
     max_df.to_csv(os.path.join(output_dir, "max_results.csv"))
     percentile_95_df.to_csv(os.path.join(output_dir, "95th_percentile_results.csv"))
     percentile_5_df.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
 
+    # save all-column results
+    all_medians.to_csv(os.path.join(output_dir, "median_results.csv"))
+    all_means.to_csv(os.path.join(output_dir, "mean_results.csv"))
+    all_percentile_95s.to_csv(os.path.join(output_dir, "95th_percentile_results.csv"))
+    all_percentile_5s.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
+
+    # Step 4: pickle the simulation results
     with open(os.path.join(output_dir, 'simulation_results.pkl'), 'wb') as f:
         pickle.dump(simulation_results, f)
 
