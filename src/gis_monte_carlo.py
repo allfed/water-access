@@ -15,9 +15,10 @@ project_root = Path().resolve().parent
 sys.path.append(str(project_root))
 import src.gis_global_module as gis
 
+
 def sample_normal(low, high, n):
     """
-    Generate random samples from a normal distribution. 
+    Generate random samples from a normal distribution.
     Based off of Guesstimate's implementation, translated from Javascript to Python.
 
     Parameters:
@@ -70,7 +71,7 @@ def run_simulation(
     watts,
     human_mass,
     hill_polarity,
-    calculate_distance=True,
+    calculate_distance=False,
 ):
     """
     Run a simulation to analyze global water access from walking or cycling based on sensitivity parameters..
@@ -81,7 +82,7 @@ def run_simulation(
     - practical_limit_bicycle (int or float): The practical limit of water transportation using a bicycle.
     - practical_limit_buckets (int or float): The practical limit of water transportation using buckets.
     - met (int or float): The metabolic equivalent of task (MET) value.
-    - calculate_distance (bool, optional): Whether to calculate the distance during the simulation. 
+    - calculate_distance (bool, optional): Whether to calculate the distance during the simulation.
     Defaults to True, must be True to run a true simulation with the given parameters.
 
     Returns:
@@ -91,12 +92,20 @@ def run_simulation(
     - AssertionError: If any of the input parameters are of incorrect type.
 
     """
-    #print type of crr_adjustment
+    # print type of crr_adjustment
     print(type(crr_adjustment))
-    assert isinstance(crr_adjustment, (int, np.integer)), "CRR adjustment must be an integer."
-    assert isinstance(time_gathering_water, (int, float)), "Time gathering water must be a number."
-    assert isinstance(practical_limit_bicycle, (int, float)), "Practical limit bicycle must be a number."
-    assert isinstance(practical_limit_buckets, (int, float)), "Practical limit buckets must be a number."
+    assert isinstance(
+        crr_adjustment, (int, np.integer)
+    ), "CRR adjustment must be an integer."
+    assert isinstance(
+        time_gathering_water, (int, float)
+    ), "Time gathering water must be a number."
+    assert isinstance(
+        practical_limit_bicycle, (int, float)
+    ), "Practical limit bicycle must be a number."
+    assert isinstance(
+        practical_limit_buckets, (int, float)
+    ), "Practical limit buckets must be a number."
     assert isinstance(met, (int, float)), "MET must be a number."
     assert isinstance(watts, (int, float)), "Watts must be a number."
     assert isinstance(human_mass, (int, float)), "Human mass must be a number."
@@ -117,7 +126,7 @@ def run_simulation(
     return result
 
 
-def process_mc_results(simulation_results, plot=False, output_dir='results'):
+def process_mc_results(simulation_results, plot=False, output_dir="results"):
     """
     Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
 
@@ -131,7 +140,9 @@ def process_mc_results(simulation_results, plot=False, output_dir='results'):
 
     # Step 1: Calculate the median, 95th percentile, and 5th percentile of "percent_with_water" for each DataFrame
     # -1 because of zero-based indexing
-    ordered_results = sorted(simulation_results, key=lambda df: df["percent_with_water"].median())
+    ordered_results = sorted(
+        simulation_results, key=lambda df: df["percent_with_water"].median()
+    )
     median_index = round(len(ordered_results) / 2) - 1
     percentile_5_index = round(len(ordered_results) / 20) - 1
     percentile_95_index = round(len(ordered_results) - len(ordered_results) / 20) - 1
@@ -147,9 +158,13 @@ def process_mc_results(simulation_results, plot=False, output_dir='results'):
     # Calculate the median results for each country for all cols
     all_medians = pd.concat(ordered_results).groupby("ISOCODE").median().reset_index()
     # Calculate the 95th percentile results for each country for all cols
-    all_percentile_95s = pd.concat(ordered_results).groupby("ISOCODE").quantile(0.95).reset_index()
+    all_percentile_95s = (
+        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.95).reset_index()
+    )
     # Calculate the 5th percentile results for each country for all cols
-    all_percentile_5s = pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
+    all_percentile_5s = (
+        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
+    )
 
     # Step 2: Plot the chloropleth maps for max, min, median, 95th percentile, and 5th percentile if plot argument is True
     if plot:
@@ -177,8 +192,7 @@ def process_mc_results(simulation_results, plot=False, output_dir='results'):
     all_percentile_5s.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
 
     # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, 'simulation_results.pkl'), 'wb') as f:
+    with open(os.path.join(output_dir, "simulation_results.pkl"), "wb") as f:
         pickle.dump(simulation_results, f)
 
     print("Simulation results have been processed and saved to the results folder.")
-
