@@ -19,7 +19,7 @@ import src.gis_monte_carlo as mc
 
 if __name__ == "__main__":
     # Monte Carlo parameters
-    num_iterations = 3  # Number of simulations to run
+    num_iterations = 50  # Number of simulations to run
 
     crr_adjustments = np.random.randint(-1, 2, size=num_iterations)
     time_gatherings = mc.sample_normal(4, 10, num_iterations)
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # Record the start time
     start_time = time.time()
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=40) as executor:
         # Submit all simulations to the executor
         futures = [
             executor.submit(
