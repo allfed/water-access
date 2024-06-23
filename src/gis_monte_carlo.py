@@ -127,6 +127,7 @@ def run_simulation(
 
 
 def process_mc_results(simulation_results, plot=False, output_dir="results"):
+    # TODO adapt/newfn for subnational
     """
     Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
 
