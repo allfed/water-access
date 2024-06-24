@@ -2,3 +2,4 @@ data/GIS/**/*.csv filter=lfs diff=lfs merge=lfs -text
 data/processed/bicycle_velocity_by_zone.csv filter=lfs diff=lfs merge=lfs -text
 data/processed/walk_velocity_by_zone.csv filter=lfs diff=lfs merge=lfs -text
 data/GIS/GIS_data_zones.csv filter=lfs diff=lfs merge=lfs -text
+data/GIS/geoBoundariesCGAZ_ADM1.geojson filter=lfs diff=lfs merge=lfs -text
