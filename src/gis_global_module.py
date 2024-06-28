@@ -1066,10 +1066,10 @@ def run_global_analysis(
     practical_limit_buckets,
     met,
     watts,
-    human_mass,
     hill_polarity,
     calculate_distance=True,
     plot=False,
+    human_mass=62, # gets overridden by country specific weight
 ):
     """
     Runs one run of the global analysis for water access.
@@ -1126,8 +1126,8 @@ if __name__ == "__main__":
         practical_limit_buckets=20,
         met=4.5,
         watts=75,
-        human_mass=62,
         hill_polarity="flat_uphill",
         calculate_distance=True,
         plot=True,
+        human_mass=62, # gets overridden by country specific weight
     )

@@ -70,7 +70,7 @@ def run_simulation(
     met,
     watts,
     hill_polarity,
-    calculate_distance=False,
+    calculate_distance=True,
 ):
     """
     Run a simulation to analyze global water access from walking or cycling based on sensitivity parameters..
@@ -118,7 +118,7 @@ def run_simulation(
         watts=watts,
         hill_polarity=hill_polarity,
         calculate_distance=calculate_distance,
-        plot=True,
+        plot=False,
     )
     return df_zones
 
