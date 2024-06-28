@@ -22,12 +22,11 @@ if __name__ == "__main__":
     num_iterations = 50  # Number of simulations to run
 
     crr_adjustments = np.random.randint(-1, 2, size=num_iterations)
-    time_gatherings = mc.sample_normal(4, 10, num_iterations)
+    time_gatherings = mc.sample_normal(4, 8, num_iterations)
     practical_limits_bicycle = mc.sample_normal(30, 45, num_iterations)
     practical_limits_buckets = mc.sample_normal(15, 25, num_iterations)
     mets = mc.sample_normal(3, 6, num_iterations)
     watts_values = mc.sample_normal(50, 100, num_iterations)
-    human_masses = mc.sample_lognormal(55.2, 99.4, num_iterations)
 
     polarity_options = [
         "uphill_downhill",
@@ -42,7 +41,6 @@ if __name__ == "__main__":
     print(practical_limits_bicycle)
     print(mets)
     print(watts_values)
-    print(human_masses)
     print(hill_polarities)
 
     simulation_results = []
@@ -52,6 +50,7 @@ if __name__ == "__main__":
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=40) as executor:
         # Submit all simulations to the executor
+        # TODO multiple outputs??
         futures = [
             executor.submit(
                 mc.run_simulation,
@@ -61,17 +60,15 @@ if __name__ == "__main__":
                 practical_limit_buckets,
                 met,
                 watts,
-                human_mass,
                 hill_polarity,
             )
-            for crr_adjustment, time_gathering_water, practical_limit_bicycle, practical_limit_buckets, met, watts, human_mass, hill_polarity in zip(
+            for crr_adjustment, time_gathering_water, practical_limit_bicycle, practical_limit_buckets, met, watts, hill_polarity in zip(
                 crr_adjustments,
                 time_gatherings,
                 practical_limits_bicycle,
                 practical_limits_buckets,
                 mets,
                 watts_values,
-                human_masses,
                 hill_polarities,
             )
         ]
@@ -89,7 +86,10 @@ if __name__ == "__main__":
             futures_progress.update()  # Update the progress bar
 
     futures_progress.close()  # Close the progress bar
-    mc.process_mc_results(simulation_results)
+
+    #TODO check if it's just here i need to add zones results
+    # mc.process_mc_results(simulation_results)
+    mc.process_zones_results(simulation_results)
 
     # Record the end time
     end_time = time.time()

@@ -1110,15 +1110,16 @@ def run_global_analysis(
     df_zones = process_zones_for_water_access(
         df_zones, time_gathering_water=time_gathering_water
     )
+    df_zones_export = df_zones.copy()
     df_countries = process_country_data(df_zones)
     if plot:
         plot_chloropleth(df_countries)
 
-    return df_countries
+    return df_countries, df_zones_export
 
 
 if __name__ == "__main__":
-    df_countries = run_global_analysis(
+    df_countries, df_zones_export = run_global_analysis(
         crr_adjustment=0,
         time_gathering_water=6,
         practical_limit_bicycle=40,

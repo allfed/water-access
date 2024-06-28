@@ -69,7 +69,6 @@ def run_simulation(
     practical_limit_buckets,
     met,
     watts,
-    human_mass,
     hill_polarity,
     calculate_distance=False,
 ):
@@ -108,22 +107,20 @@ def run_simulation(
     ), "Practical limit buckets must be a number."
     assert isinstance(met, (int, float)), "MET must be a number."
     assert isinstance(watts, (int, float)), "Watts must be a number."
-    assert isinstance(human_mass, (int, float)), "Human mass must be a number."
     assert isinstance(hill_polarity, str), "Hill polarity must be a string."
 
-    result = gis.run_global_analysis(
+    df_countries, df_zones = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
         time_gathering_water=time_gathering_water,
         practical_limit_bicycle=practical_limit_bicycle,
         practical_limit_buckets=practical_limit_buckets,
         met=met,
         watts=watts,
-        human_mass=human_mass,
         hill_polarity=hill_polarity,
         calculate_distance=calculate_distance,
         plot=True,
     )
-    return result
+    return df_zones
 
 
 def process_mc_results(simulation_results, plot=False, output_dir="results"):
@@ -141,18 +138,19 @@ def process_mc_results(simulation_results, plot=False, output_dir="results"):
 
     # Step 1: Calculate the median, 95th percentile, and 5th percentile of "percent_with_water" for each DataFrame
     # -1 because of zero-based indexing
+    
     ordered_results = sorted(
         simulation_results, key=lambda df: df["percent_with_water"].median()
     )
-    median_index = round(len(ordered_results) / 2) - 1
-    percentile_5_index = round(len(ordered_results) / 20) - 1
-    percentile_95_index = round(len(ordered_results) - len(ordered_results) / 20) - 1
+    # median_index = round(len(ordered_results) / 2) - 1
+    # percentile_5_index = round(len(ordered_results) / 20) - 1
+    # percentile_95_index = round(len(ordered_results) - len(ordered_results) / 20) - 1
 
-    median_df = ordered_results[median_index]
-    percentile_5_df = ordered_results[percentile_5_index]
-    percentile_95_df = ordered_results[percentile_95_index]
-    min_df = ordered_results[0]
-    max_df = ordered_results[-1]
+    # median_df = ordered_results[median_index]
+    # percentile_5_df = ordered_results[percentile_5_index]
+    # percentile_95_df = ordered_results[percentile_95_index]
+    # min_df = ordered_results[0]
+    # max_df = ordered_results[-1]
 
     # Calculate the mean results for each country for all cols
     all_means = pd.concat(ordered_results).groupby("ISOCODE").mean().reset_index()
@@ -168,23 +166,25 @@ def process_mc_results(simulation_results, plot=False, output_dir="results"):
     )
 
     # Step 2: Plot the chloropleth maps for max, min, median, 95th percentile, and 5th percentile if plot argument is True
-    if plot:
-        gis.plot_chloropleth(max_df)
-        gis.plot_chloropleth(min_df)
-        gis.plot_chloropleth(median_df)
-        gis.plot_chloropleth(percentile_95_df)
-        gis.plot_chloropleth(percentile_5_df)
+    
+    # if plot:
+    #     gis.plot_chloropleth(max_df)
+    #     gis.plot_chloropleth(min_df)
+    #     gis.plot_chloropleth(median_df)
+    #     gis.plot_chloropleth(percentile_95_df)
+    #     gis.plot_chloropleth(percentile_5_df)
 
     # Step 3: Save the results to the results folder
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
     # Use os.path.join to create the full file paths and save
-    median_df.to_csv(os.path.join(output_dir, "median_results.csv"))
-    min_df.to_csv(os.path.join(output_dir, "min_results.csv"))
-    max_df.to_csv(os.path.join(output_dir, "max_results.csv"))
-    percentile_95_df.to_csv(os.path.join(output_dir, "95th_percentile_results.csv"))
-    percentile_5_df.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
+
+    # median_df.to_csv(os.path.join(output_dir, "median_results.csv"))
+    # min_df.to_csv(os.path.join(output_dir, "min_results.csv"))
+    # max_df.to_csv(os.path.join(output_dir, "max_results.csv"))
+    # percentile_95_df.to_csv(os.path.join(output_dir, "95th_percentile_results.csv"))
+    # percentile_5_df.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
 
     # save all-column results
     all_medians.to_csv(os.path.join(output_dir, "median_results.csv"))
@@ -197,3 +197,57 @@ def process_mc_results(simulation_results, plot=False, output_dir="results"):
         pickle.dump(simulation_results, f)
 
     print("Simulation results have been processed and saved to the results folder.")
+
+def process_zones_results(zones_results, output_dir="results", plot=True):
+    # TODO adapt/newfn for subnational
+    """
+    Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
+
+    Args:
+        simulation_results (list): A list of DataFrames containing simulation results.
+        plot (bool, optional): Whether to plot the chloropleth maps. Defaults to True.
+
+    Returns:
+        None
+    """
+    
+    ordered_results = sorted(
+        zones_results, key=lambda df: df["percent_with_water"].median()
+    )
+
+    # Calculate the mean results for each country for all cols
+    all_means = pd.concat(ordered_results).groupby("id").mean().reset_index()
+    # Calculate the median results for each country for all cols
+    all_medians = pd.concat(ordered_results).groupby("id").median().reset_index()
+    # Calculate the 95th percentile results for each country for all cols
+    all_percentile_95s = (
+        pd.concat(ordered_results).groupby("id").quantile(0.95).reset_index()
+    )
+    # Calculate the 5th percentile results for each country for all cols
+    all_percentile_5s = (
+        pd.concat(ordered_results).groupby("id").quantile(0.05).reset_index()
+    )
+
+    if plot:
+        gis.plot_chloropleth(all_means)
+        gis.plot_chloropleth(all_medians)
+        gis.plot_chloropleth(all_percentile_95s)
+        gis.plot_chloropleth(all_percentile_5s)
+
+    # Step 2: Save the results to the results folder
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Use os.path.join to create the full file paths and save
+
+    # save all-column results
+    all_medians.to_csv(os.path.join(output_dir, "zones_median_results.csv"))
+    all_means.to_csv(os.path.join(output_dir, "zones_mean_results.csv"))
+    all_percentile_95s.to_csv(os.path.join(output_dir, "zones_95th_percentile_results.csv"))
+    all_percentile_5s.to_csv(os.path.join(output_dir, "zones_5th_percentile_results.csv"))
+
+    # Step 4: pickle the simulation results
+    with open(os.path.join(output_dir, "zones_simulation_results.pkl"), "wb") as f:
+        pickle.dump(zones_results, f)
+
+    print("Zones simulation results have been processed and saved to the results folder.")
