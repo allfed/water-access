@@ -1030,6 +1030,11 @@ def aggregate_district_level_data(df_zones):
     Returns:
         df_countries (DataFrame): The aggregated DataFrame with district-level summaries.
     """
+    
+    df_zones["district_pop_raw"] = df_zones.groupby("shapeID")["pop_zone"].transform(
+        "sum"
+    )
+    
     df_districts = (
         df_zones.groupby("shapeID")
         .agg(
