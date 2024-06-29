@@ -109,7 +109,7 @@ def run_simulation(
     assert isinstance(watts, (int, float)), "Watts must be a number."
     assert isinstance(hill_polarity, str), "Hill polarity must be a string."
 
-    df_countries, df_zones = gis.run_global_analysis(
+    df_countries, df_districts = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
         time_gathering_water=time_gathering_water,
         practical_limit_bicycle=practical_limit_bicycle,
@@ -120,10 +120,10 @@ def run_simulation(
         calculate_distance=calculate_distance,
         plot=False,
     )
-    return df_zones
+    return df_countries, df_districts
 
 
-def process_mc_results(countries_simulation_results, plot=False, output_dir="results"):
+def process_mc_results(countries_simulation_results, plot=True, output_dir="results"):
     # TODO adapt/newfn for subnational
     """
     Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
@@ -151,7 +151,10 @@ def process_mc_results(countries_simulation_results, plot=False, output_dir="res
     # percentile_95_df = ordered_results[percentile_95_index]
     # min_df = ordered_results[0]
     # max_df = ordered_results[-1]
-
+    
+    # Extract non-numeric columns (assuming 'Entity' and 'region' are the non-numeric columns you mentioned)
+    non_numeric_cols = pd.concat(ordered_results).groupby("ISOCODE").first().reset_index()[['ISOCODE', 'Entity', 'region', 'subregion']]
+    
     # Calculate the mean results for each country for all cols
     all_means = pd.concat(ordered_results).groupby("ISOCODE").mean().reset_index()
     # Calculate the median results for each country for all cols
@@ -164,15 +167,20 @@ def process_mc_results(countries_simulation_results, plot=False, output_dir="res
     all_percentile_5s = (
         pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
     )
+    
+    # Merge with non-numeric
+    all_means = pd.merge(all_means, non_numeric_cols, on="ISOCODE")
+    all_medians = pd.merge(all_medians, non_numeric_cols, on="ISOCODE")
+    all_percentile_95s = pd.merge(all_percentile_95s, non_numeric_cols, on="ISOCODE")
+    all_percentile_5s = pd.merge(all_percentile_5s, non_numeric_cols, on="ISOCODE")
 
     # Step 2: Plot the chloropleth maps for max, min, median, 95th percentile, and 5th percentile if plot argument is True
     
-    # if plot:
-    #     gis.plot_chloropleth(max_df)
-    #     gis.plot_chloropleth(min_df)
-    #     gis.plot_chloropleth(median_df)
-    #     gis.plot_chloropleth(percentile_95_df)
-    #     gis.plot_chloropleth(percentile_5_df)
+    if plot:
+        gis.plot_chloropleth(all_means)
+        gis.plot_chloropleth(all_medians)
+        gis.plot_chloropleth(all_percentile_95s)
+        gis.plot_chloropleth(all_percentile_5s)
 
     # Step 3: Save the results to the results folder
     # Ensure the output directory exists
@@ -198,7 +206,7 @@ def process_mc_results(countries_simulation_results, plot=False, output_dir="res
 
     print("Country simulation results have been processed and saved to the results folder.")
 
-def process_districts_results(districts_simulation_results, output_dir="results", plot=True):
+def process_districts_results(districts_simulation_results, output_dir="results"):
     """
     Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
 
@@ -209,7 +217,10 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     Returns:
         None
     """
-
+    
+    # Extract non-numeric columns (assuming 'Entity' and 'region' are the non-numeric columns you mentioned)
+    non_numeric_cols = pd.concat(districts_simulation_results).groupby("shapeName").first().reset_index()[['shapeName', 'ISOCODE', 'Entity', 'region', 'subregion']]
+    
     # Calculate the mean results for each country for all cols
     all_means = pd.concat(districts_simulation_results).groupby("shapeName").mean().reset_index()
     # Calculate the median results for each country for all cols
@@ -222,12 +233,12 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     all_percentile_5s = (
         pd.concat(districts_simulation_results).groupby("shapeName").quantile(0.05).reset_index()
     )
-
-    if plot:
-        gis.plot_chloropleth(all_means)
-        gis.plot_chloropleth(all_medians)
-        gis.plot_chloropleth(all_percentile_95s)
-        gis.plot_chloropleth(all_percentile_5s)
+    
+    # Merge with non-numeric
+    all_means = pd.merge(all_means, non_numeric_cols, on="shapeName")
+    all_medians = pd.merge(all_medians, non_numeric_cols, on="shapeName")
+    all_percentile_95s = pd.merge(all_percentile_95s, non_numeric_cols, on="shapeName")
+    all_percentile_5s = pd.merge(all_percentile_5s, non_numeric_cols, on="shapeName")
 
     # Step 2: Save the results to the results folder
     # Ensure the output directory exists

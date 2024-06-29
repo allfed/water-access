@@ -22,7 +22,7 @@ if __name__ == "__main__":
     num_iterations = 15  # Number of simulations to run
 
     crr_adjustments = np.random.randint(-1, 2, size=num_iterations)
-    time_gatherings = mc.sample_normal(4, 8, num_iterations)
+    time_gatherings = mc.sample_normal(4, 7, num_iterations)
     practical_limits_bicycle = mc.sample_normal(30, 45, num_iterations)
     practical_limits_buckets = mc.sample_normal(15, 25, num_iterations)
     mets = mc.sample_normal(3, 6, num_iterations)
@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
         # Collect results as they complete
         for future in concurrent.futures.as_completed(futures):
-            district_result, countries_result = future.result()  # Unpack the results
+            countries_result, district_result = future.result()  # Unpack the results
             districts_simulation_results.append(district_result)
             countries_simulation_results.append(countries_result)
             futures_progress.update()  # Update the progress bar

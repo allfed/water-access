@@ -97,7 +97,7 @@ def run_weighted_median_on_grouped_df(df, groupby_column, value_column, weight_c
 ##############################################################################################################################
 
 # Constants
-URB_DATA_FILE = "./data/GIS/GIS_data_zones.csv"
+URB_DATA_FILE = "./data/GIS/gis_data_adm1.csv"
 COUNTRY_DATA_FILE = "./data/processed/country_data_master_interpolated.csv"
 EXPORT_FILE_LOCATION = "./data/processed/"
 CRR_FILE = "./data/lookup tables/Crr.csv"
@@ -881,6 +881,14 @@ def aggregate_country_level_data(df_zones):
         )
         .reset_index()
     )
+    # Rename the columns
+    df_countries.columns = ["ISOCODE", "Entity", "country_pop_raw", "zone_pop_with_water", "zone_pop_without_water",
+                            "population_piped_with_access", "population_piped_with_cycling_access",
+                            "population_piped_with_walking_access", "Nat Piped", "region", "subregion",
+                            "mean_max_distance_cycling", "max_max_distance_cycling", "min_max_distance_cycling",
+                            "median_max_distance_cycling", "mean_max_distance_walking", "max_max_distance_walking",
+                            "min_max_distance_walking", "median_max_distance_walking"]
+        
     return df_countries
 
 
@@ -974,6 +982,11 @@ def process_country_data(df_zones):
             "zone_pop_without_water": "country_pop_without_water",
         }
     )
+    
+    # Check if 'country_pop_with_water' exists in df_countries
+    if 'country_pop_with_water' not in df_countries.columns:
+        raise KeyError("Column 'country_pop_with_water' does not exist in df_countries. Available columns: {}".format(df_countries.columns))
+    
     df_countries["percent_with_water"] = (
         df_countries["country_pop_with_water"] / df_countries["country_pop_raw"] * 100
     )
@@ -1119,13 +1132,13 @@ def process_district_data(df_zones):
     # add percentage columns for cycling and water access
     df_districts["percent_piped_with_cycling_access"] = (
         df_districts["population_piped_with_cycling_access"]
-        / df_districts["country_pop_raw"]
+        / df_districts["district_pop_raw"]
         * 100
     )
 
     df_districts["percent_piped_with_walking_access"] = (
         df_districts["population_piped_with_walking_access"]
-        / df_districts["country_pop_raw"]
+        / df_districts["district_pop_raw"]
         * 100
     )
 
@@ -1138,7 +1151,7 @@ def process_district_data(df_zones):
     list_of_countries_to_remove = ["GUM", "ASM", "TON", "MNP", "ATG", "DMA", "ABW", "BRB"]
     df_districts = df_districts[~df_districts["ISOCODE"].isin(list_of_countries_to_remove)]
 
-    return df_countries
+    return df_districts
 
 ##############################################################################################################################
 #
@@ -1149,7 +1162,7 @@ def process_district_data(df_zones):
 
 def plot_chloropleth(df_countries):
     hover_data_list = [
-        "Entity",
+        "ISOCODE",
         "country_pop_raw",
         "country_pop_with_water",
         "country_pop_without_water",
@@ -1162,6 +1175,14 @@ def plot_chloropleth(df_countries):
         "region",
         "subregion",
         "weighted_med",
+        "mean_max_distance_cycling", 
+        "max_max_distance_cycling", 
+        "min_max_distance_cycling",
+        "median_max_distance_cycling", 
+        "mean_max_distance_walking", 
+        "max_max_distance_walking",
+        "min_max_distance_walking", 
+        "median_max_distance_walking",
     ]
 
     choro = px.choropleth(
@@ -1177,7 +1198,7 @@ def plot_chloropleth(df_countries):
         color_continuous_scale="Greys",
         range_color=(0, 100),
         scope="world",
-        hover_name="Entity",
+        hover_name="ISOCODE",
         hover_data=hover_data_list,
     )
     choro.layout.coloraxis.colorbar.title = ""
