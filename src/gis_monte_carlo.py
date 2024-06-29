@@ -123,7 +123,7 @@ def run_simulation(
     return df_zones
 
 
-def process_mc_results(simulation_results, plot=False, output_dir="results"):
+def process_mc_results(countries_simulation_results, plot=False, output_dir="results"):
     # TODO adapt/newfn for subnational
     """
     Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
@@ -140,7 +140,7 @@ def process_mc_results(simulation_results, plot=False, output_dir="results"):
     # -1 because of zero-based indexing
     
     ordered_results = sorted(
-        simulation_results, key=lambda df: df["percent_with_water"].median()
+        countries_simulation_results, key=lambda df: df["percent_with_water"].median()
     )
     # median_index = round(len(ordered_results) / 2) - 1
     # percentile_5_index = round(len(ordered_results) / 20) - 1
@@ -193,13 +193,12 @@ def process_mc_results(simulation_results, plot=False, output_dir="results"):
     all_percentile_5s.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
 
     # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "simulation_results.pkl"), "wb") as f:
-        pickle.dump(simulation_results, f)
+    with open(os.path.join(output_dir, "countries_simulation_results.pkl"), "wb") as f:
+        pickle.dump(countries_simulation_results, f)
 
-    print("Simulation results have been processed and saved to the results folder.")
+    print("Country simulation results have been processed and saved to the results folder.")
 
-def process_zones_results(zones_results, output_dir="results", plot=True):
-    # TODO adapt/newfn for subnational
+def process_districts_results(districts_simulation_results, output_dir="results", plot=True):
     """
     Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
 
@@ -210,22 +209,18 @@ def process_zones_results(zones_results, output_dir="results", plot=True):
     Returns:
         None
     """
-    
-    ordered_results = sorted(
-        zones_results, key=lambda df: df["percent_with_water"].median()
-    )
 
     # Calculate the mean results for each country for all cols
-    all_means = pd.concat(ordered_results).groupby("id").mean().reset_index()
+    all_means = pd.concat(districts_simulation_results).groupby("shapeName").mean().reset_index()
     # Calculate the median results for each country for all cols
-    all_medians = pd.concat(ordered_results).groupby("id").median().reset_index()
+    all_medians = pd.concat(districts_simulation_results).groupby("shapeName").median().reset_index()
     # Calculate the 95th percentile results for each country for all cols
     all_percentile_95s = (
-        pd.concat(ordered_results).groupby("id").quantile(0.95).reset_index()
+        pd.concat(districts_simulation_results).groupby("shapeName").quantile(0.95).reset_index()
     )
     # Calculate the 5th percentile results for each country for all cols
     all_percentile_5s = (
-        pd.concat(ordered_results).groupby("id").quantile(0.05).reset_index()
+        pd.concat(districts_simulation_results).groupby("shapeName").quantile(0.05).reset_index()
     )
 
     if plot:
@@ -241,13 +236,13 @@ def process_zones_results(zones_results, output_dir="results", plot=True):
     # Use os.path.join to create the full file paths and save
 
     # save all-column results
-    all_medians.to_csv(os.path.join(output_dir, "zones_median_results.csv"))
-    all_means.to_csv(os.path.join(output_dir, "zones_mean_results.csv"))
-    all_percentile_95s.to_csv(os.path.join(output_dir, "zones_95th_percentile_results.csv"))
-    all_percentile_5s.to_csv(os.path.join(output_dir, "zones_5th_percentile_results.csv"))
+    all_medians.to_csv(os.path.join(output_dir, "districts_median_results.csv"))
+    all_means.to_csv(os.path.join(output_dir, "distrcts_mean_results.csv"))
+    all_percentile_95s.to_csv(os.path.join(output_dir, "districts_95th_percentile_results.csv"))
+    all_percentile_5s.to_csv(os.path.join(output_dir, "districts_5th_percentile_results.csv"))
 
     # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "zones_simulation_results.pkl"), "wb") as f:
-        pickle.dump(zones_results, f)
+    with open(os.path.join(output_dir, "districts_simulation_results.pkl"), "wb") as f:
+        pickle.dump(districts_simulation_results, f)
 
-    print("Zones simulation results have been processed and saved to the results folder.")
+    print("Districts simulation results have been processed and saved to the results folder.")

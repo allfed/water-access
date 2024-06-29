@@ -19,7 +19,7 @@ import src.gis_monte_carlo as mc
 
 if __name__ == "__main__":
     # Monte Carlo parameters
-    num_iterations = 10  # Number of simulations to run
+    num_iterations = 3  # Number of simulations to run
 
     crr_adjustments = np.random.randint(-1, 2, size=num_iterations)
     time_gatherings = mc.sample_normal(4, 8, num_iterations)
@@ -43,12 +43,14 @@ if __name__ == "__main__":
     print(watts_values)
     print(hill_polarities)
 
-    simulation_results = []
+    # Initialize lists to store results from each output
+    districts_simulation_results = []
+    countries_simulation_results = []
 
     # Record the start time
     start_time = time.time()
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
         # Submit all simulations to the executor
         # TODO multiple outputs??
         futures = [
@@ -82,14 +84,16 @@ if __name__ == "__main__":
 
         # Collect results as they complete
         for future in concurrent.futures.as_completed(futures):
-            simulation_results.append(future.result())
+            district_result, countries_result = future.result()  # Unpack the results
+            districts_simulation_results.append(district_result)
+            countries_simulation_results.append(countries_result)
             futures_progress.update()  # Update the progress bar
 
     futures_progress.close()  # Close the progress bar
 
     #TODO check if it's just here i need to add zones results
-    # mc.process_mc_results(simulation_results)
-    mc.process_zones_results(simulation_results)
+    mc.process_mc_results(countries_simulation_results)
+    mc.process_districts_results(districts_simulation_results)
 
     # Record the end time
     end_time = time.time()

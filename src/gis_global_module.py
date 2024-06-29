@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
-import weightedstats as ws
+# import weightedstats as ws
 import sys
 from pathlib import Path
 import pdb
@@ -874,6 +874,8 @@ def aggregate_country_level_data(df_zones):
                 "Nat Piped": "first",
                 "region": "first",
                 "subregion": "first",
+                "max distance cycling": ["mean", "max", "min", "median"],
+                "max distance walking": ["mean", "max", "min", "median"],
                 # Additional aggregations can be added here
             }
         )
@@ -994,6 +996,11 @@ def process_country_data(df_zones):
         * 100
     )
 
+    df_countries["percent_piped_with_only_cycling_access"] = (
+        df_countries["population_piped_with_access"].sum() 
+        - df_countries["population_piped_with_walking_access"].sum()
+        ) / df_countries["population_piped_with_access"].sum()
+
     df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
         df_countries
     )
@@ -1007,6 +1014,126 @@ def process_country_data(df_zones):
 
     return df_countries
 
+##############################################################################################################################
+#
+# ANALYSIS IV: Aggregating District Data
+#
+##############################################################################################################################
+
+def aggregate_district_level_data(df_zones):
+    """
+    Aggregate zone data into district level summaries.
+
+    Parameters:
+        df_zones (DataFrame): The input DataFrame containing zone-level data.
+
+    Returns:
+        df_countries (DataFrame): The aggregated DataFrame with district-level summaries.
+    """
+    df_districts = (
+        df_zones.groupby("shapeID")
+        .agg(
+            {
+                "Entity": "first",
+                "ISOCODE": "first",
+                "shapeName": "first",
+                "district_pop_raw": "first",
+                "zone_pop_with_water": "sum",
+                "zone_pop_without_water": "sum",
+                "population_piped_with_access": "sum",
+                "population_piped_with_cycling_access": "sum",
+                "population_piped_with_walking_access": "sum",
+                "Nat Piped": "first",
+                "region": "first",
+                "subregion": "first",
+                "max distance cycling": ["mean", "max", "min", "median"],
+                "max distance walking": ["mean", "max", "min", "median"],
+            }
+        )
+        .reset_index()
+    )
+    # Rename the columns
+    df_districts.columns = [
+        "shapeID",
+        "Entity", 
+        "ISOCODE",
+        "shapeName",
+        "district_pop_raw", 
+        "zone_pop_with_water", 
+        "zone_pop_without_water",
+        "population_piped_with_access", 
+        "population_piped_with_cycling_access",
+        "population_piped_with_walking_access", 
+        "Nat Piped", 
+        "region", 
+        "subregion",
+        "mean_max_distance_cycling", 
+        "max_max_distance_cycling", 
+        "min_max_distance_cycling",
+        "median_max_distance_cycling", 
+        "mean_max_distance_walking", 
+        "max_max_distance_walking",
+        "min_max_distance_walking", 
+        "median_max_distance_walking",
+        ]
+
+    return df_districts
+
+def process_district_data(df_zones):
+    """
+    Orchestrate the processing of zone data into district-level summaries and cleanup.
+
+    Args:
+        df_zones (pandas.DataFrame): The input dataframe containing zone-level data.
+
+    Returns:
+        pandas.DataFrame: The processed dataframe containing district-level summaries.
+    """
+    assert not df_zones.empty, "Input dataframe is empty"
+
+    df_districts = aggregate_district_level_data(df_zones)
+
+    # use groupby to create weighted median, needs to be speerate from the above groupby as it uses apply, which can't be used in the same groupby
+    # needs to use apply because the function required two columns as input
+    df_median_group = df_zones.groupby(['shapeID']).apply(lambda x : pd.Series({'weighted_med':weighted_median(x,"dtw_1","pop_zone")}))
+
+    # merge the weighted median back into the df_districts dataframe
+    df_districts = df_districts.merge(df_median_group, on="shapeID")
+
+    # drop rows from the dataframe that have Nan in pop_zone and dtw_1
+    df_zones = df_zones.dropna(subset=["pop_zone", "dtw_1"])
+
+    # create summary columns
+    #rename zone columns to country
+    df_districts = df_districts.rename(columns={"zone_pop_with_water":"district_pop_with_water", "zone_pop_without_water":"district_pop_without_water"})
+
+    # create percent
+    df_districts["percent_with_water"] = df_districts["district_pop_with_water"] / df_districts["district_pop_raw"] * 100
+    df_districts["percent_without_water"] = df_districts["district_pop_without_water"] / df_districts["district_pop_raw"] * 100
+
+    # add percentage columns for cycling and water access
+    df_districts["percent_piped_with_cycling_access"] = (
+        df_districts["population_piped_with_cycling_access"]
+        / df_districts["country_pop_raw"]
+        * 100
+    )
+
+    df_districts["percent_piped_with_walking_access"] = (
+        df_districts["population_piped_with_walking_access"]
+        / df_districts["country_pop_raw"]
+        * 100
+    )
+
+    df_districts["percent_piped_with_only_cycling_access"] = (
+        df_districts["population_piped_with_access"].sum() 
+        - df_districts["population_piped_with_walking_access"].sum()
+        ) / df_districts["population_piped_with_access"].sum()
+
+
+    list_of_countries_to_remove = ["GUM", "ASM", "TON", "MNP", "ATG", "DMA", "ABW", "BRB"]
+    df_districts = df_districts[~df_districts["ISOCODE"].isin(list_of_countries_to_remove)]
+
+    return df_countries
 
 ##############################################################################################################################
 #
@@ -1110,16 +1237,19 @@ def run_global_analysis(
     df_zones = process_zones_for_water_access(
         df_zones, time_gathering_water=time_gathering_water
     )
-    df_zones_export = df_zones.copy()
+
+    # add df_districts
+    df_zones_districts = df_zones.copy()
+    df_districts = process_district_data(df_zones_districts)
     df_countries = process_country_data(df_zones)
     if plot:
         plot_chloropleth(df_countries)
 
-    return df_countries, df_zones_export
+    return df_countries, df_districts
 
 
 if __name__ == "__main__":
-    df_countries, df_zones_export = run_global_analysis(
+    df_countries, df_districts = run_global_analysis(
         crr_adjustment=0,
         time_gathering_water=6,
         practical_limit_bicycle=40,
