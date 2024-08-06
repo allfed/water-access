@@ -1,40 +1,100 @@
 import concurrent.futures
 import numpy as np
-from scipy.stats import norm, lognorm
-import pandas as pd
 from pathlib import Path
 import sys
 from tqdm import tqdm
-import pickle
-import numpy as np
-from scipy.stats import norm
 import time
 
-# # Resolve project root and update sys.path
+# Resolve project root and update sys.path
 project_root = Path().resolve().parent
 sys.path.append(str(project_root))
-import src.gis_global_module as gis
 import src.gis_monte_carlo as mc
+
+# -------------------------------------------------------------------------------
+# DEFINE MONTE CARLO SIMULATION PARAMETERS
+# -------------------------------------------------------------------------------
+
+# Define the number of simulations to run
+# Expect ~15-20 minutes for one simulation,
+# but multiprocessing will speed up large batches significantly
+NUM_ITERATIONS = 15
+
+# Define maximum simultaneous processes to run for multiprocessing
+# 15 was the most that could run on a 32 core hyperthreaded machine
+MAX_WORKERS = 15
+
+# -------------------------------------------------------------------------------
+
+
+# -------------------------------------------------------------------------------
+# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
+# -------------------------------------------------------------------------------
+
+# CRR adjustments.
+# 1 means one road type better, -1 means one road type worse
+CRR_LOWER_ESTIMATE = -1
+CRR_UPPER_ESTIMATE = 1
+
+# Time gathering water in hours
+TIME_GATHERING_LOWER_ESTIMATE = 4
+TIME_GATHERING_UPPER_ESTIMATE = 7
+
+# Practical load limits for cycling in kg
+PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
+PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
+
+# Practical load limits for walking with buckets in kg
+PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
+PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
+
+# Average METS available for walking with buckets to and from water source
+METS_LOWER_ESTIMATE = 3
+METS_UPPER_ESTIMATE = 6
+
+# Average watts available for cycling to and from water source
+WATTS_LOWER_ESTIMATE = 50
+WATTS_UPPER_ESTIMATE = 100
+
+# Polarity options (randomly chosen from list each simulation run)
+# The first word defines the trip to the water source
+# The second word defines the trip from the water source
+# Options to include: "uphill_downhill", "downhill_uphill", "uphill_flat",
+# "flat_uphill", "downhill_flat", "flat_downhill", "flat_flat"
+
+POLARITY_OPTIONS = [
+    "uphill_downhill",
+    "uphill_flat",
+    "flat_uphill",
+    "downhill_uphill",
+]
+
+# -------------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
     # Monte Carlo parameters
-    num_iterations = 15  # Number of simulations to run
+    crr_adjustments = np.random.randint(
+        CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
+    )
+    time_gatherings = mc.sample_normal(
+        TIME_GATHERING_LOWER_ESTIMATE, TIME_GATHERING_UPPER_ESTIMATE, NUM_ITERATIONS
+    )
+    practical_limits_bicycle = mc.sample_normal(
+        PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
+        PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
+        NUM_ITERATIONS,
+    )
+    practical_limits_buckets = mc.sample_normal(
+        PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
+        PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
+        NUM_ITERATIONS,
+    )
+    mets = mc.sample_normal(METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS)
+    watts_values = mc.sample_normal(
+        WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
+    )
 
-    crr_adjustments = np.random.randint(-1, 2, size=num_iterations)
-    time_gatherings = mc.sample_normal(4, 7, num_iterations)
-    practical_limits_bicycle = mc.sample_normal(30, 45, num_iterations)
-    practical_limits_buckets = mc.sample_normal(15, 25, num_iterations)
-    mets = mc.sample_normal(3, 6, num_iterations)
-    watts_values = mc.sample_normal(50, 100, num_iterations)
-
-    polarity_options = [
-        "uphill_downhill",
-        "uphill_flat",
-        "flat_uphill",
-        "downhill_uphill",
-    ]
-    hill_polarities = np.random.choice(polarity_options, num_iterations)
+    hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
 
     print(crr_adjustments)
     print(time_gatherings)
@@ -50,9 +110,8 @@ if __name__ == "__main__":
     # Record the start time
     start_time = time.time()
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=15) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # Submit all simulations to the executor
-        # TODO multiple outputs??
         futures = [
             executor.submit(
                 mc.run_simulation,
@@ -91,7 +150,6 @@ if __name__ == "__main__":
 
     futures_progress.close()  # Close the progress bar
 
-    #TODO check if it's just here i need to add zones results
     mc.process_mc_results(countries_simulation_results)
     mc.process_districts_results(districts_simulation_results)
 
