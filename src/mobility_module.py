@@ -20,6 +20,7 @@ from plotly.subplots import make_subplots
 
 import numpy as np
 
+
 def linspace_creator(max_value_array, min_value, res):
     """
     Creates a linspace numpy array from the given inputs.
@@ -136,6 +137,7 @@ class mobility_models:
     - sprott_solution(hpv, s, mv, mo)
     - numerical_mobility_model(mr, mv, mo, met, hpv)
     """
+
     def sprott_model(hpv, mv, mo, mr):
         """
         Takes the inputs from the hpv data, model variables, and model options, and returns the results in the form of a matrix :[HPV:Slope:Load] which gives the velocity.
@@ -361,9 +363,9 @@ class mobility_models:
         D = np.pi**2 / (6 * mv.g * mv.L)  # leg component
 
         B1 = (
-            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :] # add g?
+            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]  # add g?
         )  # rolling resistance component
-        B2 = m_HPV_load_pilot * np.sin(np.arctan(s))  # slope component
+        B2 = m_HPV_load_pilot * mv.g * np.sin(np.arctan(s))  # slope component
         B = B1 + B2
 
         ##### velocities
@@ -509,7 +511,9 @@ class mobility_models:
                         # limit to max 7m/s
                         v_load = min(v_load, 7)
                         mr.v_load_matrix3d[i, j, k] = v_load
-                        mr.load_matrix3d[i, j, k] = load_vector[k] # amount of water carried
+                        mr.load_matrix3d[i, j, k] = load_vector[
+                            k
+                        ]  # amount of water carried
                     else:
                         mr.v_load_matrix3d[i, j, k] = np.nan
                         mr.load_matrix3d[i, j, k] = load_vector[k]
@@ -554,7 +558,6 @@ class mobility_models:
         Returns:
             velocity of the HPV given the load and slope
         """
-        #TODO See if we need to update mets calculation here too
         m_load, met, s = data
         v_solve = p[0]
         G = (s * 360 / (2 * np.pi)) / 45
@@ -564,7 +567,7 @@ class mobility_models:
             + (-0.05372 * G)
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
-            + (0.000320 * v_solve * G**3) # this was previously 0.00320 - bug?
+            + (0.000320 * v_solve * G**3)  # this was previously 0.00320 - bug?
             - (met.budget_VO2 / m_load)
         )
         # add in rolling resistance stuff...
@@ -619,7 +622,7 @@ class HPV_variables:
 
 
 class model_variables:
-    def __init__(self, P_t = 75, m1 = 62):
+    def __init__(self, P_t=75, m1=62):
         #### variables (changeable)
         self.s_deg = 0  # slope in degrees (only used for loading scenario, is overriden in variable slope scenario)
         self.m1 = m1  # mass of rider/person
@@ -631,14 +634,14 @@ class model_variables:
         self.L = 1  # leg length
         self.A = 0.51  # cross sectional area
         self.C_d = 0.9  # constant for wind
-        self.ro = 1.225 # air density
-        self.eta = 0.92 # efficienct
-        self.g = 9.81 # gravity
-        self.waterration = 15 # water ration in litres
+        self.ro = 1.225  # air density
+        self.eta = 0.92  # efficienct
+        self.g = 9.81  # gravity
+        self.waterration = 15  # water ration in litres
 
 
 class model_options:
-    def __init__(self, ulhillpo=0, lhillpo=1):
+    def __init__(self, ulhillpo=-1, lhillpo=1):
         # model options
         self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
 
@@ -717,10 +720,14 @@ class MET_values:
         # so 75 Watts output (from Marks textbook) is probably equivalent to about 6 METs
         if use_country_specific_weights == True:
             self.budget_VO2 = (
-            self.MET_VO2_conversion * self.MET_of_sustainable_excercise * country_weight
+                self.MET_VO2_conversion
+                * self.MET_of_sustainable_excercise
+                * country_weight
             )  # vo2 budget for a person
             self.budget_watts = (
-                self.MET_watt_conversion * self.MET_of_sustainable_excercise * country_weight
+                self.MET_watt_conversion
+                * self.MET_of_sustainable_excercise
+                * country_weight
             )  # vo2 budget for a person
         else:
             self.budget_VO2 = (
@@ -736,7 +743,7 @@ class model_results:
         self.hpv_name = (hpv.name,)
 
         # create slope vector
-        self.slope_vector_deg = np.array([0, 1, 2, 4.5, 20])
+        self.slope_vector_deg = np.arange(0, 4)
 
         # = linspace_creator(
         #     np.array([mo.slope_end]), mo.slope_start, mo.slope_res
@@ -783,20 +790,32 @@ class model_results:
                 "Name": self.hpv_name[0].transpose()[0][0],
                 "Load": self.load_matrix3d[:, slope_scene, load_scene],
                 "Slope": self.slope_matrix3d_deg[:, slope_scene, load_scene],
-                "Average Trip Velocity": self.v_avg_matrix3d[:, slope_scene, load_scene],
-                "Litres * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Average Trip Velocity": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ],
+                "Litres * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 * mv.t_hours,
-                "Water ration * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Water ration * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 / mv.waterration
                 * mv.t_hours,
-                "Distance to Water Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Distance to Water Achievable": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * mv.t_hours
                 / 2,
-                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
+                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * mv.t_hours,
-                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[:, slope_scene, load_scene]
+                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene],
                 "Loaded Velocity": self.v_load_matrix3d[:, slope_scene, load_scene],
                 "Unloaded Velocity": hpv.v_no_load.transpose()[0][0],
@@ -855,15 +874,15 @@ Plotting Class
 class plotting_hpv:
     def surf_plot(mr, mo, hpv):
         """
-        Plots a 3D surface graph of distance achievable based on load, slope, and velocity.
+         Plots a 3D surface graph of distance achievable based on load, slope, and velocity.
 
-       Args:
-            mr (object): The mobility results object.
-            mo (object): The mobility options object.
-            hpv (object): The human-powered vehicle object.
+        Args:
+             mr (object): The mobility results object.
+             mo (object): The mobility options object.
+             hpv (object): The human-powered vehicle object.
 
-        Returns:
-            None
+         Returns:
+             None
         """
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         # Make data.
@@ -1276,6 +1295,198 @@ class plotting_hpv:
         )
         fig.show()
         # py.iplot(fig, filename=chart_title)
+
+    def new_slope_plot(mr, mo, hpv, mv):
+        """
+        Generate a bar plot showing the efficiency of water collection for different hpvs.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+            mv (object): model variables
+
+        Returns:
+            None
+        """
+
+        # run mr.load_results(hpv, mv, mo)  for mo.slope_scene between 0 and 20
+        df = pd.DataFrame()
+
+        for slope_scene in range(0, 13):
+            mo.slope_scene = slope_scene
+            mr.load_results(hpv, mv, mo)
+            new_df = mr.create_dataframe_single_scenario(
+                hpv, mv, mo.load_scene, mo.slope_scene
+            )
+            df = df.append(new_df)
+
+        # Truncate the Viridis colormap to remove the last 20% of colors
+        truncated_viridis = px.colors.sequential.Viridis[
+            : -int(len(px.colors.sequential.Viridis) * 0.1)
+        ]
+
+        fig = px.scatter(
+            df,
+            x="Name",
+            y="Water ration * Km",
+            hover_data=[
+                "Name",
+                "Average Trip Velocity",
+                "Loaded Velocity",
+                "Unloaded Velocity",
+                "Distance to Water Achievable",
+                "Total Round trip Distance Achievable",
+                "Load",
+                "Slope",
+                "Hours Collecting Water Max",
+                "Hours Spent Collecting Single Person Water",
+            ],
+            color="Slope",
+            labels={
+                "Name": "Human-Powered Vehicle",
+                "Water ration * Km": "Performance [15L.km.hr⁻¹]",
+            },
+            # opacity=0.8,
+            # labels={
+            #     "Name": "Human-Powered Vehicle",
+            #     "Water ration * Km": "Performance [15L.km.hr⁻¹]",
+            # },
+            color_continuous_scale=truncated_viridis,
+        )
+
+        # Order from lowest to highest
+        fig.update_xaxes(categoryorder="total ascending")
+        # fig.update_traces(marker={"size": 7})
+
+        fig.update_layout(
+            width=1500,
+            height=1000,
+            font=dict(size=30),
+            xaxis_tickangle=-45,
+            yaxis=dict(tickfont=dict(size=30)),
+            title=dict(font=dict(size=20)),
+        )
+
+        fig.update_layout(
+            margin=dict(l=170, r=30, t=30, b=290),
+            coloraxis_colorbar=dict(title=dict(text="Slope [degrees]", side="right")),
+        )
+
+        fig.update_traces(
+            marker=dict(
+                size=15, opacity=0.7, line=dict(width=1, color="rgba(0, 0, 0, 0.4)")
+            )
+        )
+
+        # save as tiff
+        # fig.write_image("../results/hpv_performance_slope.png")
+
+        fig.update_xaxes(title_standoff=40)
+        fig.update_yaxes(title_standoff=40)
+
+        fig.show()
+
+    def scatter_plot_loading_distance(mr, mo, hpv, mv):
+        """
+        Generate a bar plot showing the efficiency of water collection at a specific slope angle.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+            mv (object): model variables
+
+        Returns:
+            None
+        """
+        slope_name = mr.slope_vector_deg.flat[mo.slope_scene]
+        chart_title = "Efficiency at %0.2f degrees, with model %s" % (
+            slope_name,
+            mr.model_name,
+        )
+
+        df = mr.create_dataframe_single_scenario(hpv, mv, mo.load_scene, mo.slope_scene)
+
+        fig = px.scatter(
+            df,
+            x="Load",
+            y="Water ration * Km",
+            hover_data=[
+                "Name",
+                "Average Trip Velocity",
+                "Loaded Velocity",
+                "Unloaded Velocity",
+                "Distance to Water Achievable",
+                "Total Round trip Distance Achievable",
+                "Load",
+                "Slope",
+                "Hours Collecting Water Max",
+                "Hours Spent Collecting Single Person Water",
+            ],
+            color="Name",
+            labels={
+                "Name": "",
+                "Water ration * Km": "Performance [15L.km.hr⁻¹]",
+                "Load": "Load [kg]",
+            },
+            # add Dark2 colorscale
+            color_discrete_sequence=px.colors.qualitative.Dark2,
+        )
+        # for trace in fig.data:
+        #     trace.marker = dict(size=12, line=dict(width=1, color="rgba(0, 0, 0, 0.4)"))
+
+        # Order from lowest to highest
+        # fig.update_traces(marker={"size": 20})
+        fig.update_traces(
+            marker=dict(
+                size=15, opacity=0.7, line=dict(width=1, color="rgba(0, 0, 0, 0.4)")
+            )
+        )
+        fig.update_layout(
+            width=1500,
+            height=1000,
+            font=dict(size=30),
+            xaxis_tickangle=-45,
+            yaxis=dict(tickfont=dict(size=30)),
+            title=dict(font=dict(size=20)),
+        )
+        fig.update_layout(
+            margin=dict(l=150, r=30, t=30, b=130),
+            # coloraxis_colorbar=dict(title=dict(text="Slope [degrees]", side="right")),
+        )
+
+        # Get the data for the points you want to annotate
+        bicycle_data = df[df["Name"] == "Bicycle"].iloc[0]
+        cycle_rickshaw_data = df[df["Name"] == "Cycle Rickshaw"].iloc[0]
+        stretcher_data = df[df["Name"] == "Stretcher"].iloc[0]
+
+        # Add annotations
+        fig.add_annotation(
+            x=bicycle_data["Load"],
+            y=bicycle_data["Water ration * Km"],
+            text="Bicycle",
+            showarrow=True,
+            arrowhead=1,
+        )
+        fig.add_annotation(
+            x=cycle_rickshaw_data["Load"],
+            y=cycle_rickshaw_data["Water ration * Km"],
+            text="Cycle Rickshaw",
+            showarrow=True,
+            arrowhead=1,
+        )
+        fig.add_annotation(
+            x=stretcher_data["Load"],
+            y=stretcher_data["Water ration * Km"],
+            text="Stretcher",
+            showarrow=True,
+            arrowhead=1,
+        )
+
+        # save as tiff
+        # fig.write_image("../results/hpv_load_performance.png")
+        fig.show()
 
 
 if __name__ == "__main__":

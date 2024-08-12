@@ -124,7 +124,6 @@ def run_simulation(
 
 
 def process_mc_results(countries_simulation_results, plot=True, output_dir="results"):
-    # TODO adapt/newfn for subnational
     """
     Process the Monte Carlo simulation results. Calculate the median, 95th percentile, 5th percentile, max, and min values and plot the results.
 
@@ -136,25 +135,19 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
         None
     """
 
-    # Step 1: Calculate the median, 95th percentile, and 5th percentile of "percent_with_water" for each DataFrame
-    # -1 because of zero-based indexing
-    
+    # Calculate the median, 95th percentile, and 5th percentile of "percent_with_water" for each DataFrame
     ordered_results = sorted(
         countries_simulation_results, key=lambda df: df["percent_with_water"].median()
     )
-    # median_index = round(len(ordered_results) / 2) - 1
-    # percentile_5_index = round(len(ordered_results) / 20) - 1
-    # percentile_95_index = round(len(ordered_results) - len(ordered_results) / 20) - 1
 
-    # median_df = ordered_results[median_index]
-    # percentile_5_df = ordered_results[percentile_5_index]
-    # percentile_95_df = ordered_results[percentile_95_index]
-    # min_df = ordered_results[0]
-    # max_df = ordered_results[-1]
-    
-    # Extract non-numeric columns (assuming 'Entity' and 'region' are the non-numeric columns you mentioned)
-    non_numeric_cols = pd.concat(ordered_results).groupby("ISOCODE").first().reset_index()[['ISOCODE', 'Entity', 'region', 'subregion']]
-    
+    # Extract non-numeric columns
+    non_numeric_cols = (
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .first()
+        .reset_index()[["ISOCODE", "Entity", "region", "subregion"]]
+    )
+
     # Calculate the mean results for each country for all cols
     all_means = pd.concat(ordered_results).groupby("ISOCODE").mean().reset_index()
     # Calculate the median results for each country for all cols
@@ -167,7 +160,7 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
     all_percentile_5s = (
         pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
     )
-    
+
     # Merge with non-numeric
     all_means = pd.merge(all_means, non_numeric_cols, on="ISOCODE")
     all_medians = pd.merge(all_medians, non_numeric_cols, on="ISOCODE")
@@ -175,7 +168,6 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
     all_percentile_5s = pd.merge(all_percentile_5s, non_numeric_cols, on="ISOCODE")
 
     # Step 2: Plot the chloropleth maps for max, min, median, 95th percentile, and 5th percentile if plot argument is True
-    
     if plot:
         gis.plot_chloropleth(all_means)
         gis.plot_chloropleth(all_medians)
@@ -186,25 +178,24 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    # Use os.path.join to create the full file paths and save
-
-    # median_df.to_csv(os.path.join(output_dir, "median_results.csv"))
-    # min_df.to_csv(os.path.join(output_dir, "min_results.csv"))
-    # max_df.to_csv(os.path.join(output_dir, "max_results.csv"))
-    # percentile_95_df.to_csv(os.path.join(output_dir, "95th_percentile_results.csv"))
-    # percentile_5_df.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
-
     # save all-column results
-    all_medians.to_csv(os.path.join(output_dir, "median_results.csv"))
-    all_means.to_csv(os.path.join(output_dir, "mean_results.csv"))
-    all_percentile_95s.to_csv(os.path.join(output_dir, "95th_percentile_results.csv"))
-    all_percentile_5s.to_csv(os.path.join(output_dir, "5th_percentile_results.csv"))
+    all_medians.to_csv(os.path.join(output_dir, "country_median_results.csv"))
+    all_means.to_csv(os.path.join(output_dir, "country_mean_results.csv"))
+    all_percentile_95s.to_csv(
+        os.path.join(output_dir, "country_95th_percentile_results.csv")
+    )
+    all_percentile_5s.to_csv(
+        os.path.join(output_dir, "country_5th_percentile_results.csv")
+    )
 
     # Step 4: pickle the simulation results
     with open(os.path.join(output_dir, "countries_simulation_results.pkl"), "wb") as f:
         pickle.dump(countries_simulation_results, f)
 
-    print("Country simulation results have been processed and saved to the results folder.")
+    print(
+        "Country simulation results have been processed and saved to the results folder."
+    )
+
 
 def process_districts_results(districts_simulation_results, output_dir="results"):
     """
@@ -217,23 +208,44 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     Returns:
         None
     """
-    
+
     # Extract non-numeric columns (assuming 'Entity' and 'region' are the non-numeric columns you mentioned)
-    non_numeric_cols = pd.concat(districts_simulation_results).groupby("shapeName").first().reset_index()[['shapeName', 'ISOCODE', 'Entity', 'region', 'subregion']]
-    
+    non_numeric_cols = (
+        pd.concat(districts_simulation_results)
+        .groupby("shapeName")
+        .first()
+        .reset_index()[["shapeName", "ISOCODE", "Entity", "region", "subregion"]]
+    )
+
     # Calculate the mean results for each country for all cols
-    all_means = pd.concat(districts_simulation_results).groupby("shapeName").mean().reset_index()
+    all_means = (
+        pd.concat(districts_simulation_results)
+        .groupby("shapeName")
+        .mean()
+        .reset_index()
+    )
     # Calculate the median results for each country for all cols
-    all_medians = pd.concat(districts_simulation_results).groupby("shapeName").median().reset_index()
+    all_medians = (
+        pd.concat(districts_simulation_results)
+        .groupby("shapeName")
+        .median()
+        .reset_index()
+    )
     # Calculate the 95th percentile results for each country for all cols
     all_percentile_95s = (
-        pd.concat(districts_simulation_results).groupby("shapeName").quantile(0.95).reset_index()
+        pd.concat(districts_simulation_results)
+        .groupby("shapeName")
+        .quantile(0.95)
+        .reset_index()
     )
     # Calculate the 5th percentile results for each country for all cols
     all_percentile_5s = (
-        pd.concat(districts_simulation_results).groupby("shapeName").quantile(0.05).reset_index()
+        pd.concat(districts_simulation_results)
+        .groupby("shapeName")
+        .quantile(0.05)
+        .reset_index()
     )
-    
+
     # Merge with non-numeric
     all_means = pd.merge(all_means, non_numeric_cols, on="shapeName")
     all_medians = pd.merge(all_medians, non_numeric_cols, on="shapeName")
@@ -249,11 +261,17 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     # save all-column results
     all_medians.to_csv(os.path.join(output_dir, "districts_median_results.csv"))
     all_means.to_csv(os.path.join(output_dir, "distrcts_mean_results.csv"))
-    all_percentile_95s.to_csv(os.path.join(output_dir, "districts_95th_percentile_results.csv"))
-    all_percentile_5s.to_csv(os.path.join(output_dir, "districts_5th_percentile_results.csv"))
+    all_percentile_95s.to_csv(
+        os.path.join(output_dir, "districts_95th_percentile_results.csv")
+    )
+    all_percentile_5s.to_csv(
+        os.path.join(output_dir, "districts_5th_percentile_results.csv")
+    )
 
     # Step 4: pickle the simulation results
     with open(os.path.join(output_dir, "districts_simulation_results.pkl"), "wb") as f:
         pickle.dump(districts_simulation_results, f)
 
-    print("Districts simulation results have been processed and saved to the results folder.")
+    print(
+        "Districts simulation results have been processed and saved to the results folder."
+    )

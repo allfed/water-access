@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
+
 # import weightedstats as ws
 import sys
 from pathlib import Path
@@ -271,7 +272,7 @@ def merge_and_adjust_population(df_zones_input, df_input):
 
 def crr_add_uncertainty(road_type, adjustment):
     """
-    The road type is adjusted by the given integer amount, unless the change would go out of bounds. 
+    The road type is adjusted by the given integer amount, unless the change would go out of bounds.
     In these cases, the adjustment stops at the best or worst road type.
 
     Parameters:
@@ -348,7 +349,7 @@ def road_analysis(df_zones, crr_adjustment=0):
     df_zones["dominant_road_type"] = road_types[
         non_zero_indices + 1
     ]  # +1 to adjust for 'No Roads'
-    
+
     # Load the Crr mapping table
     df_crr = pd.read_csv(CRR_FILE)
 
@@ -423,7 +424,6 @@ def extract_slope_crr(df_zones):
                Crr_values: The series containing Crr values.
     """
     df_zones["Crr"] = df_zones["Crr"].astype(float)
-    # TODO add country specific body mass (done?)
     # TODO update test to use country specific body mass
     country_average_weights = df_zones["Average Weight"]
     slope_zones = df_zones["slope_1"]
@@ -431,7 +431,9 @@ def extract_slope_crr(df_zones):
     return slope_zones, Crr_values, country_average_weights
 
 
-def run_bicycle_model(mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt):
+def run_bicycle_model(
+    mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt
+):
     """
     Runs a bicycle model for different slope zones and Crr values.
 
@@ -450,17 +452,23 @@ def run_bicycle_model(mv, mo, hpv, slope_zones, Crr_values, country_average_weig
     project_root = Path().resolve().parent
     sys.path.append(str(project_root))
     import src.mobility_module as mm
+
     n_runs = len(slope_zones)
     results = np.zeros((n_runs, 3))
-    # TODO update the loop below to use the country-specific body mass (done?)
     # TODO update test to include country_average_weight
-    for i, (slope, crr, country_average_weight) in enumerate(zip(slope_zones, Crr_values, country_average_weights)):
+    for i, (slope, crr, country_average_weight) in enumerate(
+        zip(slope_zones, Crr_values, country_average_weights)
+    ):
         hpv.Crr = crr
         mv.m1 = country_average_weight
         results[i] = mm.mobility_models.single_bike_run(
-            # need to modify single_bike_run function to take country_average_weight instead of m1 
+            # need to modify single_bike_run function to take country_average_weight instead of m1
             # (done by updated mv to take country_average_weight as m1)
-            mv, mo, hpv, slope, load_attempt
+            mv,
+            mo,
+            hpv,
+            slope,
+            load_attempt,
         )
     # for i, (slope, crr) in enumerate(zip(slope_zones, Crr_values)):
     #     hpv.Crr = crr
@@ -470,9 +478,11 @@ def run_bicycle_model(mv, mo, hpv, slope_zones, Crr_values, country_average_weig
     return results
 
 
-def process_and_save_results(df_zones, results, export_file_location, velocity_type, save_csv=False):
+def process_and_save_results(
+    df_zones, results, export_file_location, velocity_type, save_csv=False
+):
     """
-    Process the results and optionally save them to a DataFrame. 
+    Process the results and optionally save them to a DataFrame.
     The results should only be saved for single runs, as saving all monte carlo csvs will be too large.
 
     Args:
@@ -506,7 +516,9 @@ def process_and_save_results(df_zones, results, export_file_location, velocity_t
 
     if save_csv:
         # Customizing the output CSV filename based on the type of velocity
-        output_csv_filename = os.path.join(export_file_location, f"{velocity_type}_velocity_by_zone.csv")
+        output_csv_filename = os.path.join(
+            export_file_location, f"{velocity_type}_velocity_by_zone.csv"
+        )
 
         # only save the newly created cols in the csv
         df_zones[
@@ -520,6 +532,7 @@ def process_and_save_results(df_zones, results, export_file_location, velocity_t
         ].to_csv(output_csv_filename)
 
     return df_zones
+
 
 # function to map hill polarity strings to integers for lhillpo and ulhillpo, using a dictionary for the mapping
 def map_hill_polarity(hill_polarity):
@@ -545,14 +558,15 @@ def map_hill_polarity(hill_polarity):
 
     return ulhillpo, lhillpo
 
+
 def calculate_and_merge_bicycle_distance(
-    df_zones, 
-    calculate_distance, 
-    export_file_location, 
-    practical_limit_bicycle=40, 
-    watts=75, 
+    df_zones,
+    calculate_distance,
+    export_file_location,
+    practical_limit_bicycle=40,
+    watts=75,
     human_mass=62,
-    hill_polarity="flat_uphill"
+    hill_polarity="flat_uphill",
 ):
     """
     Calculates and merges bicycle distance for each zone in the given dataframe.
@@ -588,15 +602,19 @@ def calculate_and_merge_bicycle_distance(
         mo = mm.model_options(ulhillpo=ulhillpo, lhillpo=lhillpo)
         mo.model_selection = 2  # Cycling model
 
-        #TODO update for country average weight (done?)
+        # Extract values, initalise vars, and run model
         slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
-
-        #TODO update for country average weight here? (i think no, because done in run_bicycle_model function)
         mv = mm.model_variables(P_t=watts)
         hpv = mm.HPV_variables(param_df, mv)
 
         results = run_bicycle_model(
-            mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt=25
+            mv,
+            mo,
+            hpv,
+            slope_zones,
+            Crr_values,
+            country_average_weights,
+            load_attempt=25,
         )
         process_and_save_results(df_zones, results, export_file_location, "bicycle")
     else:
@@ -607,7 +625,9 @@ def calculate_and_merge_bicycle_distance(
     return df_zones
 
 
-def run_walking_model(mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt):
+def run_walking_model(
+    mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt
+):
     """
     Run the walking model for multiple slope zones.
 
@@ -628,12 +648,21 @@ def run_walking_model(mv, mo, met, hpv, slope_zones, country_average_weights, lo
     project_root = Path().resolve().parent
     sys.path.append(str(project_root))
     import src.mobility_module as mm
+
     n_runs = len(slope_zones)
     results = np.zeros((n_runs, 3))
-    #TODO update the loop below to use the country-specific body mass
-    for i, (slope, country_average_weight) in enumerate(zip(slope_zones, country_average_weights)):
+
+    # Run model for each zone with country-specific weights
+    for i, (slope, country_average_weight) in enumerate(
+        zip(slope_zones, country_average_weights)
+    ):
         mv.m1 = country_average_weight
-        met_values = mm.MET_values(mv, country_weight=country_average_weight, met=met, use_country_specific_weights=True)
+        met_values = mm.MET_values(
+            mv,
+            country_weight=country_average_weight,
+            met=met,
+            use_country_specific_weights=True,
+        )
         results[i] = mm.mobility_models.single_lankford_run(
             mv, mo, met_values, hpv, slope, load_attempt
         )
@@ -681,12 +710,13 @@ def calculate_and_merge_walking_distance(
         mo = mm.model_options(ulhillpo=ulhillpo, lhillpo=lhillpo)
         mo.model_selection = 3  # Lankford model
         mv = mm.model_variables(m1=human_mass)
-        #TODO update mets here to take country-specific body mass (removed and defined inside run_walking_model function instead)
         hpv = mm.HPV_variables(param_df, mv)
 
-        # TODO update for country average weight (done?)
+        # Run model for each zone with country-specific weights
         slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
-        results = run_walking_model(mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt=20)
+        results = run_walking_model(
+            mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt=20
+        )
         process_and_save_results(df_zones, results, export_file_location, "walk")
     else:
         df_zones_walking = pd.read_csv(
@@ -746,10 +776,7 @@ def calculate_population_water_access(df_zones):
     # If urban use urban piped and unpiped, if rural use rural piped and unpiped
     # Use the urban_rural column to do this
     df_zones["zone_pop_piped"] = (
-        df_zones["pop_zone"] 
-        * df_zones["urban_rural"] 
-        * df_zones["URBANPiped"] 
-        / 100
+        df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANPiped"] / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
         * df_zones["RURALPiped"]
@@ -882,13 +909,28 @@ def aggregate_country_level_data(df_zones):
         .reset_index()
     )
     # Rename the columns
-    df_countries.columns = ["ISOCODE", "Entity", "country_pop_raw", "zone_pop_with_water", "zone_pop_without_water",
-                            "population_piped_with_access", "population_piped_with_cycling_access",
-                            "population_piped_with_walking_access", "Nat Piped", "region", "subregion",
-                            "mean_max_distance_cycling", "max_max_distance_cycling", "min_max_distance_cycling",
-                            "median_max_distance_cycling", "mean_max_distance_walking", "max_max_distance_walking",
-                            "min_max_distance_walking", "median_max_distance_walking"]
-        
+    df_countries.columns = [
+        "ISOCODE",
+        "Entity",
+        "country_pop_raw",
+        "zone_pop_with_water",
+        "zone_pop_without_water",
+        "population_piped_with_access",
+        "population_piped_with_cycling_access",
+        "population_piped_with_walking_access",
+        "Nat Piped",
+        "region",
+        "subregion",
+        "mean_max_distance_cycling",
+        "max_max_distance_cycling",
+        "min_max_distance_cycling",
+        "median_max_distance_cycling",
+        "mean_max_distance_walking",
+        "max_max_distance_walking",
+        "min_max_distance_walking",
+        "median_max_distance_walking",
+    ]
+
     return df_countries
 
 
@@ -959,13 +1001,12 @@ def process_country_data(df_zones):
 
     df_countries = aggregate_country_level_data(df_zones)
     assert not df_countries.empty, "Country-level dataframe is empty"
-    # TODO check this out - maybe can remove? maybe debug to check properly?
-    # Added plot=True, so we can run n=1 again and see if results seem ok without the asserts
+    # TODO check this out (assert raises error, but probably not an issue as some NaNs are expected?)
     # assert not df_countries.isnull().values.any(), "Country-level dataframe contains NaN values"
 
     df_median_group = calculate_weighted_median(df_zones)
     assert not df_median_group.empty, "Weighted median dataframe is empty"
-    # TODO check this out - maybe can remove?
+    # TODO check this out (assert raises error, but probably not an issue as some NaNs are expected?)
     # assert not df_median_group.isnull().values.any(), "Weighted median dataframe contains NaN values"
 
     df_countries = df_countries.merge(
@@ -982,11 +1023,15 @@ def process_country_data(df_zones):
             "zone_pop_without_water": "country_pop_without_water",
         }
     )
-    
+
     # Check if 'country_pop_with_water' exists in df_countries
-    if 'country_pop_with_water' not in df_countries.columns:
-        raise KeyError("Column 'country_pop_with_water' does not exist in df_countries. Available columns: {}".format(df_countries.columns))
-    
+    if "country_pop_with_water" not in df_countries.columns:
+        raise KeyError(
+            "Column 'country_pop_with_water' does not exist in df_countries. Available columns: {}".format(
+                df_countries.columns
+            )
+        )
+
     df_countries["percent_with_water"] = (
         df_countries["country_pop_with_water"] / df_countries["country_pop_raw"] * 100
     )
@@ -1010,9 +1055,9 @@ def process_country_data(df_zones):
     )
 
     df_countries["percent_piped_with_only_cycling_access"] = (
-        df_countries["population_piped_with_access"].sum() 
+        df_countries["population_piped_with_access"].sum()
         - df_countries["population_piped_with_walking_access"].sum()
-        ) / df_countries["population_piped_with_access"].sum()
+    ) / df_countries["population_piped_with_access"].sum()
 
     df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
         df_countries
@@ -1027,11 +1072,13 @@ def process_country_data(df_zones):
 
     return df_countries
 
+
 ##############################################################################################################################
 #
 # ANALYSIS IV: Aggregating District Data
 #
 ##############################################################################################################################
+
 
 def aggregate_district_level_data(df_zones):
     """
@@ -1043,11 +1090,11 @@ def aggregate_district_level_data(df_zones):
     Returns:
         df_countries (DataFrame): The aggregated DataFrame with district-level summaries.
     """
-    
+
     df_zones["district_pop_raw"] = df_zones.groupby("shapeID")["pop_zone"].transform(
         "sum"
     )
-    
+
     df_districts = (
         df_zones.groupby("shapeID")
         .agg(
@@ -1073,29 +1120,30 @@ def aggregate_district_level_data(df_zones):
     # Rename the columns
     df_districts.columns = [
         "shapeID",
-        "Entity", 
+        "Entity",
         "ISOCODE",
         "shapeName",
-        "district_pop_raw", 
-        "zone_pop_with_water", 
+        "district_pop_raw",
+        "zone_pop_with_water",
         "zone_pop_without_water",
-        "population_piped_with_access", 
+        "population_piped_with_access",
         "population_piped_with_cycling_access",
-        "population_piped_with_walking_access", 
-        "Nat Piped", 
-        "region", 
+        "population_piped_with_walking_access",
+        "Nat Piped",
+        "region",
         "subregion",
-        "mean_max_distance_cycling", 
-        "max_max_distance_cycling", 
+        "mean_max_distance_cycling",
+        "max_max_distance_cycling",
         "min_max_distance_cycling",
-        "median_max_distance_cycling", 
-        "mean_max_distance_walking", 
+        "median_max_distance_cycling",
+        "mean_max_distance_walking",
         "max_max_distance_walking",
-        "min_max_distance_walking", 
+        "min_max_distance_walking",
         "median_max_distance_walking",
-        ]
+    ]
 
     return df_districts
+
 
 def process_district_data(df_zones):
     """
@@ -1113,7 +1161,9 @@ def process_district_data(df_zones):
 
     # use groupby to create weighted median, needs to be speerate from the above groupby as it uses apply, which can't be used in the same groupby
     # needs to use apply because the function required two columns as input
-    df_median_group = df_zones.groupby(['shapeID']).apply(lambda x : pd.Series({'weighted_med':weighted_median(x,"dtw_1","pop_zone")}))
+    df_median_group = df_zones.groupby(["shapeID"]).apply(
+        lambda x: pd.Series({"weighted_med": weighted_median(x, "dtw_1", "pop_zone")})
+    )
 
     # merge the weighted median back into the df_districts dataframe
     df_districts = df_districts.merge(df_median_group, on="shapeID")
@@ -1122,12 +1172,23 @@ def process_district_data(df_zones):
     df_zones = df_zones.dropna(subset=["pop_zone", "dtw_1"])
 
     # create summary columns
-    #rename zone columns to country
-    df_districts = df_districts.rename(columns={"zone_pop_with_water":"district_pop_with_water", "zone_pop_without_water":"district_pop_without_water"})
+    # rename zone columns to country
+    df_districts = df_districts.rename(
+        columns={
+            "zone_pop_with_water": "district_pop_with_water",
+            "zone_pop_without_water": "district_pop_without_water",
+        }
+    )
 
     # create percent
-    df_districts["percent_with_water"] = df_districts["district_pop_with_water"] / df_districts["district_pop_raw"] * 100
-    df_districts["percent_without_water"] = df_districts["district_pop_without_water"] / df_districts["district_pop_raw"] * 100
+    df_districts["percent_with_water"] = (
+        df_districts["district_pop_with_water"] / df_districts["district_pop_raw"] * 100
+    )
+    df_districts["percent_without_water"] = (
+        df_districts["district_pop_without_water"]
+        / df_districts["district_pop_raw"]
+        * 100
+    )
 
     # add percentage columns for cycling and water access
     df_districts["percent_piped_with_cycling_access"] = (
@@ -1143,15 +1204,26 @@ def process_district_data(df_zones):
     )
 
     df_districts["percent_piped_with_only_cycling_access"] = (
-        df_districts["population_piped_with_access"].sum() 
+        df_districts["population_piped_with_access"].sum()
         - df_districts["population_piped_with_walking_access"].sum()
-        ) / df_districts["population_piped_with_access"].sum()
+    ) / df_districts["population_piped_with_access"].sum()
 
-
-    list_of_countries_to_remove = ["GUM", "ASM", "TON", "MNP", "ATG", "DMA", "ABW", "BRB"]
-    df_districts = df_districts[~df_districts["ISOCODE"].isin(list_of_countries_to_remove)]
+    list_of_countries_to_remove = [
+        "GUM",
+        "ASM",
+        "TON",
+        "MNP",
+        "ATG",
+        "DMA",
+        "ABW",
+        "BRB",
+    ]
+    df_districts = df_districts[
+        ~df_districts["ISOCODE"].isin(list_of_countries_to_remove)
+    ]
 
     return df_districts
+
 
 ##############################################################################################################################
 #
@@ -1175,13 +1247,13 @@ def plot_chloropleth(df_countries):
         "region",
         "subregion",
         "weighted_med",
-        "mean_max_distance_cycling", 
-        "max_max_distance_cycling", 
+        "mean_max_distance_cycling",
+        "max_max_distance_cycling",
         "min_max_distance_cycling",
-        "median_max_distance_cycling", 
-        "mean_max_distance_walking", 
+        "median_max_distance_cycling",
+        "mean_max_distance_walking",
         "max_max_distance_walking",
-        "min_max_distance_walking", 
+        "min_max_distance_walking",
         "median_max_distance_walking",
     ]
 
@@ -1222,7 +1294,7 @@ def run_global_analysis(
     hill_polarity,
     calculate_distance=True,
     plot=False,
-    human_mass=62, # gets overridden by country specific weight
+    human_mass=62,  # gets overridden by country specific weight
 ):
     """
     Runs one run of the global analysis for water access.
@@ -1247,7 +1319,7 @@ def run_global_analysis(
         calculate_distance=calculate_distance,
         export_file_location=EXPORT_FILE_LOCATION,
         practical_limit_bicycle=practical_limit_bicycle,
-        watts=watts, 
+        watts=watts,
         human_mass=human_mass,
         hill_polarity=hill_polarity,
     )
@@ -1285,5 +1357,5 @@ if __name__ == "__main__":
         hill_polarity="flat_uphill",
         calculate_distance=True,
         plot=True,
-        human_mass=62, # gets overridden by country specific weight
+        human_mass=62,  # gets overridden by country specific weight
     )
