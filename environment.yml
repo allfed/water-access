@@ -3,22 +3,24 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9
-  - numpy=1.21.2
-  - pandas=1.4.3
-  - matplotlib=3.5.2
+  - python=3.11  # Latest stable Python version
+  - numpy  # Latest compatible version
+  - pandas  # Latest compatible version
+  - matplotlib  # Latest compatible version
   - ipykernel 
-  - ipywidgets >=7.6
-  - notebook>=5.3
-  - Flask==2.1.0
+  - ipywidgets>=7.6
+  - notebook>=6.4  # Updated notebook version
+  - jupyterlab  # For a modern Jupyter interface
+  - Flask>=2.3.2  # Latest stable version of Flask
+  - werkzeug>=2.3.7  # Latest stable version of Werkzeug
   - pycountry 
-  - pyarrow  # Added for Parquet support
-  - pip
-  - dash
-  - scipy
+  - pyarrow  # For Parquet support
+  - scipy  # Latest compatible version
   - pyinterpolate
   - weightedstats
-  - pytest==8.0.2
+  - dash
+  - pytest>=7.4.0  # Latest stable version of pytest
+  - pip
   - pip:
     - plotly
     - kaleido
@@ -28,5 +30,3 @@ dependencies:
     - jupyter-dash
     - jupyterlab-dash
     - countryinfo
-
-
