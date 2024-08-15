@@ -1,11 +1,73 @@
 # Standard library imports
 import os
+from pathlib import Path
 
 # Third-party library imports
 import pandas as pd
 import numpy as np
 import pycountry
 from sklearn.linear_model import LinearRegression
+
+
+"""
+This script processes and interpolates various datasets related to water access, GDP, bicycle ownership, 
+and BMI/weight to generate a merged dataset with imputed values. The script includes the following functionalities:
+
+1. **File Path Setup**:
+   - Automatically determines file paths relative to the repository structure.
+   - Ensures that data files are correctly located in the `data/original_data` directory.
+
+2. **Data Processing**:
+   - Processes WHO household water data, including handling special cases like Japan.
+   - Adds country codes (alpha2, alpha3) and merges additional datasets including GDP, bicycle ownership, and BMI data.
+   - Preprocesses and appends country information, including continent and neighboring countries.
+   - Note special treatment of Japan due to small amounts of missing data. Assinging assumed values deemed more accurate than imputation.
+
+3. **Imputation and Interpolation**:
+   - Performs GDP-based regression imputation for missing values (Optional).
+   - Conducts spatial interpolation using data from neighboring countries and continents.
+   - Handles special cases such as small island nations and countries without continent data.
+
+4. **Output**:
+   - Generates final datasets with interpolated values and saves them to the `data/processed/semi-processed` directory.
+   - Tracks the imputation methods used for transparency.
+
+**Usage**:
+- Ensure all required data files are placed in the `data/original_data` directory.
+- Adjust any file paths or settings as necessary within the script.
+- Run the script from the `scripts` directory to process the data and generate the output.
+
+**Modules Used**:
+- `pandas` for data manipulation.
+- `numpy` for numerical operations.
+- `pycountry` for country code management.
+- `sklearn` for regression imputation.
+
+This script is designed to be adaptable across different environments by using relative file paths and modular functions.
+"""
+
+
+
+# Define the root of the repository by going up one level from the script directory
+data_script_dir = Path(__file__).resolve().parent
+script_dir = data_script_dir.parent
+repo_root = script_dir.parent
+
+# Define the data directory relative to the repo root
+data_dir = repo_root / "data" / "original_data"
+
+# Define paths to the files
+water_JMP_file_path = data_dir / "WHO Household Water Data - 2023 Data.csv"
+bicycle_file_path = data_dir / "global-bike-ownership.csv"
+gdp_per_capita_file_path = data_dir / "gdp_data.csv"
+bmi_women_file_path = data_dir / "Mean BMI Women 2016.csv"
+bmi_men_file_path = data_dir / "Mean BMI Men 2016.csv"
+height_file_path = data_dir / "Human Height by Birth Year.csv"
+
+# https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
+# https://ourworldindata.org/grapher/mean-body-mass-index
+
+
 
 
 def add_alpha2_from_alpha3(df, col):
@@ -177,11 +239,26 @@ def import_and_select_latest_pbo(csv_path):
     # Return the resulting DataFrame
     return latest_pbo_df
 
+
+
+def handle_japan_case(row):
+    """
+    Handles missing data for Japan by assuming 100% URBANPiped and
+    calculating RURALPiped based on the TOTALPiped and % urban.
+    As Japan is highgly developed, it is assumed it shares approximately 100% urban piped water.
+    Leaving this to spatial imputation will assign Asian average values which is a worse assumption than 100%
+    """
+    if row['Country'] == 'Japan' and pd.isna(row['URBANPiped']) and pd.isna(row['RURALPiped']):
+        row['URBANPiped'] = 100.0
+        row['RURALPiped'] = (row['TOTALPiped'] - (row['% urban'] * row['URBANPiped'] / 100)) / ((100 - row['% urban']) / 100)
+    return row
+
 def process_water_data(df):
     """
     Processes water data by calculating TOTALPiped, filling missing values, and adding necessary columns.
     Ensures that missing values are filled from previous years' data.
     """
+
     # Replace '>99' with 100, '<1' with 0, and '-' with NaN
     df.replace({'<1': 0, '>99': 100, '-': pd.NA}, inplace=True)
 
@@ -190,6 +267,16 @@ def process_water_data(df):
     df[columns_to_convert] = df[columns_to_convert].replace({' ': ''}, regex=True)
     df[columns_to_convert] = df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
 
+    # Handle special cases:
+    # If % urban is 0, set URBANPiped equal to RURALPiped
+    df.loc[df['% urban'] == 0, 'URBANPiped'] = df['RURALPiped']
+
+    # If % urban is 100 and RURALPiped is NaN, set RURALPiped equal to URBANPiped
+    df.loc[(df['% urban'] == 100) & (df['RURALPiped'].isna()), 'RURALPiped'] = df['URBANPiped']
+
+    # Handle Japan's special case
+    df = df.apply(handle_japan_case, axis=1)
+
     # Fill missing rural and urban piped data where total piped is 100
     df.loc[(df['TOTALPiped'] == 100) & (df['RURALPiped'].isna()), 'RURALPiped'] = 100
     df.loc[(df['TOTALPiped'] == 100) & (df['URBANPiped'].isna()), 'URBANPiped'] = 100
@@ -197,25 +284,28 @@ def process_water_data(df):
     # Sort by country and year
     df = df.sort_values(['Country', 'Year'])
 
-    # Iterate through each country to ensure URBANPiped and RURALPiped have values
+    # Iterate through each country to ensure URBANPiped, RURALPiped, and TOTALPiped have values
     def fill_from_older_data(group):
         group['RURALPiped'] = group['RURALPiped'].ffill().bfill()  # Fill forward first, then backward
         group['URBANPiped'] = group['URBANPiped'].ffill().bfill()
+        group['TOTALPiped'] = group['TOTALPiped'].ffill().bfill()
         return group
 
-    # Explicitly exclude the grouping column after applying the function
+    # Apply the fill_from_older_data function to each country group
     df = df.groupby('Country', group_keys=False).apply(fill_from_older_data).reset_index(drop=True)
 
-    # Ensure that a copy is being worked on to avoid SettingWithCopyWarning
-    most_recent_df = df.drop_duplicates('Country', keep='last').copy()
-
-    # Recalculate TOTALPiped
-    most_recent_df['TOTALPiped_Recalculated'] = (
-        (most_recent_df['% urban'] / 100) * most_recent_df['URBANPiped'] +
-        ((100 - most_recent_df['% urban']) / 100) * most_recent_df['RURALPiped']
+    # Recalculate TOTALPiped for all years
+    df['TOTALPiped_Recalculated'] = (
+        (df['% urban'] / 100) * df['URBANPiped'] +
+        ((100 - df['% urban']) / 100) * df['RURALPiped']
     )
 
-    return most_recent_df
+    # Filter to keep only the most recent non-empty data entry per country
+    df = df.dropna(subset=['URBANPiped', 'RURALPiped', 'TOTALPiped'], how='all')
+    df = df.sort_values(['Country', 'Year'], ascending=[True, False])
+    df = df.drop_duplicates('Country', keep='first').reset_index(drop=True)
+
+    return df
 
 
 def merge_gdp_data(df_cleaned, df_gdp, alpha2_col='alpha2', alpha3_col='Country Code'):
@@ -324,9 +414,81 @@ def append_country_info(df, country_info_df):
     return df
 
 
+import pandas as pd
+
+def calculate_average_weight_per_country(bmi_women_file, bmi_men_file, height_file):
+    """
+    This script calculates the average weight per country using BMI and height data for men and women.
+    
+    Parameters:
+    - bmi_women_file: str, path to the file containing BMI data for women
+    - bmi_men_file: str, path to the file containing BMI data for men
+    - height_file: str, path to the file containing height data
+
+    Data Sources:
+    1. Mean Body Mass Index (BMI) in Adult Women (2016):
+       - Source: https://ourworldindata.org/grapher/mean-body-mass-index-bmi-in-adult-women
+    2. Mean Body Mass Index (BMI) in Adult Men (2016):
+       - Source: https://ourworldindata.org/grapher/mean-body-mass-index-bmi-in-adult-men
+    3. Human Height by Birth Year:
+       - Source: https://ourworldindata.org/human-height
+
+    Data is sourced from:
+    - NCD RisC, Human Height (2017) – processed by Our World in Data
+    - NCD RisC (2017) – processed by Our World in Data
+
+    The script performs the following steps:
+    1. Loads the datasets.
+    2. Filters for the most recent year of data available for each country.
+    3. Aligns BMI data to this most recent year.
+    4. Calculates the average weight for men and women using the BMI and height data.
+    5. Calculates the overall average weight assuming a 50/50 distribution between men and women.
+    6. Outputs the final DataFrame with overall average weights per country.
+    """
+
+    # Load the datasets
+    bmi_women_df = pd.read_csv(bmi_women_file)
+    bmi_men_df = pd.read_csv(bmi_men_file)
+    height_df = pd.read_csv(height_file)
+
+    # Step 1: Filter for the most recent year data in the height dataset
+    most_recent_height_df = height_df.loc[height_df.groupby('Entity')['Year'].idxmax()]
+
+    # Step 2: Align BMI data to the most recent year from height data
+    # Keep only the data for the most recent year in the height dataset for each country
+    merged_df = pd.merge(most_recent_height_df, bmi_women_df, on=['Entity', 'Year'], how='left')
+    merged_df = pd.merge(merged_df, bmi_men_df, on=['Entity', 'Year'], how='left')
+
+    # Step 3: Remove non-country entities by checking for the presence of an ISO3 country code
+    merged_df = merged_df[merged_df['Code'].notna()]
+    # drop OWID_WRL
+    merged_df = merged_df[merged_df['Code'] != 'OWID_WRL']
+
+    # Step 4: Calculate the weight using the formula: Weight (kg) = BMI * (Height in meters)^2
+    merged_df['Average Weight (male, kg)'] = merged_df['Mean BMI (male)'] * (merged_df['Mean male height (cm)'] / 100) ** 2
+    merged_df['Average Weight (female, kg)'] = merged_df['Mean BMI (female)'] * (merged_df['Mean female height (cm)'] / 100) ** 2
+
+    # Step 5: Calculate the overall average weight assuming a 50/50 distribution
+    merged_df['Overall Average Weight (kg)'] = (merged_df['Average Weight (male, kg)'] + merged_df['Average Weight (female, kg)']) / 2
+
+    # Step 6: Select relevant columns for the final output and drop the 'Year' column
+    average_weight_df = merged_df[['Entity', 'Code', 'Overall Average Weight (kg)']]
+
+    # Drop duplicates to ensure only one entry per country
+    average_weight_df = average_weight_df.drop_duplicates(subset=['Entity', 'Code'])
+
+    # Rename columns from Code to alpha3 and Entity to Country, Average Weight to Weight
+    average_weight_df.rename(columns={'Code': 'alpha3', 'Entity': 'Country', 'Overall Average Weight (kg)': 'Weight'}, inplace=True)
+
+    return average_weight_df
 
 
-def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path):
+
+
+
+
+
+def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file ,bmi_men_file ,height_file):
     """
     Main function to process the input data file, interpolate missing data, and save the results.
     """
@@ -386,14 +548,20 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path):
     df_cleaned_merge = drop_countries_without_continent(df_merged_info)
     df_cleaned_merge = drop_small_island_nations(df_cleaned_merge)
 
+    # import weight data
+    df_weight = calculate_average_weight_per_country(bmi_women_file ,bmi_men_file ,height_file)
+
+    # merge weight df with df_cleaned_merge
+    df_cleaned_merge = df_cleaned_merge.merge(df_weight, on='alpha3', how='left')
+
     # Example usage
-    list_of_vars = ['RURALPiped', 'URBANPiped', 'PBO']
+    list_of_vars = ['RURALPiped', 'URBANPiped', 'PBO', 'Weight']
 
     # Merge and impute using GDP regression
     df_gdp_imputation, df_gdp_imputation_track = merge_and_impute_with_gdp(df_cleaned_merge, gdp_per_capita_df, list_of_vars)
 
     # SPATIAL Interpolation
-    list_of_vars = ['RURALPiped', 'URBANPiped','PBO']
+    # rtename spatiual vars, eg: RURALPiped_spatial, URBANPiped_spatial, PBO_spatial, Weight_spatial
     # Interpolate variables
     df_spatial_imputation, df_spatial_imputation_track = spatial_imputation(df_cleaned_merge, list_of_vars, "alpha2")
 
@@ -401,13 +569,42 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path):
     df_imputed = df_spatial_imputation.merge(df_gdp_imputation, on='alpha3', suffixes=('_spatial', '_gdp'))
     df_output = df_imputed.merge(df, on='alpha3')
     df_imputed_track = df_spatial_imputation_track.merge(df_gdp_imputation_track, on='alpha3', suffixes=('_spatial', '_gdp'))
+
+
+
+    # remove columns that are are not in vars
+    # Spatial imputation columns
+    spatial_list_of_vars = [f"{var}_spatial" for var in list_of_vars]
+    # GDP imputation columns
+    gdp_list_of_vars = [f"{var}_gdp" for var in list_of_vars]
+    output = "spatial"
+    if output == "spatial":
+        df_output = df_output[['alpha3'] + spatial_list_of_vars + ['% urban']]
+        # rename columns
+        df_output.columns = [var.replace('_spatial', '') for var in df_output.columns]
+    elif output == "gdp":
+        df_output = df_output[['alpha3'] + gdp_list_of_vars + ['% urban']]
+        # rename columns
+        df_output.columns = [var.replace('_gdp', '') for var in df_output.columns]
+    else:
+        df_output = df_output[['alpha3'] + spatial_list_of_vars + gdp_list_of_vars]
+
+
+
     # # Save dataframes as CSV
     df_output.to_csv('../../data/processed/semi-processed/merged_data.csv', index=False)
     df_imputed_track.to_csv('../../data/processed/semi-processed/merged_data_track.csv', index=False)
 
-water_JMP_file_path = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/WHO Household Water Data - 2023 Data.csv"
-bicycle_file_path = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/global-bike-ownership.csv"
-gdp_per_capita_file_path = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/API_NY.GDP.PCAP.CD_DS2_en_csv_v2_3189570.csv'
 
-main(water_JMP_file_path, bicycle_file_path,gdp_per_capita_file_path)
 
+
+# water_JMP_file_path = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/WHO Household Water Data - 2023 Data.csv"
+# bicycle_file_path = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/global-bike-ownership.csv"
+# gdp_per_capita_file_path = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/API_NY.GDP.PCAP.CD_DS2_en_csv_v2_3189570.csv'
+
+# bmi_women_file = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/BMI Women 2016.csv'
+# bmi_men_file = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/Mean BMI Men 2016.csv'
+# height_file = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/Human Height by Birth Year.csv'
+
+# dfv =     calculate_average_weight_per_country(bmi_women_file ,bmi_men_file ,height_file)
+main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file_path ,bmi_men_file_path ,height_file_path)
