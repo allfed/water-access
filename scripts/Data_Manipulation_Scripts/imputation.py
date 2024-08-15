@@ -55,6 +55,7 @@ repo_root = script_dir.parent
 
 # Define the data directory relative to the repo root
 data_dir = repo_root / "data" / "original_data"
+semi_processed_dir = repo_root / "data" / "processed" / "semi-processed"
 
 # Define paths to the files
 water_JMP_file_path = data_dir / "WHO Household Water Data - 2023 Data.csv"
@@ -63,6 +64,11 @@ gdp_per_capita_file_path = data_dir / "gdp_data.csv"
 bmi_women_file_path = data_dir / "Mean BMI Women 2016.csv"
 bmi_men_file_path = data_dir / "Mean BMI Men 2016.csv"
 height_file_path = data_dir / "Human Height by Birth Year.csv"
+population_file_path = data_dir / "population.csv" #OWID
+
+## http://download.geonames.org/export/dump/countryInfo.txt
+country_info_csv_path =  data_dir / "countryInfo.txt"
+country_info_output_file_path = semi_processed_dir / "preprocessed_countryInfo.txt"
 
 # https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
 # https://ourworldindata.org/grapher/mean-body-mass-index
@@ -483,12 +489,49 @@ def calculate_average_weight_per_country(bmi_women_file, bmi_men_file, height_fi
     return average_weight_df
 
 
+import pandas as pd
+
+def load_latest_population_data(population_file_path):
+    """
+    Loads population data, selects the latest available population for each country, 
+    and removes non-country entries and the 'OWID_WRL' entry.
+
+    Parameters:
+    - population_file_path: str, path to the population CSV file.
+
+    Returns:
+    - pd.DataFrame: A DataFrame containing the latest population values for each country.
+    """
+    # Load the data
+    df_population = pd.read_csv(population_file_path)
+
+    # Drop non-country entries and 'OWID_WRL'
+    df_population = df_population.dropna(subset=['Code'])
+    df_population = df_population[df_population['Code'] != 'OWID_WRL']
+
+    # Sort the DataFrame by 'Code' and 'Year' in descending order
+    df_population.sort_values(by=['Code', 'Year'], ascending=[True, False], inplace=True)
+
+    # Drop duplicates to keep the latest population value for each country
+    latest_population_df = df_population.drop_duplicates(subset=['Code'], keep='first')
+
+    # Select only relevant columns: 'Code' (alpha-3), 'Entity' (Country), and 'Population (historical estimates)'
+    latest_population_df = latest_population_df[['Code', 'Entity', 'Population (historical estimates)']]
+
+    # Rename columns to make them more descriptive
+    latest_population_df.rename(columns={
+        'Code': 'alpha3',
+        'Entity': 'Country',
+        'Population (historical estimates)': 'Population'
+    }, inplace=True)
+
+    return latest_population_df
 
 
 
 
 
-def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file ,bmi_men_file ,height_file):
+def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file ,bmi_men_file ,height_file, population_file_path, country_info_output_file_path):
     """
     Main function to process the input data file, interpolate missing data, and save the results.
     """
@@ -530,17 +573,8 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     # merge data
     df = df.merge(df_bike, how='outer', on='alpha3')
 
-    ### HERE NEEDS MANUAOL ATTENTION ####
-
-    ## http://download.geonames.org/export/dump/countryInfo.txt
-    country_info_csv_path =  "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/lookup tables/countryInfo.txt"
-    output_file_path = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/processed/semi-processed/preprocessed_countryInfo.txt'
-
-    # Preprocess the file to remove the '#' from the header and skip comments
-    preprocess_country_info_file(country_info_csv_path,output_file_path)
-
     # Load the country info from the preprocessed file
-    country_info_df = load_country_info(output_file_path)
+    country_info_df = load_country_info(country_info_output_file_path)
     country_info_df.rename(columns={'ISO3': 'alpha3'}, inplace=True)
 
     df_merged_info = append_country_info(df, country_info_df)
@@ -571,6 +605,11 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     df_imputed_track = df_spatial_imputation_track.merge(df_gdp_imputation_track, on='alpha3', suffixes=('_spatial', '_gdp'))
 
 
+    # POPULATION
+    df_population = load_latest_population_data(population_file_path)
+    df_output = df_output.merge(df_population, on='alpha3')
+
+
 
     # remove columns that are are not in vars
     # Spatial imputation columns
@@ -579,32 +618,22 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     gdp_list_of_vars = [f"{var}_gdp" for var in list_of_vars]
     output = "spatial"
     if output == "spatial":
-        df_output = df_output[['alpha3'] + spatial_list_of_vars + ['% urban']]
+        df_output = df_output[['alpha3'] + spatial_list_of_vars + ['% urban'] + ['Population']]
         # rename columns
         df_output.columns = [var.replace('_spatial', '') for var in df_output.columns]
     elif output == "gdp":
-        df_output = df_output[['alpha3'] + gdp_list_of_vars + ['% urban']]
+        df_output = df_output[['alpha3'] + gdp_list_of_vars + ['% urban'] + ['Population']]
         # rename columns
         df_output.columns = [var.replace('_gdp', '') for var in df_output.columns]
     else:
         df_output = df_output[['alpha3'] + spatial_list_of_vars + gdp_list_of_vars]
 
-
-
     # # Save dataframes as CSV
-    df_output.to_csv('../../data/processed/semi-processed/merged_data.csv', index=False)
+    df_output.to_csv('../../data/processed/merged_data.csv', index=False)
     df_imputed_track.to_csv('../../data/processed/semi-processed/merged_data_track.csv', index=False)
 
 
+preprocess_country_info_file(country_info_csv_path,country_info_output_file_path)
 
 
-# water_JMP_file_path = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/WHO Household Water Data - 2023 Data.csv"
-# bicycle_file_path = "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/global-bike-ownership.csv"
-# gdp_per_capita_file_path = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/API_NY.GDP.PCAP.CD_DS2_en_csv_v2_3189570.csv'
-
-# bmi_women_file = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/BMI Women 2016.csv'
-# bmi_men_file = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/Mean BMI Men 2016.csv'
-# height_file = '/Users/kevin/Documents/ProgrammingIsFun/ALLFED/Water/water-access-gis/water-access/data/original_data/Human Height by Birth Year.csv'
-
-# dfv =     calculate_average_weight_per_country(bmi_women_file ,bmi_men_file ,height_file)
-main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file_path ,bmi_men_file_path ,height_file_path)
+main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file_path ,bmi_men_file_path ,height_file_path, population_file_path , country_info_output_file_path)
