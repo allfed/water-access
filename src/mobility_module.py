@@ -386,6 +386,7 @@ class mobility_models:
     def numerical_mobility_model(mr, mv, mo, met, hpv):
         """
         Calculates the velocity and load matrix for different HPVs, slopes, and loads.
+        Used for sensitivity analysis.
 
         Parameters:
         - mr (object): Model results object
@@ -630,7 +631,7 @@ class model_variables:
         self.F_max = 300  # maximum force exertion for pushing up a hill for a short amount of time
         self.L = 1  # leg length
         self.minimumViableLoad = 0  # in kg, the minimum useful load for such a trip
-        self.t_hours = 8  # number of hours to gather water (ONLY used in mobility and sensitivity notebooks. Defined separately in global analysis)
+        self.t_hours = 5.5  # number of hours to gather water (ONLY used in mobility and sensitivity notebooks. Defined separately in global analysis)
         self.L = 1  # leg length
         self.A = 0.51  # cross sectional area
         self.C_d = 0.9  # constant for wind
@@ -641,7 +642,7 @@ class model_variables:
 
 
 class model_options:
-    def __init__(self, ulhillpo=-1, lhillpo=1):
+    def __init__(self, ulhillpo=0, lhillpo=1):
         # model options
         self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
 

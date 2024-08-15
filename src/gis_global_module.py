@@ -370,7 +370,7 @@ def road_analysis(df_zones, crr_adjustment=0):
 
 
 # Main function to run all steps
-def preprocess_data(crr_adjustment):
+def preprocess_data(crr_adjustment, use_sample_data=False):
     """
     Preprocesses data by loading, managing, merging, and adjusting population data.
 
@@ -381,6 +381,18 @@ def preprocess_data(crr_adjustment):
         pandas.DataFrame: The preprocessed data.
 
     """
+    if use_sample_data:
+        warnings.warn(
+            "Using sample data. This should only be done for testing, and not for generating real model results!"
+        )
+        URB_DATA_FILE = "./data/GIS/GIS_data_zones_sample.csv"
+        COUNTRY_DATA_FILE = (
+            "./data/processed/country_data_master_interpolated_sample.csv"
+        )
+    else:
+        URB_DATA_FILE = "./data/GIS/gis_data_adm1.csv"
+        COUNTRY_DATA_FILE = "./data/processed/country_data_master_interpolated.csv"
+
     df_zones_input, df_input = load_data(URB_DATA_FILE, COUNTRY_DATA_FILE)
     df_zones_input = manage_urban_rural(df_zones_input)
     df_zones_input = manage_slope(df_zones_input)
@@ -1295,6 +1307,7 @@ def run_global_analysis(
     calculate_distance=True,
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
+    use_sample_data=False,  # only change to test functionality
 ):
     """
     Runs one run of the global analysis for water access.
@@ -1306,14 +1319,17 @@ def run_global_analysis(
         practical_limit_buckets (float): The practical limit for distance traveled by carrying buckets in kilometers.
         met (str): metabolic equivalent of task (energy for walking).
         watts (float): The power output in watts (energy for cycling).
+        calculate_distance (bool, optional): Whether to calculate distance or not. Defaults to True, otherwise new results are not generated.
         human_mass (float): The mass of an average human carrying water in kilograms.
-        calculate_distance (bool, optional): Whether to calculate distance or not. Defaults to True.
         plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
+        use_sample_data (bool, optional): Whether to use sample data or not (only for testing). Defaults to False.
 
     Returns:
         pandas.DataFrame: The processed data for each country.
     """
-    df_zones = preprocess_data(crr_adjustment=crr_adjustment)
+    df_zones = preprocess_data(
+        crr_adjustment=crr_adjustment, use_sample_data=use_sample_data
+    )
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,
         calculate_distance=calculate_distance,
@@ -1347,6 +1363,7 @@ def run_global_analysis(
 
 
 if __name__ == "__main__":
+
     df_countries, df_districts = run_global_analysis(
         crr_adjustment=0,
         time_gathering_water=6,
@@ -1358,4 +1375,8 @@ if __name__ == "__main__":
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
+        use_sample_data=False,
     )
+
+    df_countries.to_csv("results/country_results_single_run.csv", index=False)
+    df_districts.to_csv("results/district_results_single_run.csv", index=False)

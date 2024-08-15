@@ -525,6 +525,7 @@ class TestCalculateAndMergeBicycleDistance:
                 "zone": ["A", "B", "C"],
                 "slope_1": [0, 1, 2],
                 "Crr": [0.01, 0.02, 0.03],
+                "Average Weight": [60, 50, 70],
             }
         )
         calculate_distance = True
@@ -540,8 +541,16 @@ class TestCalculateAndMergeBicycleDistance:
     def test_calculate_and_merge_bicycle_distance_merges_bicycle_distance_from_file(
         self,
     ):
-        df_zones = pd.DataFrame({"fid": [1, 2, 3], "zone": ["A", "B", "C"]})
-        calculate_distance = False
+        df_zones = pd.DataFrame(
+            {
+                "fid": [1, 2, 3],
+                "zone": ["A", "B", "C"],
+                "slope_1": [0, 1, 2],
+                "Crr": [0.01, 0.02, 0.03],
+                "Average Weight": [60, 50, 70],
+            }
+        )
+        calculate_distance = True
         export_file_location = "./data/processed/"
         practical_limit_bicycle = 40
 
@@ -566,12 +575,15 @@ class TestRunWalkingModel:
         mo = mm.model_options()
         mo.model_selection = 3  # Lankford model
         mv = mm.model_variables()
-        met = mm.MET_values(mv, met=3.3)
+        met = 3.3
         hpv = mm.HPV_variables(param_df, mv)
 
         slope_zones = [0, 1, 2]
+        country_average_weights = [60, 50, 70]
 
-        result = run_walking_model(mv, mo, met, hpv, slope_zones, load_attempt=20)
+        result = run_walking_model(
+            mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt=20
+        )
         assert isinstance(result, np.ndarray)
 
     def test_run_walking_model_calls_single_walk_run_for_each_slope_zone(
@@ -587,9 +599,10 @@ class TestRunWalkingModel:
         mo = mm.model_options()
         mo.model_selection = 3  # Lankford model
         mv = mm.model_variables()
-        met = mm.MET_values(mv, met=3.3)
+        met = 3.3
         hpv = mm.HPV_variables(param_df, mv)
         slope_zones = [0, 1, 2]
+        country_average_weights = [60, 50, 70]
         load_attempt = 1
 
         calls = []
@@ -602,7 +615,9 @@ class TestRunWalkingModel:
             mock_single_lankford_run,
         )
 
-        run_walking_model(mv, mo, met, hpv, slope_zones, load_attempt)
+        run_walking_model(
+            mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt
+        )
 
         expected_calls = [0, 1, 2]
         assert calls == expected_calls
@@ -618,6 +633,7 @@ class TestCalculateAndMergeWalkingDistance:
                 "zone": ["A", "B", "C"],
                 "slope_1": [0, 1, 2],
                 "Crr": [0.01, 0.02, 0.03],
+                "Average Weight": [60, 50, 70],
             }
         )
         calculate_distance = True
@@ -800,6 +816,8 @@ class TestAggregateCountryLevelData:
                 "Nat Piped": ["Yes", "No"],
                 "region": ["North America", "North America"],
                 "subregion": ["Northern America", "Northern America"],
+                "max distance cycling": [20, 30],
+                "max distance walking": [5, 10],
             }
         )
 
@@ -836,6 +854,8 @@ class TestAggregateCountryLevelData:
                     "Northern America",
                     "Northern America",
                 ],
+                "max distance cycling": [20, 20, 30, 30],
+                "max distance walking": [5, 5, 10, 10],
             }
         )
 
@@ -852,6 +872,14 @@ class TestAggregateCountryLevelData:
                 "Nat Piped": ["No", "Yes"],
                 "region": ["North America", "North America"],
                 "subregion": ["Northern America", "Northern America"],
+                "mean_max_distance_cycling": [30.0, 20.0],
+                "max_max_distance_cycling": [30, 20],
+                "min_max_distance_cycling": [30, 20],
+                "median_max_distance_cycling": [30.0, 20.0],
+                "mean_max_distance_walking": [10.0, 5.0],
+                "max_max_distance_walking": [10, 5],
+                "min_max_distance_walking": [10, 5],
+                "median_max_distance_walking": [10.0, 5.0],
             }
         )
 
@@ -940,6 +968,8 @@ class TestProcessCountryData:
                 ],
                 "zone_pop_with_water": [1000, 2000, 1500],
                 "zone_pop_without_water": [0, 0, 0],
+                "max distance cycling": [10, 20, 30],
+                "max distance walking": [5, 10, 15],
             }
         )
         result = process_country_data(df_zones)
@@ -965,6 +995,8 @@ class TestProcessCountryData:
                 ],
                 "zone_pop_with_water": [1000, 2000, 1500],
                 "zone_pop_without_water": [0, 0, 0],
+                "max distance cycling": [10, 20, 30],
+                "max distance walking": [5, 10, 15],
             }
         )
         result = process_country_data(df_zones)
@@ -981,9 +1013,20 @@ class TestProcessCountryData:
                 "Nat Piped": [1500, 1000],
                 "region": ["Africa", "North America"],
                 "subregion": ["Northern Africa", "Northern America"],
+                "mean_max_distance_cycling": [30.0, 10.0],
+                "max_max_distance_cycling": [30, 10],
+                "min_max_distance_cycling": [30, 10],
+                "median_max_distance_cycling": [30.0, 10.0],
+                "mean_max_distance_walking": [15.0, 5.0],
+                "max_max_distance_walking": [15, 5],
+                "min_max_distance_walking": [15, 5],
+                "median_max_distance_walking": [15.0, 5.0],
                 "weighted_med": [15, 10],
                 "percent_with_water": [100.0, 100.0],
                 "percent_without_water": [0.0, 0.0],
+                "percent_piped_with_cycling_access": [100.0, 100.0],
+                "percent_piped_with_walking_access": [100.0, 100.0],
+                "percent_piped_with_only_cycling_access": [0.0, 0.0],
             },
             index=pd.Int64Index([1, 2], dtype="int64"),
         )
@@ -1016,6 +1059,8 @@ class TestProcessCountryData:
                 ],
                 "zone_pop_with_water": [1000, 2000, 1500],
                 "zone_pop_without_water": [0, 0, 0],
+                "max distance cycling": [10, 20, 30],
+                "max distance walking": [5, 10, 15],
             }
         )
         with pytest.raises(AssertionError):
@@ -1050,6 +1095,8 @@ class TestProcessCountryData:
                 ],
                 "zone_pop_with_water": [1000, 2000, 1500],
                 "zone_pop_without_water": [0, 0, 0],
+                "max distance cycling": [10, 20, 30],
+                "max distance walking": [5, 10, 15],
             }
         )
         with pytest.raises(IndexError):
@@ -1075,6 +1122,8 @@ class TestProcessCountryData:
                 ],
                 "zone_pop_with_water": [1000, 2000, 1500],
                 "zone_pop_without_water": [0, 0, 0],
+                "max distance cycling": [10, 20, 30],
+                "max distance walking": [5, 10, 15],
             }
         )
         result = process_country_data(df_zones)
@@ -1101,6 +1150,8 @@ class TestProcessCountryData:
                 ],
                 "zone_pop_with_water": [1000, 2000, 1500],
                 "zone_pop_without_water": [0, 0, 0],
+                "max distance cycling": [10, 20, 30],
+                "max distance walking": [5, 10, 15],
             }
         )
         process_country_data(df_zones)
