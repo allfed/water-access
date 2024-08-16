@@ -21,6 +21,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 
 
+
 def linspace_creator(max_value_array, min_value, res):
     """
     Creates a linspace numpy array from the given inputs.
@@ -137,6 +138,7 @@ class mobility_models:
     - sprott_solution(hpv, s, mv, mo)
     - numerical_mobility_model(mr, mv, mo, met, hpv)
     """
+
 
     def sprott_model(hpv, mv, mo, mr):
         """
@@ -411,7 +413,7 @@ class mobility_models:
         Now for the ith HPV, the jth slope, and the kth load it will determine the velocity of the HPV given the metabolic/energy input
         Uses scipy.optimize's fsolve to solve the systems of equations int he walking models
         full_output=True means that a flag is returned to see if the solve was succesful.
-        Many solves are not successful if the agent 'rus out of energy' and physicaly can't carry the load up the incline with the energy budget provided, these are handled in the if statement using
+        Many solves are not successful if the agent 'runs out of energy' and physicaly can't carry the load up the incline with the energy budget provided, these are handled in the if statement using
         """
 
         limit_practical_load = True
@@ -639,6 +641,10 @@ class model_variables:
         self.eta = 0.92  # efficienct
         self.g = 9.81  # gravity
         self.waterration = 15  # water ration in litres
+        self.ro = 1.225  # air density
+        self.eta = 0.92  # efficienct
+        self.g = 9.81  # gravity
+        self.waterration = 15  # water ration in litres
 
 
 class model_options:
@@ -797,8 +803,17 @@ class model_results:
                 "Litres * Km": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
+                "Average Trip Velocity": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ],
+                "Litres * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 * mv.t_hours,
+                "Water ration * Km": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 "Water ration * Km": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
@@ -808,12 +823,21 @@ class model_results:
                 "Distance to Water Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
+                "Distance to Water Achievable": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * mv.t_hours
                 / 2,
                 "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
                     :, slope_scene, load_scene
                 ]
+                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
+                    :, slope_scene, load_scene
+                ]
                 * mv.t_hours,
+                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
+                    :, slope_scene, load_scene
+                ]
                 "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
                     :, slope_scene, load_scene
                 ]
@@ -829,6 +853,9 @@ class model_results:
             }
         )
         return df
+
+    def filter_slope_vector_deg(self, value):
+        return self.slope_vector_deg[self.slope_vector_deg == value]
 
     def load_results(self, hpv, mv, mo):
         """
@@ -876,12 +903,19 @@ class plotting_hpv:
     def surf_plot(mr, mo, hpv):
         """
          Plots a 3D surface graph of distance achievable based on load, slope, and velocity.
+         Plots a 3D surface graph of distance achievable based on load, slope, and velocity.
 
         Args:
              mr (object): The mobility results object.
              mo (object): The mobility options object.
              hpv (object): The human-powered vehicle object.
+        Args:
+             mr (object): The mobility results object.
+             mo (object): The mobility options object.
+             hpv (object): The human-powered vehicle object.
 
+         Returns:
+             None
          Returns:
              None
         """
@@ -1043,7 +1077,7 @@ class plotting_hpv:
         fig.show()
         # py.iplot(fig, filename=chart_title)
 
-    def slope_plot_plotly(mr, mo, hpv):
+    def slope_line_plot_plotly(mr, mo, hpv):
         """
         Generates a plot using Plotly library to visualize the relationship between slope and velocity.
 
@@ -1078,6 +1112,55 @@ class plotting_hpv:
             x = mr.slope_matrix3d_deg[i, :, mo.load_scene]
             i += 1
             fig.add_trace(go.Scatter(x=x, y=y, mode="lines", name=HPVname))
+
+        # Update the title
+        fig.update_layout(title=dict(text=chart_title))
+        # Update te axis label (valid for 2d graphs using graph object)
+        fig.update_xaxes(title_text=xaxis_title)
+        fig.update_yaxes(title_text=yaxis_title)
+        # fig.update_yaxes(range=[0, 15])
+
+        fig.show()
+        # py.iplot(fig, filename=chart_title)
+
+    def slope_plot_plotly(mr, mo, hpv):
+        """
+        Generates a plot using Plotly library to visualize the relationship between slope and velocity.
+
+        Args:
+            mr (object): model results object
+            mo (object): mobility options object
+            hpv (object): human-powered vehicle data
+
+        Returns:
+            None
+        """
+        xaxis_title = "HPV Type"
+        yaxis_title = "Water Ration * Distance [km]"
+        if mo.load_scene == 0:
+            load_name = mr.load_matrix3d.flat[mo.load_scene]
+        elif mo.load_scene == -1:
+            load_name = "maximum"
+        else:
+            load_name = "variable"
+
+        chart_title = f"Water Ration * Distance with different slopes, {load_name} kg load, model {mr.model_name}"
+
+        i = 0
+        fig = go.Figure()
+        for HPVname in mr.hpv_name[0].transpose()[0][0]:
+            # y = mr.distance_achievable[
+            #     i, :, mo.load_scene
+            # ] * mr.water_ration_matrix3d[i, :, mo.load_scene]
+            y = mr.v_load_matrix3d[i, :, mo.load_scene]
+            x = HPVname
+            color = mr.slope_matrix3d_deg[i, :, mo.load_scene]
+            i += 1
+            fig.add_trace(
+                go.Scatter(
+                    x=x, y=y, mode="markers", marker=dict(color=color), name=HPVname
+                )
+            )
 
         # Update the title
         fig.update_layout(title=dict(text=chart_title))
