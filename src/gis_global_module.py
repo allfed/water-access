@@ -101,10 +101,31 @@ def run_weighted_median_on_grouped_df(df, groupby_column, value_column, weight_c
 
 
 
-URB_DATA_FILE = "./data/GIS/gis_data_adm1.csv"
-COUNTRY_DATA_FILE = "./data/processed/merged_data.csv"
-EXPORT_FILE_LOCATION = "./data/processed/"
-CRR_FILE = "./data/lookup tables/Crr.csv"
+
+# Assuming the script is in the src directory, set the script_dir accordingly
+script_dir = Path(__file__).resolve().parent
+repo_root = script_dir.parent
+results_dir = repo_root / "results"
+
+# Define paths relative to the src directory
+# URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
+URB_DATA_FILE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
+COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
+EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
+CRR_FILE = repo_root / "data" / "lookup tables" / "Crr.csv"
+FILE_PATH_PARAMS = repo_root / "data" / "lookup tables" / "mobility-model-parameters.csv"
+
+# Results File Path
+DISTRICT_RESULTS_FILE_PATH = results_dir / "district_results.csv"
+COUNTRY_RESULTS_FILE_PATH = results_dir / "country_results.csv"
+
+
+
+# Example usage
+print(URB_DATA_FILE)
+print(COUNTRY_DATA_FILE)
+print(EXPORT_FILE_LOCATION)
+print(CRR_FILE)
 
 
 def load_data(urb_data_file, country_data_file):
@@ -119,13 +140,43 @@ def load_data(urb_data_file, country_data_file):
     - df_zones_input (pandas.DataFrame): The loaded urban data as a DataFrame.
     - df_input (pandas.DataFrame): The loaded country data as a DataFrame.
     """
+    # dtype_zones = {
+    #     'ISOCODE': str,
+    #     'NAME0': str,
+    #     'DATATYPE': str,
+    #     'shapeName': str,
+    #     'shapeID': str,
+    #     'shapeGroup': str,
+    #     'shapeType': str
+    # }
+    
+    # dtype_input = {
+    #     'alpha3': str,
+    #     'alpha2': str,
+    #     'region': str,
+    #     'subregion': str,
+    #     'borders': str
+    # }
+
     try:
         df_zones_input = pd.read_csv(urb_data_file)
         df_input = pd.read_csv(country_data_file)
     except:
         df_zones_input = pd.read_csv("." + urb_data_file)
         df_input = pd.read_csv("." + country_data_file)
+
+    # print("df_zones_input")
+    # print(df_zones_input.dtypes)
+    # print(df_zones_input.head())
+    # print("df_input")
+    # print(df_input.dtypes)
+    # print(df_input.head())
+
+
+    
+
     return df_zones_input, df_input
+
 
 
 # Function for managing urban/rural data
@@ -168,7 +219,63 @@ def manage_slope(df_zones_input):
     return df_zones_input
 
 
-# Function for merging dataframes and adjusting populations
+def calculate_population_density(df, group_col, value_col):
+    """
+    Calculate the population density percentage per group.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        group_col (str): The column to group by.
+        value_col (str): The column to calculate the density for.
+
+    Returns:
+        pd.Series: A Series with the population density percentage for each group.
+
+    Raises:
+        ValueError: If the DataFrame is empty, or the specified columns do not exist.
+        ZeroDivisionError: If a group has a zero sum in the value column.
+    """
+    # Step 1: Validate input DataFrame
+    if df.empty:
+        raise ValueError("The input DataFrame is empty. Please provide a valid DataFrame.")
+    
+    if group_col not in df.columns:
+        raise ValueError(f"The specified group column '{group_col}' does not exist in the DataFrame.")
+    
+    if value_col not in df.columns:
+        raise ValueError(f"The specified value column '{value_col}' does not exist in the DataFrame.")
+    
+    # Step 2: Handle NaN values in the value column
+    if df[value_col].isna().any():
+        warnings.warn(f"NaN values detected in '{value_col}'. Filling with zeros.")
+    df[value_col] = df[value_col].fillna(0)
+    
+    # Step 3: Calculate the sum per group
+    group_sums = df.groupby(group_col)[value_col].sum()
+
+    # Step 4: Identify and handle zero-sum groups
+    zero_sum_groups = group_sums[group_sums == 0].index
+    if not zero_sum_groups.empty:
+        warnings.warn(f"Groups with zero sum detected in '{value_col}' for group(s): {zero_sum_groups.tolist()}.")
+
+    non_zero_sum_groups = group_sums[group_sums != 0].index
+
+    # Step 5: Calculate density only for non-zero-sum groups
+    try:
+        pop_density_perc = df.groupby(group_col)[value_col].apply(lambda x: x / x.sum())
+    except ZeroDivisionError:
+        raise ZeroDivisionError(f"Division by zero encountered in group '{group_col}' during density calculation.")
+
+    # Step 6: Reset index to ensure proper alignment with the original DataFrame
+    pop_density_perc = pop_density_perc.reset_index(level=0, drop=True)
+
+    # Ensure that the resulting Series aligns with the original DataFrame
+    pop_density_perc = pop_density_perc.reindex(df.index)
+
+    return pop_density_perc
+
+
+
 def merge_and_adjust_population(df_zones_input, df_input):
     """
     Merge and adjust population data based on zone and country information.
@@ -179,42 +286,43 @@ def merge_and_adjust_population(df_zones_input, df_input):
 
     Returns:
         DataFrame: DataFrame with merged and adjusted population data.
-
-    Raises:
-        None
     """
+    # Ensure the input DataFrames are not empty
     assert not df_zones_input.empty, "df_zones_input is empty"
     assert not df_input.empty, "df_input is empty"
-    # this analysis loses some data as the overlap between the rasters is not perfect. To reduce this error, use the 30 arc second data. Too much heavy lifting for my computer to do this at the moment.
-    # merge df_input and df_zones on ISO_CC. This assigns all the country data to each zone.
-    # join inner will remove some of the data that is not in both datasets
+
+    # Merge df_input and df_zones on ISOCODE and alpha3
     df_zones = df_zones_input.merge(
         df_input, left_on="ISOCODE", right_on="alpha3", how="inner"
     )
-    # adjust population to account for 9 values per raster point (2.5 to 5 arc min resoltuions. 9 values per point)
-    df_zones["AdjPopFloat"] = df_zones["pop_count_15_1"] / 9
 
-    # convert population density to percent of national population on a per country basis, grouped by ISO_CC
-    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["AdjPopFloat"].apply(
-        lambda x: x / x.sum()
-    )
-    # multiply population density by population on a per country basis
+    #adjust population to account for 9 values per raster point (2.5 to 5 arc min resoltuions. 9 values per point)
+    df_zones["AdjPopFloat"] = df_zones["pop_count_15_1"] / 9 
+
+    # Calculate population density percentage robustly
+    try:
+        pop_density_perc = calculate_population_density(df_zones, "ISOCODE", "AdjPopFloat")
+    except Exception as e:
+        raise RuntimeError(f"Error in calculating population density: {e}")
+
+    # Ensure that pop_density_perc aligns with df_zones
+    df_zones["pop_density_perc"] = pop_density_perc.reset_index(level=0, drop=True)
+
+    # Multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
 
-    # sum the population in each zone
-    df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")["pop_zone"].transform(
-        "sum"
-    )
-    df_zones["country_pop_ratio"] = df_zones.groupby("ISOCODE")[
-        "AdjPopFloat"
-    ].transform("sum")
+    # Sum the population in each zone
+    df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")["pop_zone"].transform("sum")
+    df_zones["country_pop_ratio"] = df_zones.groupby("ISOCODE")["AdjPopFloat"].transform("sum")
 
-    # trim the dataframe to only include rows where there is a population
-    # find non zero values AdjPopFloat
+    # Trim the DataFrame to only include rows where there is a significant population
     df_zones["any_pop"] = df_zones["AdjPopFloat"].apply(lambda x: 1 if x > 10 else 0)
     df_zones = df_zones[df_zones["any_pop"] == 1]
 
+    # Drop temporary columns
+    df_zones = df_zones.drop(columns=["any_pop"])
     return df_zones
+
 
 
 # Function for road analysis
@@ -388,15 +496,22 @@ def preprocess_data(crr_adjustment, use_sample_data=False):
         warnings.warn(
             "Using sample data. This should only be done for testing, and not for generating real model results!"
         )
-        URB_DATA_FILE = "./data/GIS/GIS_data_zones_sample.csv"
-        COUNTRY_DATA_FILE = (
+        urb_data_file = "./data/GIS/GIS_data_zones_sample.csv"
+        country_data_file = (
             "./data/processed/country_data_master_interpolated_sample.csv"
         )
     else:
-        URB_DATA_FILE = "./data/GIS/gis_data_adm1.csv"
-        COUNTRY_DATA_FILE = "./data/processed/country_data_master_interpolated.csv"
+        # Assuming the script is in the src directory, set the script_dir accordingly
+        script_dir = Path(__file__).resolve().parent
+        repo_root = script_dir.parent
 
-    df_zones_input, df_input = load_data(URB_DATA_FILE, COUNTRY_DATA_FILE)
+        # Define paths relative to the src directory
+        urb_data_file = URB_DATA_FILE
+        country_data_file = COUNTRY_DATA_FILE
+
+
+
+    df_zones_input, df_input = load_data(urb_data_file, country_data_file)
     df_zones_input = manage_urban_rural(df_zones_input)
     df_zones_input = manage_slope(df_zones_input)
     df_zones = merge_and_adjust_population(df_zones_input, df_input)
@@ -440,7 +555,7 @@ def extract_slope_crr(df_zones):
     """
     df_zones["Crr"] = df_zones["Crr"].astype(float)
     # TODO update test to use country specific body mass
-    country_average_weights = df_zones["Average Weight"]
+    country_average_weights = df_zones["Weight"]
     slope_zones = df_zones["slope_1"]
     Crr_values = df_zones["Crr"]
     return slope_zones, Crr_values, country_average_weights
@@ -604,7 +719,9 @@ def calculate_and_merge_bicycle_distance(
         sys.path.append(str(project_root))
         import src.mobility_module as mm
 
-        file_path_params = "./data/lookup tables/mobility-model-parameters.csv"
+
+
+        file_path_params = FILE_PATH_PARAMS
         param_df = load_hpv_parameters(file_path_params, "Bicycle")
 
         # Overwrite practical limit with the function inputs
@@ -712,7 +829,7 @@ def calculate_and_merge_walking_distance(
         sys.path.append(str(project_root))
         import src.mobility_module as mm
 
-        file_path_params = "./data/lookup tables/mobility-model-parameters.csv"
+        file_path_params = FILE_PATH_PARAMS
         param_df = load_hpv_parameters(file_path_params, "Buckets")
 
         # Overwrite practical limit with the function inputs
@@ -800,11 +917,11 @@ def calculate_population_water_access(df_zones):
     df_zones["zone_pop_unpiped"] = (
         df_zones["pop_zone"]
         * df_zones["urban_rural"]
-        * df_zones["URBANNon-piped"]
+        * (100 - df_zones["URBANPiped"])
         / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
-        * df_zones["RURALNon-piped"]
+        * (100 - df_zones["RURALPiped"])
         / 100
     )
 
@@ -869,7 +986,7 @@ def calculate_water_rations(df_zones):
     )
     df_zones["bikes_in_zone"] = (
         df_zones["pop_zone"]
-        / df_zones["Average household size (number of members)"]
+        / df_zones["Household_Size"]
         * df_zones["PBO"]
     )
     df_zones["water_rations_achievable"] = (
@@ -906,16 +1023,14 @@ def aggregate_country_level_data(df_zones):
         df_zones.groupby("ISOCODE")
         .agg(
             {
-                "Entity": "first",
+                "alpha3": "first",
                 "country_pop_raw": "first",
                 "zone_pop_with_water": "sum",
                 "zone_pop_without_water": "sum",
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
-                "Nat Piped": "first",
-                "region": "first",
-                "subregion": "first",
+                "Continent": "first",
                 "max distance cycling": ["mean", "max", "min", "median"],
                 "max distance walking": ["mean", "max", "min", "median"],
                 # Additional aggregations can be added here
@@ -926,16 +1041,14 @@ def aggregate_country_level_data(df_zones):
     # Rename the columns
     df_countries.columns = [
         "ISOCODE",
-        "Entity",
+        "alpha3",
         "country_pop_raw",
         "zone_pop_with_water",
         "zone_pop_without_water",
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
-        "Nat Piped",
-        "region",
-        "subregion",
+        "Continent",
         "mean_max_distance_cycling",
         "max_max_distance_cycling",
         "min_max_distance_cycling",
@@ -1081,7 +1194,7 @@ def process_country_data(df_zones):
     # Log or print summary of removed countries
     print(
         "Countries removed from analysis due to being further than Libya's median:",
-        removed_further_than_libya["Entity"].tolist(),
+        removed_further_than_libya["alpha3"].tolist(),
     )
     print("Countries removed manually:", removed_countries_list)
 
@@ -1114,7 +1227,7 @@ def aggregate_district_level_data(df_zones):
         df_zones.groupby("shapeID")
         .agg(
             {
-                "Entity": "first",
+                "alpha3": "first",
                 "ISOCODE": "first",
                 "shapeName": "first",
                 "district_pop_raw": "first",
@@ -1123,9 +1236,7 @@ def aggregate_district_level_data(df_zones):
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
-                "Nat Piped": "first",
-                "region": "first",
-                "subregion": "first",
+                "Continent": "first",
                 "max distance cycling": ["mean", "max", "min", "median"],
                 "max distance walking": ["mean", "max", "min", "median"],
             }
@@ -1135,7 +1246,7 @@ def aggregate_district_level_data(df_zones):
     # Rename the columns
     df_districts.columns = [
         "shapeID",
-        "Entity",
+        "alpha3",
         "ISOCODE",
         "shapeName",
         "district_pop_raw",
@@ -1144,9 +1255,7 @@ def aggregate_district_level_data(df_zones):
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
-        "Nat Piped",
-        "region",
-        "subregion",
+        "Continent",
         "mean_max_distance_cycling",
         "max_max_distance_cycling",
         "min_max_distance_cycling",
@@ -1249,7 +1358,7 @@ def process_district_data(df_zones):
 
 def plot_chloropleth(df_countries):
     hover_data_list = [
-        "ISOCODE",
+        "alpha3",
         "country_pop_raw",
         "country_pop_with_water",
         "country_pop_without_water",
@@ -1258,9 +1367,7 @@ def plot_chloropleth(df_countries):
         "population_piped_with_walking_access",
         "percent_without_water",
         "percent_with_water",
-        "Nat Piped",
-        "region",
-        "subregion",
+        "Continent",
         "weighted_med",
         "mean_max_distance_cycling",
         "max_max_distance_cycling",
@@ -1275,7 +1382,7 @@ def plot_chloropleth(df_countries):
     choro = px.choropleth(
         title="Percent of Population Has to Relocate",
         data_frame=df_countries,
-        locations="ISOCODE",
+        locations="alpha3",
         height=600,
         color="percent_without_water",
         # use constant colorbar grading (not relative)
@@ -1285,7 +1392,7 @@ def plot_chloropleth(df_countries):
         color_continuous_scale="Greys",
         range_color=(0, 100),
         scope="world",
-        hover_name="ISOCODE",
+        hover_name="alpha3",
         hover_data=hover_data_list,
     )
     choro.layout.coloraxis.colorbar.title = ""
@@ -1333,6 +1440,9 @@ def run_global_analysis(
     df_zones = preprocess_data(
         crr_adjustment=crr_adjustment, use_sample_data=use_sample_data
     )
+    print("\n\n 1 \n\n")
+    print(len(df_zones["ISOCODE"].unique()))
+
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,
         calculate_distance=calculate_distance,
@@ -1342,6 +1452,10 @@ def run_global_analysis(
         human_mass=human_mass,
         hill_polarity=hill_polarity,
     )
+
+    print("\n\n 2 \n\n")
+    print(len(df_zones["ISOCODE"].unique()))
+
     df_zones = calculate_and_merge_walking_distance(
         df_zones,
         calculate_distance=calculate_distance,
@@ -1351,14 +1465,29 @@ def run_global_analysis(
         human_mass=human_mass,
         hill_polarity=hill_polarity,
     )
+
+    print("\n\n 3 \n\n")
+    print(len(df_zones["ISOCODE"].unique()))
+
+
     df_zones = process_zones_for_water_access(
         df_zones, time_gathering_water=time_gathering_water
     )
+
+    print("\n\n 4 \n\n")
+    print(len(df_zones["ISOCODE"].unique()))
 
     # add df_districts
     df_zones_districts = df_zones.copy()
     df_districts = process_district_data(df_zones_districts)
     df_countries = process_country_data(df_zones)
+
+
+    print("\n\n 5 \n\n")
+    print(len(df_districts["ISOCODE"].unique()))
+    print(len(df_countries["ISOCODE"].unique()))
+
+
     if plot:
         plot_chloropleth(df_countries)
 
@@ -1381,5 +1510,5 @@ if __name__ == "__main__":
         use_sample_data=False,
     )
 
-    df_countries.to_csv("results/country_results_single_run.csv", index=False)
-    df_districts.to_csv("results/district_results_single_run.csv", index=False)
+    df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
+    df_districts.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)

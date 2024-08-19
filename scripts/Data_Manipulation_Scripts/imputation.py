@@ -65,6 +65,7 @@ bmi_women_file_path = data_dir / "Mean BMI Women 2016.csv"
 bmi_men_file_path = data_dir / "Mean BMI Men 2016.csv"
 height_file_path = data_dir / "Human Height by Birth Year.csv"
 population_file_path = data_dir / "population.csv" #OWID
+household_size_file_path = data_dir / "undesa_pd_2022_hh-size-composition.xlsx"
 
 ## http://download.geonames.org/export/dump/countryInfo.txt
 country_info_csv_path =  data_dir / "countryInfo.txt"
@@ -91,6 +92,32 @@ def add_alpha2_from_alpha3(df, col):
         countries.append(alpha2)
     df["alpha2"] = countries
     return df
+
+def add_alpha3_from_ISO_numeric(df, col):
+    """
+    Adds a column of alpha3 codes to a dataframe with ISO numeric codes in the specified column.
+    
+    Parameters:
+    df (pd.DataFrame): The DataFrame containing the ISO numeric codes.
+    col (str): The column name in df containing ISO numeric codes.
+    
+    Returns:
+    pd.DataFrame: The DataFrame with an additional 'alpha3' column containing the corresponding alpha-3 codes.
+    """
+    countries = []
+    for input_country in df[col]:
+        try:
+            # Convert numeric code to a zero-padded string of length 3
+            numeric_str = f"{int(input_country):03}"
+            country = pycountry.countries.get(numeric=numeric_str)
+            alpha3 = country.alpha_3 if country else f"unk_{input_country}"
+        except Exception as e:
+            alpha3 = f"unk_{input_country}"
+        countries.append(alpha3)
+    
+    df["alpha3"] = countries
+    return df
+
 
 def add_alpha_codes(df, col):
     """
@@ -218,6 +245,57 @@ def drop_countries_without_continent(df, continent_col='Continent'):
     df_cleaned = df_cleaned[df_cleaned[continent_col].str.strip() != '']
     
     return df_cleaned
+
+
+def import_and_select_latest_household_size(file_path: Path, sheet_name: str = 'HH size and composition 2022') -> pd.DataFrame:
+    """
+    Imports an Excel file containing household size data, filters out non-numeric household sizes,
+    and selects the latest household size value for each country based on the available data.
+    
+    Parameters:
+    file_path (Path): The Path to the Excel file.
+    sheet_name (str): The sheet name in the Excel file (default is 'HH size and composition 2022').
+    
+    Returns:
+    pd.DataFrame: A DataFrame with the latest household size values for each country.
+    """
+    # Load the Excel file, skipping the first 4 rows to align with the correct header
+    df = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=4)
+
+
+    # Select the necessary columns
+    df = df[['Country or area', 'ISO Code', 'Average household size (number of members)', 'Reference date (dd/mm/yyyy)']]
+
+    # Rename columns for consistency
+    df.rename(columns={
+        'Country or area': 'Country',
+        'ISO Code': 'ISO',
+        'Average household size (number of members)': 'Household_Size',
+        'Reference date (dd/mm/yyyy)': 'Year'
+    }, inplace=True)
+
+    # Filter out non-numeric household sizes (e.g., '..')
+    df = df[pd.to_numeric(df['Household_Size'], errors='coerce').notna()]
+
+    # Convert 'Household_Size' to a numeric type
+    df['Household_Size'] = pd.to_numeric(df['Household_Size'])
+
+    # Convert 'Year' column to datetime and extract the year
+    df['Year'] = pd.to_datetime(df['Year'], errors='coerce').dt.year
+
+    # Sort the DataFrame by 'ISO' and 'Year' in descending order
+    df.sort_values(by=['ISO', 'Year'], ascending=[True, False], inplace=True)
+
+    # Drop duplicates to keep the latest 'Household_Size' value for each 'ISO'
+    latest_household_size_df = df.drop_duplicates(subset=['ISO'], keep='first')
+
+    # Select only the 'ISO' and 'Household_Size' columns
+    latest_household_size_df = latest_household_size_df[['ISO', 'Household_Size']]
+
+    # Return the resulting DataFrame
+    return latest_household_size_df
+
+
 
 def import_and_select_latest_pbo(csv_path):
     """
@@ -531,7 +609,7 @@ def load_latest_population_data(population_file_path):
 
 
 
-def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file ,bmi_men_file ,height_file, population_file_path, country_info_output_file_path):
+def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file ,bmi_men_file ,height_file, population_file_path, country_info_output_file_path, household_size_file_path):
     """
     Main function to process the input data file, interpolate missing data, and save the results.
     """
@@ -563,7 +641,20 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
 
     df = add_alpha2_from_alpha3(df, "alpha3")
 
-    # add bicycle data
+
+    #############################
+    ## add household size data ##
+
+    # Import the latest household size data using the defined function
+    household_size_df = import_and_select_latest_household_size(household_size_file_path)
+    # Assuming df_imported is your DataFrame with ISO numeric codes in the 'ISO' column
+    household_size_df = add_alpha3_from_ISO_numeric(household_size_df, 'ISO')
+    # Merge the household size data with the existing data
+    df = df.merge(household_size_df, how='outer', on='alpha3')
+
+
+    ######################
+    ## add bicycle data ##
     df_bike = import_and_select_latest_pbo(bicycle_file_path)
     # rename ISO to alpha3
     df_bike.rename(columns={'ISO': 'alpha3'}, inplace=True)
@@ -583,13 +674,13 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     df_cleaned_merge = drop_small_island_nations(df_cleaned_merge)
 
     # import weight data
-    df_weight = calculate_average_weight_per_country(bmi_women_file ,bmi_men_file ,height_file)
+    df_weight = calculate_average_weight_per_country(bmi_women_file_path ,bmi_men_file_path ,height_file_path)
 
     # merge weight df with df_cleaned_merge
     df_cleaned_merge = df_cleaned_merge.merge(df_weight, on='alpha3', how='left')
 
-    # Example usage
-    list_of_vars = ['RURALPiped', 'URBANPiped', 'PBO', 'Weight']
+    # List of variables to impute
+    list_of_vars = ['RURALPiped', 'URBANPiped', 'PBO', 'Weight', 'Household_Size']
 
     # Merge and impute using GDP regression
     df_gdp_imputation, df_gdp_imputation_track = merge_and_impute_with_gdp(df_cleaned_merge, gdp_per_capita_df, list_of_vars)
@@ -601,7 +692,7 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
 
     # merge the dataframes
     df_imputed = df_spatial_imputation.merge(df_gdp_imputation, on='alpha3', suffixes=('_spatial', '_gdp'))
-    df_output = df_imputed.merge(df, on='alpha3')
+    df_output = df_imputed.merge(df_cleaned_merge, on='alpha3')
     df_imputed_track = df_spatial_imputation_track.merge(df_gdp_imputation_track, on='alpha3', suffixes=('_spatial', '_gdp'))
 
 
@@ -609,7 +700,7 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     df_population = load_latest_population_data(population_file_path)
     df_output = df_output.merge(df_population, on='alpha3')
 
-
+    extra_vars = ['alpha2', 'Continent', '% urban', 'Population']
 
     # remove columns that are are not in vars
     # Spatial imputation columns
@@ -618,11 +709,11 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     gdp_list_of_vars = [f"{var}_gdp" for var in list_of_vars]
     output = "spatial"
     if output == "spatial":
-        df_output = df_output[['alpha3'] + spatial_list_of_vars + ['% urban'] + ['Population']]
+        df_output = df_output[['alpha3'] + spatial_list_of_vars + extra_vars]
         # rename columns
         df_output.columns = [var.replace('_spatial', '') for var in df_output.columns]
     elif output == "gdp":
-        df_output = df_output[['alpha3'] + gdp_list_of_vars + ['% urban'] + ['Population']]
+        df_output = df_output[['alpha3'] + gdp_list_of_vars + extra_vars]
         # rename columns
         df_output.columns = [var.replace('_gdp', '') for var in df_output.columns]
     else:
@@ -633,7 +724,18 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     df_imputed_track.to_csv('../../data/processed/semi-processed/merged_data_track.csv', index=False)
 
 
-preprocess_country_info_file(country_info_csv_path,country_info_output_file_path)
+# preprocess_country_info_file(country_info_csv_path,country_info_output_file_path)
 
 
-main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file_path ,bmi_men_file_path ,height_file_path, population_file_path , country_info_output_file_path)
+main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file_path ,bmi_men_file_path ,height_file_path, population_file_path, country_info_output_file_path, household_size_file_path)
+
+
+
+
+
+
+# # Assuming you have an existing DataFrame `df_existing`
+# df_existing = pd.read_csv('/mnt/data/your_existing_data.csv')
+
+# # Merge the household size data with the existing data
+# df_with_household_size = pd.merge(df_existing, latest_household_size_df, on='ISO', how='left')

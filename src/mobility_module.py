@@ -797,50 +797,20 @@ class model_results:
                 "Name": self.hpv_name[0].transpose()[0][0],
                 "Load": self.load_matrix3d[:, slope_scene, load_scene],
                 "Slope": self.slope_matrix3d_deg[:, slope_scene, load_scene],
-                "Average Trip Velocity": self.v_avg_matrix3d[
-                    :, slope_scene, load_scene
-                ],
-                "Litres * Km": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
-                "Average Trip Velocity": self.v_avg_matrix3d[
-                    :, slope_scene, load_scene
-                ],
-                "Litres * Km": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Average Trip Velocity": self.v_avg_matrix3d[:, slope_scene, load_scene],
+                "Litres * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 * mv.t_hours,
-                "Water ration * Km": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
-                "Water ration * Km": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Water ration * Km": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * self.load_matrix3d[:, slope_scene, load_scene]
                 / mv.waterration
                 * mv.t_hours,
-                "Distance to Water Achievable": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
-                "Distance to Water Achievable": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Distance to Water Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * mv.t_hours
                 / 2,
-                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
-                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[
-                    :, slope_scene, load_scene
-                ]
+                "Total Round trip Distance Achievable": self.distance_achievable_one_hr[:, slope_scene, load_scene]
                 * mv.t_hours,
-                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
-                    :, slope_scene, load_scene
-                ]
-                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[
-                    :, slope_scene, load_scene
-                ]
+                "Load Velocity [kg * m/s]": self.v_avg_matrix3d[:, slope_scene, load_scene]
                 * self.load_matrix3d[:, slope_scene, load_scene],
                 "Loaded Velocity": self.v_load_matrix3d[:, slope_scene, load_scene],
                 "Unloaded Velocity": hpv.v_no_load.transpose()[0][0],
@@ -852,7 +822,7 @@ class model_results:
                 ),
             }
         )
-        return df
+
 
     def filter_slope_vector_deg(self, value):
         return self.slope_vector_deg[self.slope_vector_deg == value]
