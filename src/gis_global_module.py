@@ -41,6 +41,7 @@ results_dir = repo_root / "results"
 # URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
 URB_DATA_FILE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
+COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
 EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
 CRR_FILE = repo_root / "data" / "lookup tables" / "Crr.csv"
 FILE_PATH_PARAMS = repo_root / "data" / "lookup tables" / "mobility-model-parameters.csv"
@@ -225,6 +226,7 @@ def merge_and_adjust_population(df_zones_input, df_input):
 
     # trim the dataframe to only include rows where there is a population
     # find non zero values AdjPopFloat
+    # TODO this is already done I think.... in THE GIS ANALYSIS
     df_zones["any_pop"] = df_zones["AdjPopFloat"].apply(lambda x: 1 if x > 10 else 0)
     df_zones = df_zones[df_zones["any_pop"] == 1]
 
@@ -807,11 +809,11 @@ def calculate_population_water_access(df_zones):
     df_zones["zone_pop_unpiped"] = (
         df_zones["pop_zone"]
         * df_zones["urban_rural"]
-        * df_zones["URBANNon-piped"]
+        * (100 - df_zones["URBANPiped"])
         / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
-        * df_zones["RURALNon-piped"]
+        * (100 - df_zones["RURALPiped"])
         / 100
     )
 
@@ -876,7 +878,7 @@ def calculate_water_rations(df_zones):
     )
     df_zones["bikes_in_zone"] = (
         df_zones["pop_zone"]
-        / df_zones["Average household size (number of members)"]
+        / df_zones["Household_Size"]
         * df_zones["PBO"]
     )
     df_zones["water_rations_achievable"] = (
@@ -920,7 +922,7 @@ def aggregate_country_level_data(df_zones):
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
-                "Nat Piped": "first",
+                # "Nat Piped": "first",
                 "region": "first",
                 "subregion": "first",
                 "max distance cycling": ["mean", "max", "min", "median"],
@@ -940,7 +942,7 @@ def aggregate_country_level_data(df_zones):
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
-        "Nat Piped",
+        # "Nat Piped",
         "region",
         "subregion",
         "mean_max_distance_cycling",
@@ -1130,7 +1132,7 @@ def aggregate_district_level_data(df_zones):
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
-                "Nat Piped": "first",
+                # "Nat Piped": "first",
                 "region": "first",
                 "subregion": "first",
                 "max distance cycling": ["mean", "max", "min", "median"],
@@ -1151,7 +1153,7 @@ def aggregate_district_level_data(df_zones):
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
-        "Nat Piped",
+        # "Nat Piped",
         "region",
         "subregion",
         "mean_max_distance_cycling",
@@ -1265,7 +1267,7 @@ def plot_chloropleth(df_countries):
         "population_piped_with_walking_access",
         "percent_without_water",
         "percent_with_water",
-        "Nat Piped",
+        # "Nat Piped",
         "region",
         "subregion",
         "weighted_med",
@@ -1362,6 +1364,10 @@ def run_global_analysis(
         df_zones, time_gathering_water=time_gathering_water
     )
 
+    print("\n\n 1 \n\n")
+    print(len(df_zones["ISOCODE"].unique()))
+
+
     # add df_districts
     df_zones_districts = df_zones.copy()
     df_districts = process_district_data(df_zones_districts)
@@ -1369,7 +1375,14 @@ def run_global_analysis(
     if plot:
         plot_chloropleth(df_countries)
 
+    print("\n\n 5 \n\n")
+    print(len(df_districts["ISOCODE"].unique()))
+    print(len(df_countries["ISOCODE"].unique()))
+
+
+    #TODO consider retuyrning df_zones here as well
     return df_countries, df_districts
+
 
 
 if __name__ == "__main__":
@@ -1387,6 +1400,7 @@ if __name__ == "__main__":
         human_mass=62,  # gets overridden by country specific weight
         use_sample_data=False,
     )
+
 
     df_countries.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
     df_districts.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
