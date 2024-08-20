@@ -1,4 +1,4 @@
-name: water-access
+name: water-access-original
 channels:
   - conda-forge
   - defaults

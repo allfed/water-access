@@ -12,6 +12,47 @@ import os
 import warnings
 
 
+
+
+
+# ## Import Data from CSVs.
+# CSVs created in previous script, which did the cycling mobility on a per country basis
+#
+# ### GIS Data From QGIS Export
+# https://ghsl.jrc.ec.europa.eu/download.php?ds=smod <- urbanisation
+#
+# https://www.earthenv.org/topography <- topography
+#
+# https://www.globio.info/download-grip-dataset <- roads
+
+
+##############################################################################################################################
+#
+# PRE-PROCESSING
+#
+##############################################################################################################################
+
+# Assuming the script is in the src directory, set the script_dir accordingly
+script_dir = Path(__file__).resolve().parent
+repo_root = script_dir.parent
+results_dir = repo_root / "results"
+
+# Define paths relative to the src directory
+# URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
+URB_DATA_FILE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
+COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
+EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
+CRR_FILE = repo_root / "data" / "lookup tables" / "Crr.csv"
+FILE_PATH_PARAMS = repo_root / "data" / "lookup tables" / "mobility-model-parameters.csv"
+
+# Results File Path
+DISTRICT_RESULTS_FILE_PATH = results_dir / "district_results.csv"
+COUNTRY_RESULTS_FILE_PATH = results_dir / "country_results.csv"
+
+
+
+
+
 def weighted_mean(var, wts):
     if len(var) == 0 or len(wts) == 0:
         return 0
@@ -78,30 +119,6 @@ def run_weighted_median_on_grouped_df(df, groupby_column, value_column, weight_c
             }
         )
     return pd.DataFrame(d)
-
-
-# ## Import Data from CSVs.
-# CSVs created in previous script, which did the cycling mobility on a per country basis
-#
-# ### GIS Data From QGIS Export
-# https://ghsl.jrc.ec.europa.eu/download.php?ds=smod <- urbanisation
-#
-# https://www.earthenv.org/topography <- topography
-#
-# https://www.globio.info/download-grip-dataset <- roads
-
-
-##############################################################################################################################
-#
-# PRE-PROCESSING
-#
-##############################################################################################################################
-
-# Constants
-URB_DATA_FILE = "./data/GIS/gis_data_adm1.csv"
-COUNTRY_DATA_FILE = "./data/processed/country_data_master_interpolated.csv"
-EXPORT_FILE_LOCATION = "./data/processed/"
-CRR_FILE = "./data/lookup tables/Crr.csv"
 
 
 def load_data(urb_data_file, country_data_file):
@@ -385,13 +402,6 @@ def preprocess_data(crr_adjustment, use_sample_data=False):
         warnings.warn(
             "Using sample data. This should only be done for testing, and not for generating real model results!"
         )
-        URB_DATA_FILE = "./data/GIS/GIS_data_zones_sample.csv"
-        COUNTRY_DATA_FILE = (
-            "./data/processed/country_data_master_interpolated_sample.csv"
-        )
-    else:
-        URB_DATA_FILE = "./data/GIS/gis_data_adm1.csv"
-        COUNTRY_DATA_FILE = "./data/processed/country_data_master_interpolated.csv"
 
     df_zones_input, df_input = load_data(URB_DATA_FILE, COUNTRY_DATA_FILE)
     df_zones_input = manage_urban_rural(df_zones_input)
@@ -601,7 +611,7 @@ def calculate_and_merge_bicycle_distance(
         sys.path.append(str(project_root))
         import src.mobility_module as mm
 
-        file_path_params = "./data/lookup tables/mobility-model-parameters.csv"
+        file_path_params = FILE_PATH_PARAMS
         param_df = load_hpv_parameters(file_path_params, "Bicycle")
 
         # Overwrite practical limit with the function inputs
@@ -709,7 +719,7 @@ def calculate_and_merge_walking_distance(
         sys.path.append(str(project_root))
         import src.mobility_module as mm
 
-        file_path_params = "./data/lookup tables/mobility-model-parameters.csv"
+        file_path_params = FILE_PATH_PARAMS
         param_df = load_hpv_parameters(file_path_params, "Buckets")
 
         # Overwrite practical limit with the function inputs
@@ -1378,5 +1388,5 @@ if __name__ == "__main__":
         use_sample_data=False,
     )
 
-    df_countries.to_csv("results/country_results_single_run.csv", index=False)
-    df_districts.to_csv("results/district_results_single_run.csv", index=False)
+    df_countries.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
+    df_districts.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
