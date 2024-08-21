@@ -174,7 +174,7 @@ def load_gdp_per_capita(file_path):
     
     return df_recent_gdp
 
-def spatial_imputation(df, list_of_vars, alpha2_col, alpha3_col='alpha3'):
+def spatial_imputation(df, list_of_vars, alpha2_col='alpha2', alpha3_col='alpha3'):
     """
     Interpolates missing values in the dataframe using bordering countries and continent.
     Prioritizes original data and avoids cascading imputations.
@@ -337,6 +337,17 @@ def handle_japan_case(row):
         row['URBANPiped'] = 100.0
         row['RURALPiped'] = (row['TOTALPiped'] - (row['% urban'] * row['URBANPiped'] / 100)) / ((100 - row['% urban']) / 100)
     return row
+def handle_seychelles_case(row):
+    """
+    Handles missing data for Seychelles by assuming 100% URBANPiped and RURALPiped.
+    Seycheles is a small island nation with high urbanization and piped water access.
+    Kevin is half Seychellois and he says this is a good assumption. He has never seen
+    a dwelling without piped water in Seychelles.
+    """
+    if row['Country'] == 'Seychelles' and pd.isna(row['URBANPiped']) and pd.isna(row['RURALPiped']):
+        row['URBANPiped'] = 100.0
+        row['RURALPiped'] = 100.0
+    return row
 
 def process_water_data(df):
     """
@@ -361,6 +372,7 @@ def process_water_data(df):
 
     # Handle Japan's special case
     df = df.apply(handle_japan_case, axis=1)
+    df = df.apply(handle_seychelles_case, axis=1)
 
     # Fill missing rural and urban piped data where total piped is 100
     df.loc[(df['TOTALPiped'] == 100) & (df['RURALPiped'].isna()), 'RURALPiped'] = 100
@@ -484,6 +496,11 @@ def preprocess_country_info_file(input_path, output_path):
 
 
 def import_country_regions(file_path):
+    """
+    https://github.com/lukes/ISO-3166-Countries-with-Regional-Codes/blob/master/all/all.csv
+    Imports the country regions data from the specified file
+    and returns a DataFrame with the relevant columns.
+    """
     # Define the new column names
     new_column_names = {
         'name': 'Entity',
@@ -719,9 +736,9 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     # Merge and impute using GDP regression
     df_gdp_imputation, df_gdp_imputation_track = merge_and_impute_with_gdp(df_cleaned_merge, gdp_per_capita_df, list_of_vars)
 
-    # SPATIAL Interpolation
+    # SPATIAL Imputation
     # rtename spatiual vars, eg: RURALPiped_spatial, URBANPiped_spatial, PBO_spatial, Weight_spatial
-    # Interpolate variables
+    # Imputation variables
     df_spatial_imputation, df_spatial_imputation_track = spatial_imputation(df_cleaned_merge, list_of_vars, "alpha2")
 
     # merge the dataframes

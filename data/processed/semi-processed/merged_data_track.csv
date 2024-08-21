@@ -186,7 +186,7 @@ STP,,,,,,,,,,
 SAU,,,neighbor interpolated,,neighbor interpolated,,,gdp regression,,gdp regression
 SEN,,,,,,,,,,
 SRB,,,neighbor interpolated,,,,,gdp regression,,
-SYC,continent interpolated,continent interpolated,continent interpolated,,,gdp regression,gdp regression,gdp regression,,
+SYC,,,continent interpolated,,,,,gdp regression,,
 SLE,,,,,,,,,,
 SGP,,,continent interpolated,,,,,gdp regression,,
 SVK,,,,,,,,,,
