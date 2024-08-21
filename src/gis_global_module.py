@@ -38,8 +38,8 @@ repo_root = script_dir.parent
 results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
-# URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
-URB_DATA_FILE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
+URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
+URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
 EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
@@ -404,8 +404,6 @@ def calaculated_nat_piped(df_zones_input):
     return df_zones_input   
 
 
-
-
 # Main function to run all steps
 def preprocess_data(crr_adjustment, use_sample_data=False):
     """
@@ -418,12 +416,17 @@ def preprocess_data(crr_adjustment, use_sample_data=False):
         pandas.DataFrame: The preprocessed data.
 
     """
+
     if use_sample_data:
+        urban_data_file = URB_DATA_FILE_SAMPLE
+
         warnings.warn(
             "Using sample data. This should only be done for testing, and not for generating real model results!"
         )
+    else:
+        urban_data_file = URB_DATA_FILE
 
-    df_zones_input, df_input = load_data(URB_DATA_FILE, COUNTRY_DATA_FILE)
+    df_zones_input, df_input = load_data(urban_data_file, COUNTRY_DATA_FILE)
     df_zones_input = calaculated_nat_piped(df_zones_input)
     df_zones_input = manage_urban_rural(df_zones_input)
     df_zones_input = manage_slope(df_zones_input)
