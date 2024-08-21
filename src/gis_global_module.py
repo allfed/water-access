@@ -1372,6 +1372,10 @@ def run_global_analysis(
     df_zones_districts = df_zones.copy()
     df_districts = process_district_data(df_zones_districts)
     df_countries = process_country_data(df_zones)
+
+    # drop countries in df_distciricts if they don't appear in df_copuntries
+    df_districts = df_districts[df_districts["ISOCODE"].isin(df_countries["ISOCODE"])]
+
     if plot:
         plot_chloropleth(df_countries)
 
