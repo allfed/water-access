@@ -140,6 +140,9 @@ def load_data(urb_data_file, country_data_file):
     except:
         df_zones_input = pd.read_csv("." + urb_data_file)
         df_input = pd.read_csv("." + country_data_file)
+
+
+    
     return df_zones_input, df_input
 
 
@@ -388,6 +391,21 @@ def road_analysis(df_zones, crr_adjustment=0):
     return df_zones
 
 
+def calaculated_nat_piped(df_zones_input):
+    """
+    Calaculates National piped using the formula
+    [ URBANPiped ×‘% urban’ ÷100+(100−‘% urban’ )÷100×RURALPiped ]
+
+    """
+    df_zones_input["NATPiped"] = (
+        df_zones_input["URBANPiped"] * df_zones_input["% urban"] / 100
+        + (100 - df_zones_input["% urban"]) / 100 * df_zones_input["RURALPiped"]
+    )
+    return df_zones_input   
+
+
+
+
 # Main function to run all steps
 def preprocess_data(crr_adjustment, use_sample_data=False):
     """
@@ -406,6 +424,7 @@ def preprocess_data(crr_adjustment, use_sample_data=False):
         )
 
     df_zones_input, df_input = load_data(URB_DATA_FILE, COUNTRY_DATA_FILE)
+    df_zones_input = calaculated_nat_piped(df_zones_input)
     df_zones_input = manage_urban_rural(df_zones_input)
     df_zones_input = manage_slope(df_zones_input)
     df_zones = merge_and_adjust_population(df_zones_input, df_input)
