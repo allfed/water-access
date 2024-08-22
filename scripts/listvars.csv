@@ -1,37 +1,25 @@
 ,Name
-7,Coefficient of Rolling Resistance
-8,Coefficient of Rolling Resistance
-9,Coefficient of Rolling Resistance
-7,Reference Area
-8,Reference Area
-9,Reference Area
-7,Drag Coefficient
-8,Drag Coefficient
-9,Drag Coefficient
-7,Efficiency
-8,Efficiency
-9,Efficiency
-7,Air Density
+0,Water Ration
+1,Water Ration
+2,Human Weight
+3,Human Weight
+4,Time Gathering Water
+5,Time Gathering Water
+6,HPV Weight
+7,HPV Weight
 8,Air Density
 9,Air Density
-7,MET budget
-8,MET budget
-9,MET budget
-7,T_hours
-8,T_hours
-9,T_hours
-7,HPV Weight
-8,HPV Weight
-9,HPV Weight
-7,Water Ration
-8,Water Ration
-9,Water Ration
-7,Human Weight
-8,Human Weight
-9,Human Weight
-7,Human Power Output
-8,Human Power Output
-9,Human Power Output
-7,Load Limit
-8,Load Limit
-9,Load Limit
+10,Coefficient of Rolling Resistance
+11,Coefficient of Rolling Resistance
+12,Drag Coefficient
+13,Drag Coefficient
+14,Efficiency
+15,Efficiency
+16,Human Power Output
+17,Human Power Output
+18,Load Limit
+19,Load Limit
+20,MET budget
+21,MET budget
+22,Reference Area
+23,Reference Area

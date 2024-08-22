@@ -12,9 +12,6 @@ import os
 import warnings
 
 
-
-
-
 # ## Import Data from CSVs.
 # CSVs created in previous script, which did the cycling mobility on a per country basis
 #
@@ -39,19 +36,20 @@ results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
 URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
-URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
-COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
+# URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
+# COUNTRY_DATA_FILE = (
+#     repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
+# )
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
 EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
 CRR_FILE = repo_root / "data" / "lookup tables" / "Crr.csv"
-FILE_PATH_PARAMS = repo_root / "data" / "lookup tables" / "mobility-model-parameters.csv"
+FILE_PATH_PARAMS = (
+    repo_root / "data" / "lookup tables" / "mobility-model-parameters.csv"
+)
 
 # Results File Path
-DISTRICT_RESULTS_FILE_PATH = results_dir / "district_results.csv"
-COUNTRY_RESULTS_FILE_PATH = results_dir / "country_results.csv"
-
-
-
+DISTRICT_RESULTS_FILE_PATH = results_dir / "district_results_single_run.csv"
+COUNTRY_RESULTS_FILE_PATH = results_dir / "country_results_single_run.csv"
 
 
 def weighted_mean(var, wts):
@@ -141,8 +139,6 @@ def load_data(urb_data_file, country_data_file):
         df_zones_input = pd.read_csv("." + urb_data_file)
         df_input = pd.read_csv("." + country_data_file)
 
-
-    
     return df_zones_input, df_input
 
 
@@ -401,7 +397,7 @@ def calaculated_nat_piped(df_zones_input):
         df_zones_input["URBANPiped"] * df_zones_input["% urban"] / 100
         + (100 - df_zones_input["% urban"]) / 100 * df_zones_input["RURALPiped"]
     )
-    return df_zones_input   
+    return df_zones_input
 
 
 # Main function to run all steps
@@ -899,9 +895,7 @@ def calculate_water_rations(df_zones):
         df_zones["water_ration_kms"] / df_zones["dtw_1"]
     )
     df_zones["bikes_in_zone"] = (
-        df_zones["pop_zone"]
-        / df_zones["Household_Size"]
-        * df_zones["PBO"]
+        df_zones["pop_zone"] / df_zones["Household_Size"] * df_zones["PBO"]
     )
     df_zones["water_rations_achievable"] = (
         df_zones["bikes_in_zone"] * df_zones["water_rations_per_bike"]
@@ -1389,7 +1383,6 @@ def run_global_analysis(
     print("\n\n 1 \n\n")
     print(len(df_zones["ISOCODE"].unique()))
 
-
     # add df_districts
     df_zones_districts = df_zones.copy()
     df_districts = process_district_data(df_zones_districts)
@@ -1405,10 +1398,8 @@ def run_global_analysis(
     print(len(df_districts["ISOCODE"].unique()))
     print(len(df_countries["ISOCODE"].unique()))
 
-
-    #TODO consider retuyrning df_zones here as well
+    # TODO consider retuyrning df_zones here as well
     return df_countries, df_districts
-
 
 
 if __name__ == "__main__":
@@ -1424,9 +1415,8 @@ if __name__ == "__main__":
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
-        use_sample_data=False,
+        use_sample_data=True,
     )
-
 
     df_countries.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
     df_districts.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
