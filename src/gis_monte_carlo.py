@@ -16,7 +16,7 @@ sys.path.append(str(project_root))
 import src.gis_global_module as gis
 
 
-def sample_normal(low, high, n):
+def sample_normal(low, high, n, confidence=99):
     """
     Generate random samples from a normal distribution.
     Based off of Guesstimate's implementation, translated from Javascript to Python.
@@ -25,19 +25,28 @@ def sample_normal(low, high, n):
     low (float): The lower bound of the distribution.
     high (float): The upper bound of the distribution.
     n (int): The number of samples to generate.
+    confidence (int): The confidence level of the distribution. Must be 90, 95, or 99.
 
     Returns:
     numpy.ndarray: An array of random samples from the normal distribution.
     """
+    if confidence == 90:
+        z = 1.645
+    elif confidence == 95:
+        z = 1.96
+    elif confidence == 99:
+        z = 2.575
+    else:
+        raise ValueError("Confidence level must be 90, 95, or 99")
+    
     mean = np.mean([high, low])
-    # 1.645 for 90% CI, 1.96 for 95% CI, 2.575 for 99% CI
-    stdev = (high - mean) / 2.575
+    stdev = (high - mean) / z
     samples = np.abs(norm.rvs(loc=mean, scale=stdev, size=n))
 
     return samples
 
 
-def sample_lognormal(low, high, n):
+def sample_lognormal(low, high, n, confidence=99):
     """
     Generate random samples from a lognormal distribution.
 
@@ -45,17 +54,26 @@ def sample_lognormal(low, high, n):
     - low (float): The lower bound of the lognormal distribution.
     - high (float): The upper bound of the lognormal distribution.
     - n (int): The number of samples to generate.
+    - confidence (int): The confidence level of the distribution. Must be 90, 95, or 99.
 
     Returns:
     - samples (ndarray): An array of random samples from the lognormal distribution.
     """
     assert low > 0, "Low must be greater than 0 for lognormal distributions."
+    
+    if confidence == 90:
+        z = 1.645
+    elif confidence == 95:
+        z = 1.96
+    elif confidence == 99:
+        z = 2.575
+    else:
+        raise ValueError("Confidence level must be 90, 95, or 99")
     logHigh = np.log(high)
     logLow = np.log(low)
-
+    
     mean = np.mean([logHigh, logLow])
-    # 1.645 for 90% CI, 1.96 for 95% CI, 2.575 for 99% CI
-    stdev = (logHigh - logLow) / (2 * 2.575)
+    stdev = (logHigh - logLow) / (2 * z)
     scale = np.exp(mean)
     samples = np.abs(lognorm.rvs(s=stdev, scale=scale, size=n))
 
@@ -70,6 +88,8 @@ def run_simulation(
     met,
     watts,
     hill_polarity,
+    urban_adjustment,
+    rural_adjustment,
     calculate_distance=True,
     use_sample_data=False,
 ):
@@ -109,6 +129,8 @@ def run_simulation(
     assert isinstance(met, (int, float)), "MET must be a number."
     assert isinstance(watts, (int, float)), "Watts must be a number."
     assert isinstance(hill_polarity, str), "Hill polarity must be a string."
+    assert isinstance(urban_adjustment, (int, float)), "Urban adjustment must be a number."
+    assert isinstance(rural_adjustment, (int, float)), "Rural adjustment must be a number."
 
     df_countries, df_districts = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
@@ -118,6 +140,8 @@ def run_simulation(
         met=met,
         watts=watts,
         hill_polarity=hill_polarity,
+        urban_adjustment=urban_adjustment,
+        rural_adjustment=rural_adjustment,
         calculate_distance=calculate_distance,
         plot=False,
         use_sample_data=use_sample_data,

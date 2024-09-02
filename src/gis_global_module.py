@@ -36,7 +36,7 @@ results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
 URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
-# URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
+URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
 # COUNTRY_DATA_FILE = (
 #     repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
 # )
@@ -164,6 +164,33 @@ def manage_urban_rural(df_zones_input):
     # create new binary column for urban / rural. Rural is below 15, Urban above 15
     df_zones_input["urban_rural"] = np.where(df_zones_input["URBAN_1"] > 15, 1, 0)
     return df_zones_input
+
+
+def adjust_euclidean(df_zones_input, urban_adjustment, rural_adjustment):
+    """
+    Adjusts distance to water to account for people having to travel on roads and paths instead of 
+    in straight lines (Euclidean distance), with different adjustments for urban and rural areas.
+
+    Parameters:
+    - df_zones_input (pd.DataFrame): DataFrame of GIS zones data
+    - urban_adjustment (float): Adjustment ratio for urban areas
+    - rural_adjustment (float): Adjustment ratio for rural areas
+    """
+    # Boolean indexing for urban areas
+    urban_mask = df_zones_input["urban_rural"] == 1
+    df_zones_input.loc[urban_mask, "dtw_1"] *= urban_adjustment
+
+    # Boolean indexing for rural areas
+    rural_mask = df_zones_input["urban_rural"] == 0
+    df_zones_input.loc[rural_mask, "dtw_1"] *= rural_adjustment
+
+    # Optionally, raise an error if there are invalid values
+    if not df_zones_input["urban_rural"].isin([0, 1]).all():
+        raise ValueError("Invalid value (not 0 or 1) in 'urban_rural' column")
+    
+    return df_zones_input
+
+
 
 
 # Function for managing slope
@@ -387,21 +414,21 @@ def road_analysis(df_zones, crr_adjustment=0):
     return df_zones
 
 
-def calaculated_nat_piped(df_zones_input):
+def calculate_nat_piped(df_zones):
     """
-    Calaculates National piped using the formula
+    Calculates National piped using the formula
     [ URBANPiped ×‘% urban’ ÷100+(100−‘% urban’ )÷100×RURALPiped ]
 
     """
-    df_zones_input["NATPiped"] = (
-        df_zones_input["URBANPiped"] * df_zones_input["% urban"] / 100
-        + (100 - df_zones_input["% urban"]) / 100 * df_zones_input["RURALPiped"]
+    df_zones["NATPiped"] = (
+        df_zones["URBANPiped"] * df_zones["% urban"] / 100
+        + (100 - df_zones["% urban"]) / 100 * df_zones["RURALPiped"]
     )
-    return df_zones_input
+    return df_zones
 
 
 # Main function to run all steps
-def preprocess_data(crr_adjustment, use_sample_data=False):
+def preprocess_data(crr_adjustment, urban_adjustment, rural_adjustment, use_sample_data=False):
     """
     Preprocesses data by loading, managing, merging, and adjusting population data.
 
@@ -423,11 +450,12 @@ def preprocess_data(crr_adjustment, use_sample_data=False):
         urban_data_file = URB_DATA_FILE
 
     df_zones_input, df_input = load_data(urban_data_file, COUNTRY_DATA_FILE)
-    df_zones_input = calaculated_nat_piped(df_zones_input)
     df_zones_input = manage_urban_rural(df_zones_input)
+    df_zones_input = adjust_euclidean(df_zones_input, urban_adjustment=urban_adjustment, rural_adjustment=rural_adjustment)
     df_zones_input = manage_slope(df_zones_input)
     df_zones = merge_and_adjust_population(df_zones_input, df_input)
     df_zones = road_analysis(df_zones, crr_adjustment=crr_adjustment)
+    df_zones = calculate_nat_piped(df_zones)
     return df_zones
 
 
@@ -656,7 +684,7 @@ def calculate_and_merge_bicycle_distance(
             slope_zones,
             Crr_values,
             country_average_weights,
-            load_attempt=25,
+            load_attempt=15,
         )
         process_and_save_results(df_zones, results, export_file_location, "bicycle")
     else:
@@ -757,7 +785,7 @@ def calculate_and_merge_walking_distance(
         # Run model for each zone with country-specific weights
         slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
         results = run_walking_model(
-            mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt=20
+            mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt=15
         )
         process_and_save_results(df_zones, results, export_file_location, "walk")
     else:
@@ -938,7 +966,7 @@ def aggregate_country_level_data(df_zones):
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
-                # "Nat Piped": "first",
+                "NATPiped": "first",
                 "region": "first",
                 "subregion": "first",
                 "max distance cycling": ["mean", "max", "min", "median"],
@@ -958,7 +986,7 @@ def aggregate_country_level_data(df_zones):
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
-        # "Nat Piped",
+        "NATPiped",
         "region",
         "subregion",
         "mean_max_distance_cycling",
@@ -996,16 +1024,18 @@ def clean_up_data(df_countries):
     - countries_further_than_libya (pandas.DataFrame): The dataframe containing countries with distances greater than the maximum distance to water.
     - list_of_countries_to_remove (list): The list of specific countries manually removed from the dataframe.
     """
-    df_countries = df_countries.dropna()  # Remove any NaN rows
+    # df_countries = df_countries.dropna()  # Remove any NaN rows
 
     # Remove outliers based on max possible distance to water
-    max_distance = (
-        df_countries.loc[df_countries["ISOCODE"] == "LBY", "weighted_med"].values[0] + 1
-    )
-    countries_further_than_libya = df_countries[
-        df_countries["weighted_med"] > max_distance
-    ]
-    df_countries = df_countries[df_countries["weighted_med"] < max_distance]
+    libya_weighted_med = df_countries.loc[df_countries["ISOCODE"] == "LBY", "weighted_med"].values
+    
+    if len(libya_weighted_med) > 0:
+        max_distance = libya_weighted_med[0] + 1
+        countries_further_than_libya = df_countries[df_countries["weighted_med"] > max_distance]
+        df_countries = df_countries[df_countries["weighted_med"] < max_distance]
+    else:
+        countries_further_than_libya = pd.DataFrame()
+        print("Warning: No data for Libya (ISOCODE 'LBY'). Skipping outlier removal based on Libya's weighted_med.")
 
     # Manually remove specific countries
     list_of_countries_to_remove = [
@@ -1104,10 +1134,11 @@ def process_country_data(df_zones):
     )
 
     # Log or print summary of removed countries
-    print(
-        "Countries removed from analysis due to being further than Libya's median:",
-        removed_further_than_libya["Entity"].tolist(),
-    )
+    if not removed_further_than_libya.empty:
+        print(
+            "Countries removed from analysis due to being further than Libya's median:",
+            removed_further_than_libya["Entity"].tolist(),
+        )
     print("Countries removed manually:", removed_countries_list)
 
     return df_countries
@@ -1148,7 +1179,7 @@ def aggregate_district_level_data(df_zones):
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
-                # "Nat Piped": "first",
+                "NATPiped": "first",
                 "region": "first",
                 "subregion": "first",
                 "max distance cycling": ["mean", "max", "min", "median"],
@@ -1169,7 +1200,7 @@ def aggregate_district_level_data(df_zones):
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
-        # "Nat Piped",
+        "NATPiped",
         "region",
         "subregion",
         "mean_max_distance_cycling",
@@ -1283,7 +1314,7 @@ def plot_chloropleth(df_countries):
         "population_piped_with_walking_access",
         "percent_without_water",
         "percent_with_water",
-        # "Nat Piped",
+        "NATPiped",
         "region",
         "subregion",
         "weighted_med",
@@ -1304,10 +1335,10 @@ def plot_chloropleth(df_countries):
         height=600,
         color="percent_without_water",
         # use constant colorbar grading (not relative)
-        # color_continuous_scale="ylorbr",
+        color_continuous_scale="ylorbr",
         # color_continuous_scale="YlGnBu_r",
         # color_continuous_scale="PuRd",
-        color_continuous_scale="Greys",
+        # color_continuous_scale="Greys",
         range_color=(0, 100),
         scope="world",
         hover_name="ISOCODE",
@@ -1332,6 +1363,8 @@ def run_global_analysis(
     met,
     watts,
     hill_polarity,
+    urban_adjustment,
+    rural_adjustment,
     calculate_distance=True,
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
@@ -1356,7 +1389,7 @@ def run_global_analysis(
         pandas.DataFrame: The processed data for each country.
     """
     df_zones = preprocess_data(
-        crr_adjustment=crr_adjustment, use_sample_data=use_sample_data
+        crr_adjustment=crr_adjustment, urban_adjustment=urban_adjustment, rural_adjustment=rural_adjustment, use_sample_data=use_sample_data
     )
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,
@@ -1412,11 +1445,13 @@ if __name__ == "__main__":
         met=4.5,
         watts=75,
         hill_polarity="flat_uphill",
+        urban_adjustment=1.3,
+        rural_adjustment=1.4,
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
-        use_sample_data=True,
+        use_sample_data=False,
     )
 
-    df_countries.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
-    df_districts.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
+    df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
+    df_districts.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)

@@ -10,7 +10,7 @@ dependencies:
   - ipykernel 
   - ipywidgets >=7.6
   - notebook>=5.3
-  - Flask==2.1.0
+  - Flask==3.0.3
   - pycountry 
   - pyarrow  # Added for Parquet support
   - pip

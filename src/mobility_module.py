@@ -1,8 +1,7 @@
-# Importing NumPy for numerical operations.
 import numpy as np
 
-# Importing pandas for data manipulation and analysis.
 import pandas as pd
+import warnings
 
 # Importing matplotlib for plotting and visualization.
 import matplotlib.pyplot as plt
@@ -16,10 +15,6 @@ from scipy.optimize import fsolve
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-
-import numpy as np
-
 
 def linspace_creator(max_value_array, min_value, res):
     """
@@ -282,6 +277,7 @@ class mobility_models:
             unloaded_velocity = V_un[0][0]
             # Limit velocity to a maximum of 7m/s
             unloaded_velocity = min(unloaded_velocity, 7)
+            # assert unloaded_velocity >= 0, "Unloaded velocity cannot be negative."
         else:
             unloaded_velocity = np.nan
 
@@ -305,6 +301,10 @@ class mobility_models:
 
             # Limit velocity to a maximum of 7m/s
             loaded_velocity = min(loaded_velocity, 7)
+            # warn if negative and set to 0
+            # if loaded_velocity < 0:
+            #     warnings.warn("Loaded velocity is negative, setting to 0.")
+            #     loaded_velocity = 0
         else:
             loaded_velocity = np.nan
 

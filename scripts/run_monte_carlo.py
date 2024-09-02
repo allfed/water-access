@@ -68,6 +68,12 @@ POLARITY_OPTIONS = [
     "downhill_uphill",
 ]
 
+# Adjustments for euclidean distance to account for paths taken to water not being straight lines
+URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
+URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
+RURAL_ADJUSTMENT_LOWER_ESTIMATE = 1
+RURAL_ADJUSTMENT_UPPER_ESTIMATE = 1.3
+
 # -------------------------------------------------------------------------------
 
 
@@ -96,12 +102,21 @@ if __name__ == "__main__":
 
     hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
 
+    urban_adjustments = mc.sample_normal(
+        URBAN_ADJUSTMENT_LOWER_ESTIMATE, URBAN_ADJUSTMENT_UPPER_ESTIMATE, NUM_ITERATIONS
+    )
+    rural_adjustments = mc.sample_normal(
+        RURAL_ADJUSTMENT_LOWER_ESTIMATE, RURAL_ADJUSTMENT_UPPER_ESTIMATE, NUM_ITERATIONS
+    )
+
     print(crr_adjustments)
     print(time_gatherings)
     print(practical_limits_bicycle)
     print(mets)
     print(watts_values)
     print(hill_polarities)
+    print(urban_adjustments)
+    print(rural_adjustments)
 
     # Initialize lists to store results from each output
     districts_simulation_results = []
@@ -122,8 +137,10 @@ if __name__ == "__main__":
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
             )
-            for crr_adjustment, time_gathering_water, practical_limit_bicycle, practical_limit_buckets, met, watts, hill_polarity in zip(
+            for crr_adjustment, time_gathering_water, practical_limit_bicycle, practical_limit_buckets, met, watts, hill_polarity, urban_adjustment, rural_adjustment in zip(
                 crr_adjustments,
                 time_gatherings,
                 practical_limits_bicycle,
@@ -131,6 +148,8 @@ if __name__ == "__main__":
                 mets,
                 watts_values,
                 hill_polarities,
+                urban_adjustments,
+                rural_adjustments,
             )
         ]
 
@@ -155,5 +174,8 @@ if __name__ == "__main__":
 
     # Record the end time
     end_time = time.time()
-    # Calculate and print the time taken by the simulations
-    print(f"The simulations took {end_time - start_time} seconds.")
+    
+    # Calculate and print the time taken by the simulations in minutes and hours
+    time_taken = end_time - start_time
+    print(f"Time taken: {time_taken / 60:.2f} minutes")
+    print(f"Time taken: {time_taken / 3600:.2f} hours")

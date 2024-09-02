@@ -219,6 +219,7 @@ def spatial_imputation(df, list_of_vars, alpha2_col='alpha2', alpha3_col='alpha3
                 df_interp_track.at[idx, variable] = "continent interpolated"
 
     # Return only the list_of_vars and the alpha3 column
+    # BUG there are multiple entities for a single alpha3 code (e.g., sint maarten and netherlands for NLD)
     df_output = df_output[[alpha3_col] + list_of_vars]
     return df_output, df_interp_track
 
@@ -349,6 +350,7 @@ def handle_seychelles_case(row):
         row['RURALPiped'] = 100.0
     return row
 
+
 def process_water_data(df):
     """
     Processes water data by calculating TOTALPiped, filling missing values, and adding necessary columns.
@@ -401,6 +403,18 @@ def process_water_data(df):
     df = df.dropna(subset=['URBANPiped', 'RURALPiped', 'TOTALPiped'], how='all')
     df = df.sort_values(['Country', 'Year'], ascending=[True, False])
     df = df.drop_duplicates('Country', keep='first').reset_index(drop=True)
+
+    return df
+
+def add_back_percentage_urban_data(df, df_water):
+    """
+    Adds percentage urban data for countries where it is was dropped in process_water_data
+    """
+    # Find missing % urban data, then fill using the original data from df_water
+    original_data = df_water[['Country', '% urban']].drop_duplicates('Country', keep='first')
+    df = df.merge(original_data, left_on='Entity', right_on='Country', how='left', suffixes=('', '_temp'))
+    df['% urban'] = df['% urban'].fillna(df['% urban_temp'])
+    df = df.drop(columns=['% urban_temp', 'Country'])
 
     return df
 
@@ -458,6 +472,7 @@ def impute_using_gdp(df, list_of_vars, gdp_col='GDP per Capita (current US$)', a
             df_interp_track.loc[missing_idx, variable] = "gdp regression"
     
     # Return only the list_of_vars and the alpha3 column
+    # BUG there are multiple entities for a single alpha3 code (e.g., sint maarten, curacao and netherlands for NLD)
     df_output = df_output[[alpha3_col] + list_of_vars]
     return df_output, df_interp_track
 
@@ -663,8 +678,11 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     # Process water data
     df = process_water_data(df_water)
 
-    # Add alpha2 codes from ISO
+    # Add alpha codes from ISO
     df = add_alpha_codes(df,'Country' )
+
+    # check duplicates for alpha3
+    duplicates = (df[df.duplicated(subset=['alpha3'], keep=False)])
 
     # Manual mapping for problematic entries
     manual_alpha3_mapping = {
@@ -675,10 +693,16 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
         "China, Hong Kong SAR": "HKG",
         "China, Macao SAR": "MAC",
         "Republic of Korea": "KOR",
+        "Curaçao": "CUW",
+        "Niger": "NER",
+        "Sint Maarten (Dutch part)": "SXM",
     }
 
     # Apply manual mapping
     df['alpha3'] = df.apply(lambda row: manual_alpha3_mapping.get(row['Country'], row['alpha3']), axis=1)
+
+    # check duplicates again for alpha3
+    duplicates_2 = (df[df.duplicated(subset=['alpha3'], keep=False)])
 
     df = add_alpha2_from_alpha3(df, "alpha3")
 
@@ -743,6 +767,7 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
 
     # merge the dataframes
     df_imputed = df_spatial_imputation.merge(df_gdp_imputation, on='alpha3', suffixes=('_spatial', '_gdp'))
+    # Here's the problem
     df_output = df_imputed.merge(df_cleaned_merge, on='alpha3')
     df_imputed_track = df_spatial_imputation_track.merge(df_gdp_imputation_track, on='alpha3', suffixes=('_spatial', '_gdp'))
 
@@ -771,12 +796,17 @@ def main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_w
     else:
         df_output = df_output[['alpha3'] + spatial_list_of_vars + gdp_list_of_vars]
 
+    # Add back % urban data
+    df_output = add_back_percentage_urban_data(df_output, df_water)
 
-
-    # # Save dataframes as CSV
-    df_output.to_csv('../../data/processed/merged_data.csv', index=False)
-    df_imputed_track.to_csv('../../data/processed/semi-processed/merged_data_track.csv', index=False)
-
+    # Save dataframes as CSV
+    try:
+        df_output.to_csv('../../data/processed/merged_data.csv', index=False)
+        df_imputed_track.to_csv('../../data/processed/semi-processed/merged_data_track.csv', index=False)
+    except:
+        df_output.to_csv('./data/processed/merged_data.csv', index=False)
+        df_imputed_track.to_csv('./data/processed/semi-processed/merged_data_track.csv', index=False)
+    
 
 preprocess_country_info_file(country_info_csv_path,country_info_output_file_path)
 main(water_JMP_file_path, bicycle_file_path, gdp_per_capita_file_path, bmi_women_file_path ,bmi_men_file_path ,height_file_path, population_file_path, country_info_output_file_path, household_size_file_path, country_regions_file_path)

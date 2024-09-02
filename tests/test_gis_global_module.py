@@ -30,6 +30,8 @@ from src.gis_global_module import (
     process_and_save_results,
     clean_up_data,
     map_hill_polarity,
+    adjust_euclidean,
+    run_global_analysis,
 )
 
 
@@ -1199,3 +1201,59 @@ class TestMapHillPolarity:
         result = map_hill_polarity(hill_polarity)
         expected_result = (0, -1)
         assert result == expected_result
+
+class TestAdjustEuclidean: 
+    def test_adjust_euclidean_returns_correct_result(self):
+        df_zones_input = pd.DataFrame({
+            "dtw_1": [1000, 2000, 3000],
+            "urban_rural": [1, 0, 1]
+        })
+        expected_result = pd.DataFrame({
+            "dtw_1": [4000, 6000, 12000],
+            "urban_rural": [1, 0, 1]
+        })
+
+        result = adjust_euclidean(df_zones_input, urban_adjustment=4, rural_adjustment=3)
+
+        pd.testing.assert_frame_equal(result, expected_result)
+
+    def test_adjust_euclidean_raises_error_when_urban_rural_is_non_binary(self):
+        df_zones_input = pd.DataFrame({
+            "dtw_1": [1000, 2000, 3000],
+            "urban_rural": [1, 2, 1]
+        })
+
+        with pytest.raises(ValueError):
+            adjust_euclidean(df_zones_input, urban_adjustment=4, rural_adjustment=3)
+
+# Add test cases for run_global_analysis
+class TestRunGlobalAnalysis:
+    def test_run_global_analysis_null_run(self):
+        # If time gathering water is 0, percentage of population without water access
+        # should be equal to percentage piped
+        df_countries, df_districts = run_global_analysis(
+            crr_adjustment=0,
+            time_gathering_water=0,
+            practical_limit_bicycle=40,
+            practical_limit_buckets=20,
+            met=4.5,
+            watts=75,
+            hill_polarity="flat_uphill",
+            urban_adjustment=1.345,
+            rural_adjustment=1.2,
+            calculate_distance=True,
+            plot=False,
+            human_mass=62,  # gets overridden by country specific weight
+            use_sample_data=True,
+        )
+        # calculate MAPE between percent_without_water and NATPiped
+        # Extract the true and predicted values
+        y_true = df_countries["NATPiped"]
+        y_pred = df_countries["percent_without_water"]
+        y_true, y_pred = np.array(y_true), np.array(y_pred)
+        mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+        print(f"MAPE: {mape}")
+
+        assert df_countries["percent_without_water"].equals(df_countries["NATPiped"])
+
+
