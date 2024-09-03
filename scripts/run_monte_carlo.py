@@ -4,11 +4,16 @@ from pathlib import Path
 import sys
 from tqdm import tqdm
 import time
+import pandas as pd
 
 # Resolve project root and update sys.path
 project_root = Path().resolve().parent
 sys.path.append(str(project_root))
 import src.gis_monte_carlo as mc
+
+# Results path
+RESULTS_PATH = project_root / "results"
+PARQUET_PATH = RESULTS_PATH / "parquet_files"
 
 # -------------------------------------------------------------------------------
 # DEFINE MONTE CARLO SIMULATION PARAMETERS
@@ -16,8 +21,8 @@ import src.gis_monte_carlo as mc
 
 # Define the number of simulations to run
 # Expect ~15-20 minutes for one simulation,
-# but multiprocessing will speed up large batches significantly
-NUM_ITERATIONS = 15
+# but multiprocessing will speed up large batches signimficantly
+NUM_ITERATIONS = 1
 
 # Define maximum simultaneous processes to run for multiprocessing
 # 15 was the most that could run on a 32 core hyperthreaded machine
@@ -71,8 +76,13 @@ POLARITY_OPTIONS = [
 # Adjustments for euclidean distance to account for paths taken to water not being straight lines
 URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
 URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-RURAL_ADJUSTMENT_LOWER_ESTIMATE = 1
-RURAL_ADJUSTMENT_UPPER_ESTIMATE = 1.3
+# RURAL_ADJUSTMENT_LOWER_ESTIMATE = 1       #TODO James can delete these lines
+# RURAL_ADJUSTMENT_UPPER_ESTIMATE = 1.3
+# Set the parameters for the GPD distribution for rural adjustments. Shape, scale, and loc
+# These values were obtained from the scripts/create_pareto_distribution.py
+RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
+RURAL_PDR_PARETO_SCALE = 0.19953125000000005
+RURAL_PDR_PARETO_LOC = 1.0
 
 # -------------------------------------------------------------------------------
 
@@ -105,8 +115,8 @@ if __name__ == "__main__":
     urban_adjustments = mc.sample_normal(
         URBAN_ADJUSTMENT_LOWER_ESTIMATE, URBAN_ADJUSTMENT_UPPER_ESTIMATE, NUM_ITERATIONS
     )
-    rural_adjustments = mc.sample_normal(
-        RURAL_ADJUSTMENT_LOWER_ESTIMATE, RURAL_ADJUSTMENT_UPPER_ESTIMATE, NUM_ITERATIONS
+    rural_adjustments = mc.sample_gpd(
+        RURAL_PDR_PARETO_SHAPE, RURAL_PDR_PARETO_SCALE, RURAL_PDR_PARETO_LOC, NUM_ITERATIONS
     )
 
     print(crr_adjustments)
@@ -121,9 +131,15 @@ if __name__ == "__main__":
     # Initialize lists to store results from each output
     districts_simulation_results = []
     countries_simulation_results = []
+    zone_simulation_results = []
 
     # Record the start time
     start_time = time.time()
+    print("Starting Monte Carlo simulations...")
+    print(f"Running {NUM_ITERATIONS} simulations...")
+    print(f"Running {MAX_WORKERS} simulations concurrently...")
+    print("Start time:", time.strftime("%H:%M:%S", time.localtime()))
+    print("\n\n")
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # Submit all simulations to the executor
@@ -160,14 +176,27 @@ if __name__ == "__main__":
             desc="Simulating",
         )
 
-        # Collect results as they complete
-        for future in concurrent.futures.as_completed(futures):
-            countries_result, district_result = future.result()  # Unpack the results
+
+        for i, future in enumerate(concurrent.futures.as_completed(futures)):
+            countries_result, district_result, zone_result = future.result()
+
+            # save the results
             districts_simulation_results.append(district_result)
             countries_simulation_results.append(countries_result)
+
+            
+            # keep only the columns needed for the zone results
+            filtered_zone_result = zone_result[['zone_pop_with_water', 'zone_pop_without_water']]
+
+            # Save the filtered DataFrame to a Parquet file
+            output_file = PARQUET_PATH / f'zone_simulation_result_{i}.parquet'
+            filtered_zone_result.to_parquet(output_file, index=False)
+
             futures_progress.update()  # Update the progress bar
 
+
     futures_progress.close()  # Close the progress bar
+
 
     mc.process_mc_results(countries_simulation_results)
     mc.process_districts_results(districts_simulation_results)

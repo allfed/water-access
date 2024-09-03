@@ -36,7 +36,10 @@ results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
 URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
-URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
+URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample_stripped.csv"
+# COUNTRY_DATA_FILE = (
+#     repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
+# )
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
 EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
 CRR_FILE = repo_root / "data" / "lookup tables" / "Crr.csv"
@@ -930,7 +933,7 @@ def calculate_water_rations(df_zones):
         df_zones["water_ration_kms"] / df_zones["dtw_1"]
     )
     df_zones["bikes_in_zone"] = (
-        df_zones["pop_zone"] / df_zones["Household_Size"] * df_zones["PBO"]
+        df_zones["pop_zone"] / df_zones["Household_Size"] * df_zones["PBO"]/100 # must divide by 100 as PBO is percentage.
     )
     df_zones["water_rations_achievable"] = (
         df_zones["bikes_in_zone"] * df_zones["water_rations_per_bike"]
@@ -1474,7 +1477,7 @@ def run_global_analysis(
     calculate_distance=True,
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
-    use_sample_data=False,  # only change to test functionality
+    use_sample_data=False,  # only change to test functionality 
 ):
     """
     Runs one run of the global analysis for water access.
@@ -1541,7 +1544,7 @@ def run_global_analysis(
     print(len(df_countries["ISOCODE"].unique()))
 
     # TODO consider retuyrning df_zones here as well
-    return df_countries, df_districts
+    return df_countries, df_districts, df_zones
 
 
 if __name__ == "__main__":
@@ -1559,7 +1562,7 @@ if __name__ == "__main__":
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
-        use_sample_data=True,
+        use_sample_data=False    ,
     )
 
     df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)

@@ -1,6 +1,6 @@
 import concurrent.futures
 import numpy as np
-from scipy.stats import norm, lognorm
+from scipy.stats import norm, lognorm, genpareto
 import pandas as pd
 from pathlib import Path
 import sys
@@ -80,6 +80,24 @@ def sample_lognormal(low, high, n, confidence=99):
     return samples
 
 
+def sample_gpd(shape_param, scale_param, loc_param=1.0, n=1000):
+    """
+    Generate random samples from a Generalized Pareto Distribution (GPD).
+
+    Parameters:
+    - shape_param (float): The shape parameter of the GPD.
+    - scale_param (float): The scale parameter of the GPD.
+    - loc_param (float): The location parameter of the GPD (default is 1.0).
+    - n (int): The number of samples to generate.
+
+    Returns:
+    - samples (ndarray): An array of random samples from the GPD.
+    """
+    samples = genpareto.rvs(c=shape_param, loc=loc_param, scale=scale_param, size=n)
+    return samples
+
+
+
 def run_simulation(
     crr_adjustment,
     time_gathering_water,
@@ -132,7 +150,7 @@ def run_simulation(
     assert isinstance(urban_adjustment, (int, float)), "Urban adjustment must be a number."
     assert isinstance(rural_adjustment, (int, float)), "Rural adjustment must be a number."
 
-    df_countries, df_districts = gis.run_global_analysis(
+    df_countries, df_districts, df_zones = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
         time_gathering_water=time_gathering_water,
         practical_limit_bicycle=practical_limit_bicycle,
@@ -146,7 +164,7 @@ def run_simulation(
         plot=False,
         use_sample_data=use_sample_data,
     )
-    return df_countries, df_districts
+    return df_countries, df_districts, df_zones
 
 
 def process_mc_results(countries_simulation_results, plot=True, output_dir="results"):
