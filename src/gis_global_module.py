@@ -37,9 +37,6 @@ results_dir = repo_root / "results"
 # Define paths relative to the src directory
 URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
 URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
-# COUNTRY_DATA_FILE = (
-#     repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
-# )
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
 EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
 CRR_FILE = repo_root / "data" / "lookup tables" / "Crr.csv"
@@ -168,7 +165,7 @@ def manage_urban_rural(df_zones_input):
 
 def adjust_euclidean(df_zones_input, urban_adjustment, rural_adjustment):
     """
-    Adjusts distance to water to account for people having to travel on roads and paths instead of 
+    Adjusts distance to water to account for people having to travel on roads and paths instead of
     in straight lines (Euclidean distance), with different adjustments for urban and rural areas.
 
     Parameters:
@@ -187,10 +184,8 @@ def adjust_euclidean(df_zones_input, urban_adjustment, rural_adjustment):
     # Optionally, raise an error if there are invalid values
     if not df_zones_input["urban_rural"].isin([0, 1]).all():
         raise ValueError("Invalid value (not 0 or 1) in 'urban_rural' column")
-    
+
     return df_zones_input
-
-
 
 
 # Function for managing slope
@@ -428,7 +423,9 @@ def calculate_nat_piped(df_zones):
 
 
 # Main function to run all steps
-def preprocess_data(crr_adjustment, urban_adjustment, rural_adjustment, use_sample_data=False):
+def preprocess_data(
+    crr_adjustment, urban_adjustment, rural_adjustment, use_sample_data=False
+):
     """
     Preprocesses data by loading, managing, merging, and adjusting population data.
 
@@ -451,7 +448,11 @@ def preprocess_data(crr_adjustment, urban_adjustment, rural_adjustment, use_samp
 
     df_zones_input, df_input = load_data(urban_data_file, COUNTRY_DATA_FILE)
     df_zones_input = manage_urban_rural(df_zones_input)
-    df_zones_input = adjust_euclidean(df_zones_input, urban_adjustment=urban_adjustment, rural_adjustment=rural_adjustment)
+    df_zones_input = adjust_euclidean(
+        df_zones_input,
+        urban_adjustment=urban_adjustment,
+        rural_adjustment=rural_adjustment,
+    )
     df_zones_input = manage_slope(df_zones_input)
     df_zones = merge_and_adjust_population(df_zones_input, df_input)
     df_zones = road_analysis(df_zones, crr_adjustment=crr_adjustment)
@@ -889,6 +890,12 @@ def calculate_population_water_access(df_zones):
         ["population_piped_with_cycling_access", "population_piped_with_walking_access"]
     ].max(axis=1)
 
+    # Calculate the population that can access water only by cycling
+    # Equals population_piped_with_cycling_access if zone_walking_okay is 0
+    df_zones["population_piped_with_only_cycling_access"] = df_zones[
+        "population_piped_with_cycling_access"
+    ] * (1 - df_zones["zone_walking_okay"])
+
     # Calculate zone population with and without water access
     df_zones["zone_pop_with_water"] = (
         df_zones["population_piped_with_access"] + df_zones["zone_pop_unpiped"]
@@ -966,11 +973,10 @@ def aggregate_country_level_data(df_zones):
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
+                "population_piped_with_only_cycling_access": "sum",
                 "NATPiped": "first",
                 "region": "first",
                 "subregion": "first",
-                "max distance cycling": ["mean", "max", "min", "median"],
-                "max distance walking": ["mean", "max", "min", "median"],
                 # Additional aggregations can be added here
             }
         )
@@ -986,30 +992,119 @@ def aggregate_country_level_data(df_zones):
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
+        "population_piped_with_only_cycling_access",
         "NATPiped",
         "region",
         "subregion",
-        "mean_max_distance_cycling",
-        "max_max_distance_cycling",
-        "min_max_distance_cycling",
-        "median_max_distance_cycling",
-        "mean_max_distance_walking",
-        "max_max_distance_walking",
-        "min_max_distance_walking",
-        "median_max_distance_walking",
     ]
 
     return df_countries
 
 
-def calculate_weighted_median(df_zones):
+def weighted_percentile(df, val_column, weight_column, percentile):
+    """Calculates the weighted percentile
+    ArithmeticError
+    If the sum of the weights is zero, or if the weights are not positive.
+    """
+    df_sorted = df.sort_values(val_column)
+    cumsum = df_sorted[weight_column].cumsum()
+    cutoff = df_sorted[weight_column].sum() * percentile / 100.0
+    return df_sorted[cumsum >= cutoff][val_column].iloc[0]
+
+
+def calculate_weighted_results(df_zones):
     """
     Calculate the weighted median for each country group.
     """
-    df_median_group = df_zones.groupby("ISOCODE").apply(
-        lambda x: pd.Series({"weighted_med": weighted_median(x, "dtw_1", "pop_zone")})
+    df_median_group = (
+        df_zones.groupby("ISOCODE")
+        .apply(
+            lambda x: pd.Series(
+                {
+                    "weighted_med": weighted_median(x, "dtw_1", "pop_zone"),
+                    "weighted_med_cycling": weighted_percentile(
+                        x, "max distance cycling", "pop_zone", 50
+                    ),
+                    "weighted_5th_cycling": weighted_percentile(
+                        x, "max distance cycling", "pop_zone", 5
+                    ),
+                    "weighted_95th_cycling": weighted_percentile(
+                        x, "max distance cycling", "pop_zone", 95
+                    ),
+                    "weighted_med_walking": weighted_percentile(
+                        x, "max distance walking", "pop_zone", 50
+                    ),
+                    "weighted_5th_walking": weighted_percentile(
+                        x, "max distance walking", "pop_zone", 5
+                    ),
+                    "weighted_95th_walking": weighted_percentile(
+                        x, "max distance walking", "pop_zone", 95
+                    ),
+                }
+            )
+        )
+        .reset_index()
     )
+
     return df_median_group
+
+
+def aggregate_global(df_zones):
+    """
+    Get global data to be added to the country-level data.
+
+    Parameters:
+        df_zones (DataFrame): The input DataFrame containing zone-level data.
+
+    Returns:
+        df_global (DataFrame): One row of global data
+    """
+    # Calculate the sum for the specified columns
+    sum_data = {
+        "country_pop_raw": df_zones["pop_zone"].sum(),
+        "zone_pop_with_water": df_zones["zone_pop_with_water"].sum(),
+        "zone_pop_without_water": df_zones["zone_pop_without_water"].sum(),
+        "population_piped_with_access": df_zones["population_piped_with_access"].sum(),
+        "population_piped_with_cycling_access": df_zones[
+            "population_piped_with_cycling_access"
+        ].sum(),
+        "population_piped_with_walking_access": df_zones[
+            "population_piped_with_walking_access"
+        ].sum(),
+        "population_piped_with_only_cycling_access": df_zones[
+            "population_piped_with_only_cycling_access"
+        ].sum(),
+    }
+
+    # Calculate the weighted median and the 5th and 95th percentiles
+    weighted_data = {
+        "weighted_med": weighted_median(df_zones, "dtw_1", "pop_zone"),
+        "weighted_med_cycling": weighted_median(
+            df_zones, "max distance cycling", "pop_zone"
+        ),
+        "weighted_5th_cycling": weighted_percentile(
+            df_zones, "max distance cycling", "pop_zone", 5
+        ),
+        "weighted_95th_cycling": weighted_percentile(
+            df_zones, "max distance cycling", "pop_zone", 95
+        ),
+        "weighted_med_walking": weighted_median(
+            df_zones, "max distance walking", "pop_zone"
+        ),
+        "weighted_5th_walking": weighted_percentile(
+            df_zones, "max distance walking", "pop_zone", 5
+        ),
+        "weighted_95th_walking": weighted_percentile(
+            df_zones, "max distance walking", "pop_zone", 95
+        ),
+    }
+
+    # Create a new DataFrame with the global row
+    df_global = pd.DataFrame(
+        [{"Entity": "Global", "ISOCODE": "GLOBAL", **sum_data, **weighted_data}]
+    )
+
+    return df_global
 
 
 def clean_up_data(df_countries):
@@ -1027,15 +1122,21 @@ def clean_up_data(df_countries):
     # df_countries = df_countries.dropna()  # Remove any NaN rows
 
     # Remove outliers based on max possible distance to water
-    libya_weighted_med = df_countries.loc[df_countries["ISOCODE"] == "LBY", "weighted_med"].values
-    
+    libya_weighted_med = df_countries.loc[
+        df_countries["ISOCODE"] == "LBY", "weighted_med"
+    ].values
+
     if len(libya_weighted_med) > 0:
         max_distance = libya_weighted_med[0] + 1
-        countries_further_than_libya = df_countries[df_countries["weighted_med"] > max_distance]
+        countries_further_than_libya = df_countries[
+            df_countries["weighted_med"] > max_distance
+        ]
         df_countries = df_countries[df_countries["weighted_med"] < max_distance]
     else:
         countries_further_than_libya = pd.DataFrame()
-        print("Warning: No data for Libya (ISOCODE 'LBY'). Skipping outlier removal based on Libya's weighted_med.")
+        print(
+            "Warning: No data for Libya (ISOCODE 'LBY'). Skipping outlier removal based on Libya's weighted_med."
+        )
 
     # Manually remove specific countries
     list_of_countries_to_remove = [
@@ -1074,7 +1175,7 @@ def process_country_data(df_zones):
     # TODO check this out (assert raises error, but probably not an issue as some NaNs are expected?)
     # assert not df_countries.isnull().values.any(), "Country-level dataframe contains NaN values"
 
-    df_median_group = calculate_weighted_median(df_zones)
+    df_median_group = calculate_weighted_results(df_zones)
     assert not df_median_group.empty, "Weighted median dataframe is empty"
     # TODO check this out (assert raises error, but probably not an issue as some NaNs are expected?)
     # assert not df_median_group.isnull().values.any(), "Weighted median dataframe contains NaN values"
@@ -1082,6 +1183,13 @@ def process_country_data(df_zones):
     df_countries = df_countries.merge(
         df_median_group, on="ISOCODE"
     )  # Merge weighted median
+
+    # Add global row
+    df_global = aggregate_global(df_zones)
+    # replace country_pop_raw with sum of countries
+    df_global["country_pop_raw"] = df_countries["country_pop_raw"].sum()
+
+    df_countries = pd.concat([df_countries, df_global], ignore_index=True)
 
     # drop rows from the dataframe that have Nan in pop_zone and dtw_1
     df_zones = df_zones.dropna(subset=["pop_zone", "dtw_1"])
@@ -1124,10 +1232,17 @@ def process_country_data(df_zones):
         * 100
     )
 
-    df_countries["percent_piped_with_only_cycling_access"] = (
-        df_countries["population_piped_with_access"].sum()
-        - df_countries["population_piped_with_walking_access"].sum()
-    ) / df_countries["population_piped_with_access"].sum()
+    df_countries["proportion_piped_access_from_cycling"] = (
+        df_countries["population_piped_with_only_cycling_access"]
+        / df_countries["population_piped_with_access"]
+        * 100
+    )
+
+    df_countries["percent_with_only_cycling_access"] = (
+        df_countries["population_piped_with_only_cycling_access"]
+        / df_countries["country_pop_raw"]
+        * 100
+    )
 
     df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
         df_countries
@@ -1179,11 +1294,10 @@ def aggregate_district_level_data(df_zones):
                 "population_piped_with_access": "sum",
                 "population_piped_with_cycling_access": "sum",
                 "population_piped_with_walking_access": "sum",
+                "population_piped_with_only_cycling_access": "sum",
                 "NATPiped": "first",
                 "region": "first",
                 "subregion": "first",
-                "max distance cycling": ["mean", "max", "min", "median"],
-                "max distance walking": ["mean", "max", "min", "median"],
             }
         )
         .reset_index()
@@ -1200,17 +1314,10 @@ def aggregate_district_level_data(df_zones):
         "population_piped_with_access",
         "population_piped_with_cycling_access",
         "population_piped_with_walking_access",
+        "population_piped_with_only_cycling_access",
         "NATPiped",
         "region",
         "subregion",
-        "mean_max_distance_cycling",
-        "max_max_distance_cycling",
-        "min_max_distance_cycling",
-        "median_max_distance_cycling",
-        "mean_max_distance_walking",
-        "max_max_distance_walking",
-        "min_max_distance_walking",
-        "median_max_distance_walking",
     ]
 
     return df_districts
@@ -1274,10 +1381,17 @@ def process_district_data(df_zones):
         * 100
     )
 
-    df_districts["percent_piped_with_only_cycling_access"] = (
-        df_districts["population_piped_with_access"].sum()
-        - df_districts["population_piped_with_walking_access"].sum()
-    ) / df_districts["population_piped_with_access"].sum()
+    df_districts["proportion_piped_access_from_cycling"] = (
+        df_districts["population_piped_with_only_cycling_access"]
+        / df_districts["population_piped_with_access"]
+        * 100
+    )
+
+    df_districts["percent_with_only_cycling_access"] = (
+        df_districts["population_piped_with_only_cycling_access"]
+        / df_districts["district_pop_raw"]
+        * 100
+    )
 
     list_of_countries_to_remove = [
         "GUM",
@@ -1318,14 +1432,6 @@ def plot_chloropleth(df_countries):
         "region",
         "subregion",
         "weighted_med",
-        "mean_max_distance_cycling",
-        "max_max_distance_cycling",
-        "min_max_distance_cycling",
-        "median_max_distance_cycling",
-        "mean_max_distance_walking",
-        "max_max_distance_walking",
-        "min_max_distance_walking",
-        "median_max_distance_walking",
     ]
 
     choro = px.choropleth(
@@ -1389,7 +1495,10 @@ def run_global_analysis(
         pandas.DataFrame: The processed data for each country.
     """
     df_zones = preprocess_data(
-        crr_adjustment=crr_adjustment, urban_adjustment=urban_adjustment, rural_adjustment=rural_adjustment, use_sample_data=use_sample_data
+        crr_adjustment=crr_adjustment,
+        urban_adjustment=urban_adjustment,
+        rural_adjustment=rural_adjustment,
+        use_sample_data=use_sample_data,
     )
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,
@@ -1444,13 +1553,13 @@ if __name__ == "__main__":
         practical_limit_buckets=20,
         met=4.5,
         watts=75,
-        hill_polarity="flat_uphill",
+        hill_polarity="downhill_uphill",
         urban_adjustment=1.3,
         rural_adjustment=1.4,
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
-        use_sample_data=False,
+        use_sample_data=True,
     )
 
     df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)

@@ -16,6 +16,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+
 def linspace_creator(max_value_array, min_value, res):
     """
     Creates a linspace numpy array from the given inputs.
@@ -184,7 +185,7 @@ class mobility_models:
 
         """
         ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
-        v_solve = p[0]
+        v_solve = p
         return (
             1 / 2 * ro * v_solve**3 * C_d * A
             + v_solve * m_t * g * Crr
@@ -269,17 +270,17 @@ class mobility_models:
             mv.g,
             s * mo.ulhillpo,  # hill polarity, see model options
         )
-        V_guess = 1
+        V_guess = [1, 10, 50]
 
         V_un = fsolve(model, V_guess, args=data, full_output=True)
-        # checks if the model was successful:
-        if V_un[2] == 1:
-            unloaded_velocity = V_un[0][0]
-            # Limit velocity to a maximum of 7m/s
-            unloaded_velocity = min(unloaded_velocity, 7)
-            # assert unloaded_velocity >= 0, "Unloaded velocity cannot be negative."
-        else:
-            unloaded_velocity = np.nan
+        V_un_status = V_un[2]
+        unloaded_velocities = V_un[0]
+
+        # Take first non-negative solution
+        unloaded_velocity = [v for v in unloaded_velocities if v >= 0][0]
+        # Limit velocity to a maximum of 7m/s
+        unloaded_velocity = min(unloaded_velocity, 7)
+        assert unloaded_velocity >= 0, "Unloaded velocity cannot be negative."
 
         data = (
             mv.ro,
@@ -292,21 +293,18 @@ class mobility_models:
             mv.g,
             s * mo.lhillpo,  # hill polarity, see model options
         )
-        V_guess = 1
+
+        V_guess = [1, 10, 50]
 
         V_load = fsolve(model, V_guess, args=data, full_output=True)
-        # checks if the model was successful:
-        if V_un[2] == 1:
-            loaded_velocity = V_load[0][0]
+        V_load_status = V_load[2]
+        loaded_velocities = V_load[0]
 
-            # Limit velocity to a maximum of 7m/s
-            loaded_velocity = min(loaded_velocity, 7)
-            # warn if negative and set to 0
-            # if loaded_velocity < 0:
-            #     warnings.warn("Loaded velocity is negative, setting to 0.")
-            #     loaded_velocity = 0
-        else:
-            loaded_velocity = np.nan
+        # Take first non-negative solution
+        loaded_velocity = [v for v in loaded_velocities if v >= 0][0]
+        # Limit velocity to a maximum of 7m/s
+        loaded_velocity = min(loaded_velocity, 7)
+        assert loaded_velocity >= 0, "Loaded velocity cannot be negative."
 
         return loaded_velocity, unloaded_velocity, max_load_HPV
 

@@ -8,9 +8,9 @@ dependencies:
   - pandas=1.4.3
   - matplotlib=3.5.2
   - ipykernel 
-  - ipywidgets >=7.6
+  - ipywidgets>=7.6
   - notebook>=5.3
-  - Flask==3.0.3
+  - Flask=3.0.3
   - pycountry 
   - pyarrow  # Added for Parquet support
   - pip
@@ -18,7 +18,8 @@ dependencies:
   - scipy
   - pyinterpolate
   - weightedstats
-  - pytest==8.0.2
+  - pytest=8.0.2
+  - openpyxl=3.1.5
   - pip:
     - plotly
     - kaleido
