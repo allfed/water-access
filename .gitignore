@@ -131,6 +131,9 @@ dmypy.json
 # result files
 results/
 
+# large files
+/data/GIS/
+
 # OS generated files #
 ######################
 .DS_Store
