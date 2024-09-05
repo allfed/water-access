@@ -155,6 +155,7 @@ if __name__ == "__main__":
                 hill_polarity,
                 urban_adjustment,
                 rural_adjustment,
+                use_sample_data=False  # Enable sample data
             )
             for crr_adjustment, time_gathering_water, practical_limit_bicycle, practical_limit_buckets, met, watts, hill_polarity, urban_adjustment, rural_adjustment in zip(
                 crr_adjustments,
@@ -186,7 +187,7 @@ if __name__ == "__main__":
 
             
             # keep only the columns needed for the zone results
-            filtered_zone_result = zone_result[['zone_pop_with_water', 'zone_pop_without_water']]
+            filtered_zone_result = zone_result[['fid','zone_pop_with_water', 'zone_pop_without_water']]
 
             # Save the filtered DataFrame to a Parquet file
             output_file = PARQUET_PATH / f'zone_simulation_result_{i}.parquet'

@@ -35,8 +35,8 @@ repo_root = script_dir.parent
 results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
-URB_DATA_FILE = repo_root / "data" / "GIS" / "gis_data_adm1.csv"
-URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample_stripped.csv"
+URB_DATA_FILE = repo_root / "data" / "GIS" / "updated_GIS_output_cleaned.csv"
+URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample_updated_stripped.csv"
 # COUNTRY_DATA_FILE = (
 #     repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
 # )
@@ -146,11 +146,11 @@ def load_data(urb_data_file, country_data_file):
 def manage_urban_rural(df_zones_input):
     """
     Converts the 'dtw_1' column from meters to kilometers and creates a new binary column
-    'urban_rural' based on the 'URBAN_1' column. Rural values are below 15, while urban values
+    'urban_rural' based on the 'GHS_SMOD' column. Rural values are below 15, while urban values
     are above 15.
 
     Args:
-        df_zones_input (pandas.DataFrame): Input DataFrame containing the 'dtw_1' and 'URBAN_1' columns.
+        df_zones_input (pandas.DataFrame): Input DataFrame containing the 'dtw_1' and 'GHS_SMOD' columns.
 
     Returns:
         pandas.DataFrame: DataFrame with the 'dtw_1' column converted to kilometers and a new 'urban_rural'
@@ -162,7 +162,7 @@ def manage_urban_rural(df_zones_input):
     # Use the GHS_SMOD_E2020_GLOBE_R2023A_54009_1000_V1_0 dataset.
     # from here: https://ghsl.jrc.ec.europa.eu/download.php?ds=smod
     # create new binary column for urban / rural. Rural is below 15, Urban above 15
-    df_zones_input["urban_rural"] = np.where(df_zones_input["URBAN_1"] > 15, 1, 0)
+    df_zones_input["urban_rural"] = np.where(df_zones_input["GHS_SMOD"] > 15, 1, 0)
     return df_zones_input
 
 
@@ -231,10 +231,10 @@ def merge_and_adjust_population(df_zones_input, df_input):
         df_input, left_on="ISOCODE", right_on="alpha3", how="inner"
     )
     # adjust population to account for 9 values per raster point (2.5 to 5 arc min resoltuions. 9 values per point)
-    df_zones["AdjPopFloat"] = df_zones["pop_count_15_1"] / 9
+    df_zones["AdjPopFloat"] = df_zones["pop_density"] / 9
 
     # convert population density to percent of national population on a per country basis, grouped by ISO_CC
-    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["AdjPopFloat"].apply(
+    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["pop_density"].apply(
         lambda x: x / x.sum()
     )
     # multiply population density by population on a per country basis
@@ -244,9 +244,6 @@ def merge_and_adjust_population(df_zones_input, df_input):
     df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")["pop_zone"].transform(
         "sum"
     )
-    df_zones["country_pop_ratio"] = df_zones.groupby("ISOCODE")[
-        "AdjPopFloat"
-    ].transform("sum")
 
     # trim the dataframe to only include rows where there is a population
     # find non zero values AdjPopFloat

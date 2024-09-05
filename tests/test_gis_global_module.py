@@ -143,12 +143,12 @@ class TestLoadData:
 class TestManageUrbanRural:
     def test_manage_urban_rural_converts_dtw_1_to_kilometers(self):
         df_zones_input = pd.DataFrame(
-            {"dtw_1": [1000, 2000, 3000], "URBAN_1": [10, 20, 30]}
+            {"dtw_1": [1000, 2000, 3000], "GHS_SMOD": [10, 20, 30]}
         )
         expected_result = pd.DataFrame(
             {
                 "dtw_1": [1.0, 2.0, 3.0],
-                "URBAN_1": [10, 20, 30],
+                "GHS_SMOD": [10, 20, 30],
                 "urban_rural": [0, 1, 1],
             }
         )
@@ -159,21 +159,21 @@ class TestManageUrbanRural:
 
     def test_manage_urban_rural_creates_urban_rural_column(self):
         df_zones_input = pd.DataFrame(
-            {"dtw_1": [1000, 2000, 3000], "URBAN_1": [10, 20, 30]}
+            {"dtw_1": [1000, 2000, 3000], "GHS_SMOD": [10, 20, 30]}
         )
         result = manage_urban_rural(df_zones_input)
         assert "urban_rural" in result.columns
 
     def test_manage_urban_rural_sets_urban_rural_to_1_for_urban_zones(self):
         df_zones_input = pd.DataFrame(
-            {"dtw_1": [1000, 2000, 3000], "URBAN_1": [16, 20, 30]}
+            {"dtw_1": [1000, 2000, 3000], "GHS_SMOD": [16, 20, 30]}
         )
         result = manage_urban_rural(df_zones_input)
         assert all(result["urban_rural"] == 1)
 
     def test_manage_urban_rural_sets_urban_rural_to_0_for_rural_zones(self):
         df_zones_input = pd.DataFrame(
-            {"dtw_1": [1000, 2000, 3000], "URBAN_1": [0, 10, 15]}
+            {"dtw_1": [1000, 2000, 3000], "GHS_SMOD": [0, 10, 15]}
         )
         result = manage_urban_rural(df_zones_input)
         assert all(result["urban_rural"] == 0)
@@ -194,7 +194,7 @@ class TestManageSlope:
 class TestMergeAndAdjustPopulation:
     def test_merge_and_adjust_population_returns_dataframe(self):
         df_zones_input = pd.DataFrame(
-            {"ISOCODE": ["USA", "CAN"], "pop_count_15_1": [1000, 2000]}
+            {"ISOCODE": ["USA", "CAN"], "pop_density": [1000, 2000]}
         )
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
@@ -204,7 +204,7 @@ class TestMergeAndAdjustPopulation:
 
     def test_merge_and_adjust_population_returns_expected_result(self):
         df_zones_input = pd.DataFrame(
-            {"ISOCODE": ["USA", "CAN"], "pop_count_15_1": [1000, 2000]}
+            {"ISOCODE": ["USA", "CAN"], "pop_density": [1000, 2000]}
         )
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
@@ -213,14 +213,13 @@ class TestMergeAndAdjustPopulation:
         expected_result = pd.DataFrame(
             {
                 "ISOCODE": ["USA", "CAN"],
-                "pop_count_15_1": [1000, 2000],
+                "pop_density": [1000, 2000],
                 "alpha3": ["USA", "CAN"],
                 "Population": [1000000, 2000000],
                 "AdjPopFloat": [111.11111111111111, 222.22222222222223],
                 "pop_density_perc": [1.0, 1.0],
                 "pop_zone": [1000000.0, 2000000.0],
                 "country_pop_raw": [1000000.0, 2000000.0],
-                "country_pop_ratio": [111.11111111111111, 222.22222222222223],
                 "any_pop": [1, 1],
             }
         )

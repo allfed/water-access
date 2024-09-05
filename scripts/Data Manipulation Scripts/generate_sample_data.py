@@ -5,8 +5,10 @@ import os
 print(os.getcwd())
 
 # Define the input and output file paths
-input_file = '../../data/GIS/GIS_stripped_back.csv'
-output_file = '../../data/GIS/GIS_data_zones_sample_stripped.csv'
+input_file = '../../data/GIS/updated_GIS_output_cleaned.csv'
+output_file = '../../data/GIS/GIS_data_zones_sample_updated_stripped.csv'
+
+
 
 # Step 1: Load the dataset
 gis_data = pd.read_csv(input_file)
