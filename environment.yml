@@ -20,6 +20,8 @@ dependencies:
   - weightedstats
   - pytest=8.0.2
   - openpyxl=3.1.5
+  - rasterio
+  - geopandas
   - pip:
     - plotly
     - kaleido
@@ -29,5 +31,4 @@ dependencies:
     - jupyter-dash
     - jupyterlab-dash
     - countryinfo
-
-
+    - seaborn

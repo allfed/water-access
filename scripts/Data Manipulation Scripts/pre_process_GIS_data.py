@@ -1,110 +1,92 @@
 import pandas as pd
-""" 
+from pathlib import Path
 
+def load_data(file_path):
+    """Load data from CSV file."""
+    return pd.read_csv(file_path)
 
+def preprocess_data(df):
+    """Preprocess the dataframe."""
+    df = df.drop(['shapeType'], axis=1)
+    return df.dropna(subset=['shapeGroup'])
 
-NAN VALUES IN COLUMNS:
+def create_nan_indicators(df, columns):
+    """Create NaN indicator columns."""
+    for col in columns:
+        df[f'{col}_nan'] = df[col].isna().astype(int)
+    df['any_nan'] = df[columns].isna().any(axis=1).astype(int)
+    return df
 
-dtw            6474098
-pop_density    7070981
-GHS_SMOD         95090
-dtype: int64
+def calculate_nan_correlation(df, columns):
+    """Calculate correlation matrix for NaN presence."""
+    nan_indicator = df[columns].isna().astype(int)
+    return nan_indicator.corr()
 
-Correlation between NaN values in columns:
-                  dtw  pop_density  GHS_SMOD
-dtw          1.000000     0.825685  0.067406
-pop_density  0.825685     1.000000  0.057366
-GHS_SMOD     0.067406     0.057366  1.000000
+def count_single_nan_columns(df, columns):
+    """Count rows where only one column has NaN."""
+    counts = {}
+    for col in columns:
+        other_cols = [c for c in columns if c != col]
+        counts[col] = len(df[df[col].isna() & df[other_cols].notna().all(axis=1)])
+    return counts
 
-"""
+def drop_nan_rows(df, columns):
+    """Drop rows with NaN in specified columns."""
+    return df.dropna(subset=columns)
 
-input_file = '../../data/GIS/updated_GIS_output.csv'
+def rename_columns(df, column_mapping):
+    """Rename columns based on mapping."""
+    return df.rename(columns=column_mapping)
 
+def save_data(df, file_path):
+    """Save dataframe to CSV."""
+    df.to_csv(file_path, index=False)
 
-# read the data
-df = pd.read_csv(input_file)
+def main():
+    input_file = Path('../../data/GIS/updated_GIS_output.csv')
+    output_file = Path('../../data/GIS/GIS_pre_processed_for_analysis.csv')
+    output_file_merge = Path('../../data/GIS/GIS_country_points_fid.csv')
+    nan_columns = ['dtw_1', 'pop_density', 'GHS_SMOD', 'slope_1']
 
-# drop the columns 'shapeType'
-df = df.drop(['shapeType'], axis=1)
+    df = load_data(input_file)
+    df = preprocess_data(df)
 
-# drop rows that don't have a country code
-df = df.dropna(subset=['shapeGroup'])
+    column_mapping = {
+        'dtw': 'dtw_1',
+        'slope1': 'slope_1',
+        'shapeGroup': 'ISOCODE',
+        'tp51': 'grip_1_1',
+        'tp41': 'grip_2_1',
+        'tp31': 'grip_3_1',
+        'tp21': 'grip_4_1',
+        'tp11': 'grip_5_1',
+        'id': 'fid',
+    }
+    df = rename_columns(df, column_mapping)
+    
+    df = create_nan_indicators(df, nan_columns)
+    
+    nan_correlation = calculate_nan_correlation(df, nan_columns)
+    print("Correlation between NaN values in columns:")
+    print(nan_correlation)
 
-# Create a DataFrame with True (or 1) where NaN is present, and False (or 0) where it is not
-nan_indicator = df[['dtw', 'pop_density', 'GHS_SMOD', 'slope1']].isna()
+    single_nan_counts = count_single_nan_columns(df, nan_columns)
+    for col, count in single_nan_counts.items():
+        print(f"Number of rows where {col} is the only NaN value: {count}")
 
-# Convert the boolean values to integers (1 for NaN, 0 for not NaN)
-nan_indicator = nan_indicator.astype(int)
+    pre_len = len(df)
+    df = drop_nan_rows(df, nan_columns)
+    print(f"Number of rows dropped: {pre_len - len(df)}")
 
-# Calculate correlation matrix for NaN presence
-nan_correlation = nan_indicator.corr()
+    # export two files, one with the original columns and one with the new columns
+    # drop columns left, top, right, bottom for the first
+    df_to_process = df.drop(columns=['left', 'top', 'right', 'bottom'])
+    # only keep fid left top right bottom for the second
+    df_to_merge = df[['fid', 'left', 'top', 'right', 'bottom']]
+    
+    save_data(df_to_process, output_file)
+    save_data(df_to_merge, output_file_merge)
+    print(f"Data saved to {output_file}")
 
-# Display the correlation matrix
-print("Correlation between NaN values in columns:")
-print(nan_correlation)
-
-# Check for rows where GHS_SMOD is the only NaN value
-ghs_smod_only_nan = df[df['GHS_SMOD'].isna() & df['dtw'].notna() & df['pop_density'].notna()]
-# check the others too
-dtw_only_nan = df[df['dtw'].isna() & df['GHS_SMOD'].notna() & df['pop_density'].notna() & df['slope1'].notna()]
-pop_density_only_nan = df[df['pop_density'].isna() & df['GHS_SMOD'].notna() & df['dtw'].notna() & df['slope1'].notna()]
-slope1_only_nan = df[df['slope1'].isna() & df['GHS_SMOD'].notna() & df['dtw'].notna() & df['pop_density'].notna()]
-
-# new line
-print("\n")
-
-# print the number of NaNs in each column
-print(f"Number of NaNs in dtw: {df['dtw'].isna().sum()}")
-print(f"Number of NaNs in pop_density: {df['pop_density'].isna().sum()}")
-print(f"Number of NaNs in GHS_SMOD: {df['GHS_SMOD'].isna().sum()}")
-print(f"Number of NaNs in slope1: {df['slope1'].isna().sum()}")
-
-# new line
-print("\n")
-
-
-# Print the number of such rows
-print(f"Number of rows where GHS_SMOD is the only NaN value: {len(ghs_smod_only_nan)}")
-print(f"Number of rows where dtw is the only NaN value: {len(dtw_only_nan)}")
-print(f"Number of rows where pop_density is the only NaN value: {len(pop_density_only_nan)}")
-print(f"Number of rows where slope1 is the only NaN value: {len(slope1_only_nan)}")
-
-
-
-# since the correlation between the NaNs is so high, we can just drop the rows where there are any NaNs in the columns
-# drop rows where there are any NaNs in the columns
-print('\nDropping rows where there are any NaNs in the columns...\n')
-pre_len = len(df)
-df = df.dropna(subset=['dtw', 'pop_density', 'GHS_SMOD', 'slope1'])
-
-# print the number of rows dropped, compared to the original number of rows
-print(f"Number of rows dropped: {pre_len - len(df)}")
-
-# Remap the names# ... existing code ...
-
-column_mapping = {
-    # 'GHS_SMOD': 'URBAN_1',
-    'dtw': 'dtw_1',
-    # 'pop_density': 'pop_count_15_1',
-    'slope1': 'slope_1',
-    'shapeGroup': 'ISOCODE',
-    # Add mappings for grip columns if they exist in your current DataFrame
-    'tp51': 'grip_1_1',
-    'tp41': 'grip_2_1',
-    'tp31': 'grip_3_1',
-    'tp21': 'grip_4_1',
-    'tp11': 'grip_5_1',
-    'id': 'fid',
-    # 'id' already exists
-    # 'shapeName' already exists
-}
-
-# Rename the columns
-df = df.rename(columns=column_mapping)
-
-print('Saving the data...\n')
-
-# save the data
-df.to_csv('../../data/GIS/updated_GIS_output_cleaned.csv', index=False)
-
-print('Data saved!\n')
+if __name__ == "__main__":
+    main()

@@ -230,8 +230,6 @@ def merge_and_adjust_population(df_zones_input, df_input):
     df_zones = df_zones_input.merge(
         df_input, left_on="ISOCODE", right_on="alpha3", how="inner"
     )
-    # adjust population to account for 9 values per raster point (2.5 to 5 arc min resoltuions. 9 values per point)
-    df_zones["AdjPopFloat"] = df_zones["pop_density"] / 9
 
     # convert population density to percent of national population on a per country basis, grouped by ISO_CC
     df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["pop_density"].apply(
@@ -246,9 +244,7 @@ def merge_and_adjust_population(df_zones_input, df_input):
     )
 
     # trim the dataframe to only include rows where there is a population
-    # find non zero values AdjPopFloat
-    # TODO this is already done I think.... in THE GIS ANALYSIS
-    df_zones["any_pop"] = df_zones["AdjPopFloat"].apply(lambda x: 1 if x > 10 else 0)
+    df_zones["any_pop"] = df_zones["pop_zone"].apply(lambda x: 1 if x > 10 else 0)
     df_zones = df_zones[df_zones["any_pop"] == 1]
 
     return df_zones
