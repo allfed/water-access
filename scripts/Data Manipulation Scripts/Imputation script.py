@@ -328,10 +328,18 @@ def bicycle_data_manual_assumption(df):
     Currently don't have data and they are being assigned through spatial interpolation
     This is a worse assumnption than assigning them Mainland China values
     """
+
     manual_PBO_value = 62.97
-    df.loc[df["ISO"] == "MAC", "Bicycle Ownership"] = manual_PBO_value
-    df.loc[df["ISO"] == "HKG", "Bicycle Ownership"] = manual_PBO_value
-    df.loc[df["ISO"] == "TWN", "Bicycle Ownership"] = manual_PBO_value
+    
+    # Create new rows if they don't exist, otherwise update existing ones
+    for alpha3 in ["MAC", "HKG", "TWN"]:
+        if alpha3 not in df["alpha3"].values:
+            new_row = pd.DataFrame({"alpha3": [alpha3], "PBO": [manual_PBO_value]})
+            df = pd.concat([df, new_row], ignore_index=True)
+        else:
+            df.loc[df["alpha3"] == alpha3, "PBO"] = manual_PBO_value
+
+
     return df
     
     
@@ -868,8 +876,7 @@ def main(
     df_bike.rename(columns={"ISO": "alpha3"}, inplace=True)
     # Update 'ROM' to 'ROU' in the 'ISO' column of the bike_df DataFrame
     df_bike.loc[df_bike["alpha3"] == "ROM", "alpha3"] = "ROU"
-    
-
+    df_bike = bicycle_data_manual_assumption(df_bike)
     # merge data
     df = df.merge(df_bike, how="outer", on="alpha3")
 
