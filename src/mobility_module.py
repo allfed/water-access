@@ -270,17 +270,25 @@ class mobility_models:
             mv.g,
             s * mo.ulhillpo,  # hill polarity, see model options
         )
-        V_guess = [1, 10, 50]
+        V_guesses = [1, 10, 50]
+        unloaded_velocity = None
 
-        V_un = fsolve(model, V_guess, args=data, full_output=True)
-        V_un_status = V_un[2]
-        unloaded_velocities = V_un[0]
+        for V_guess in V_guesses:
+            V_un = fsolve(model, V_guess, args=data, full_output=True)
+            V_un_status = V_un[2]
+            unloaded_velocity = V_un[0]
+            unloaded_velocity = unloaded_velocity.item()
 
-        # Take first non-negative solution
-        unloaded_velocity = [v for v in unloaded_velocities if v >= 0][0]
+            # Check if the solution is non-negative
+            if unloaded_velocity >= 0:
+                break
+
+        # If no valid solution was found, raise an error
+        if unloaded_velocity is None or unloaded_velocity < 0:
+            raise ValueError("No valid solution found.")
+
         # Limit velocity to a maximum of 7m/s
         unloaded_velocity = min(unloaded_velocity, 7)
-        assert unloaded_velocity >= 0, "Unloaded velocity cannot be negative."
 
         data = (
             mv.ro,
@@ -294,14 +302,23 @@ class mobility_models:
             s * mo.lhillpo,  # hill polarity, see model options
         )
 
-        V_guess = [1, 10, 50]
+        V_guesses = [1, 10, 50]
+        loaded_velocity = None
 
-        V_load = fsolve(model, V_guess, args=data, full_output=True)
-        V_load_status = V_load[2]
-        loaded_velocities = V_load[0]
+        for V_guess in V_guesses:
+            V_un = fsolve(model, V_guess, args=data, full_output=True)
+            V_un_status = V_un[2]
+            loaded_velocity = V_un[0]
+            loaded_velocity = loaded_velocity.item()
 
-        # Take first non-negative solution
-        loaded_velocity = [v for v in loaded_velocities if v >= 0][0]
+            # Check if the solution is non-negative
+            if loaded_velocity >= 0:
+                break
+
+        # If no valid solution was found, raise an error
+        if loaded_velocity is None or loaded_velocity < 0:
+            raise ValueError("No valid solution found.")
+
         # Limit velocity to a maximum of 7m/s
         loaded_velocity = min(loaded_velocity, 7)
         assert loaded_velocity >= 0, "Loaded velocity cannot be negative."

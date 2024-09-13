@@ -36,7 +36,9 @@ results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
 URB_DATA_FILE = repo_root / "data" / "GIS" / "updated_GIS_output_cleaned.csv"
-URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample_updated_stripped.csv"
+URB_DATA_FILE_SAMPLE = (
+    repo_root / "data" / "GIS" / "GIS_data_zones_sample_updated_stripped.csv"
+)
 # COUNTRY_DATA_FILE = (
 #     repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
 # )
@@ -926,7 +928,10 @@ def calculate_water_rations(df_zones):
         df_zones["water_ration_kms"] / df_zones["dtw_1"]
     )
     df_zones["bikes_in_zone"] = (
-        df_zones["pop_zone"] / df_zones["Household_Size"] * df_zones["PBO"]/100 # must divide by 100 as PBO is percentage.
+        df_zones["pop_zone"]
+        / df_zones["Household_Size"]
+        * df_zones["PBO"]
+        / 100  # must divide by 100 as PBO is percentage.
     )
     df_zones["water_rations_achievable"] = (
         df_zones["bikes_in_zone"] * df_zones["water_rations_per_bike"]
@@ -1470,7 +1475,7 @@ def run_global_analysis(
     calculate_distance=True,
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
-    use_sample_data=False,  # only change to test functionality 
+    use_sample_data=False,  # only change to test functionality
 ):
     """
     Runs one run of the global analysis for water access.
@@ -1542,9 +1547,9 @@ def run_global_analysis(
 
 if __name__ == "__main__":
 
-    df_countries, df_districts = run_global_analysis(
+    df_countries, df_districts, zones_results = run_global_analysis(
         crr_adjustment=0,
-        time_gathering_water=6,
+        time_gathering_water=5.5,
         practical_limit_bicycle=40,
         practical_limit_buckets=20,
         met=4.5,
@@ -1555,8 +1560,8 @@ if __name__ == "__main__":
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
-        use_sample_data=False    ,
+        use_sample_data=True,
     )
 
-    df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
-    df_districts.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
+    # df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
+    # df_districts.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
