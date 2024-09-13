@@ -319,6 +319,23 @@ def import_and_select_latest_household_size(
     return latest_household_size_df
 
 
+def bicycle_data_manual_assumption(df):
+    """
+    Manually assigns bicycle ownership data for the following regions:
+    - Macao MAC
+    - Hong Kong HKG
+    - Taiwan TWN
+    Currently don't have data and they are being assigned through spatial interpolation
+    This is a worse assumnption than assigning them Mainland China values
+    """
+    manual_PBO_value = 62.97
+    df.loc[df["ISO"] == "MAC", "Bicycle Ownership"] = manual_PBO_value
+    df.loc[df["ISO"] == "HKG", "Bicycle Ownership"] = manual_PBO_value
+    df.loc[df["ISO"] == "TWN", "Bicycle Ownership"] = manual_PBO_value
+    return df
+    
+    
+
 def import_and_select_latest_pbo(csv_path):
     """
     Imports a CSV file containing 'ISO', 'Year', and 'PBO' columns,
@@ -363,6 +380,27 @@ def handle_japan_case(row):
             row["TOTALPiped"] - (row["% urban"] * row["URBANPiped"] / 100)
         ) / ((100 - row["% urban"]) / 100)
     return row
+
+def handle_taiwan_case(df):
+    """
+    Handles missing data for Taiwan by creating a new row with assumed values.
+    Data sources:
+    - 80.1% urban from https://www.cia.gov/the-world-factbook/field/urbanization/
+    - 94.91% overall piped from https://www.water.gov.tw/en/Contents?nodeId=4875#
+    """
+    taiwan_data = {
+        "Country": "Taiwan",
+        "% urban": 80.1,
+        "TOTALPiped": 94.91,
+        "URBANPiped": 100.0,
+        "RURALPiped": (94.91 - (80.1 * 100 / 100)) / ((100 - 80.1) / 100)
+    }
+    
+    # Create a new row for Taiwan and append it to the dataframe
+    taiwan_row = pd.DataFrame([taiwan_data])
+    df = pd.concat([df, taiwan_row], ignore_index=True)
+    
+    return df
 
 
 def handle_seychelles_case(row):
@@ -416,6 +454,7 @@ def process_water_data(df):
     # Handle Japan's special case
     df = df.apply(handle_japan_case, axis=1)
     df = df.apply(handle_seychelles_case, axis=1)
+    df = handle_taiwan_case(df)
 
     # Fill missing rural and urban piped data where total piped is 100
     df.loc[(df["TOTALPiped"] == 100) & (df["RURALPiped"].isna()), "RURALPiped"] = 100
@@ -829,6 +868,7 @@ def main(
     df_bike.rename(columns={"ISO": "alpha3"}, inplace=True)
     # Update 'ROM' to 'ROU' in the 'ISO' column of the bike_df DataFrame
     df_bike.loc[df_bike["alpha3"] == "ROM", "alpha3"] = "ROU"
+    
 
     # merge data
     df = df.merge(df_bike, how="outer", on="alpha3")
