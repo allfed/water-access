@@ -16,7 +16,7 @@ sys.path.append(str(project_root))
 import src.gis_global_module as gis
 
 
-def sample_normal(low, high, n, confidence=99):
+def sample_normal(low, high, n, confidence=90):
     """
     Generate random samples from a normal distribution.
     Based off of Guesstimate's implementation, translated from Javascript to Python.
@@ -38,7 +38,7 @@ def sample_normal(low, high, n, confidence=99):
         z = 2.575
     else:
         raise ValueError("Confidence level must be 90, 95, or 99")
-    
+
     mean = np.mean([high, low])
     stdev = (high - mean) / z
     samples = np.abs(norm.rvs(loc=mean, scale=stdev, size=n))
@@ -46,7 +46,7 @@ def sample_normal(low, high, n, confidence=99):
     return samples
 
 
-def sample_lognormal(low, high, n, confidence=99):
+def sample_lognormal(low, high, n, confidence=90):
     """
     Generate random samples from a lognormal distribution.
 
@@ -60,7 +60,7 @@ def sample_lognormal(low, high, n, confidence=99):
     - samples (ndarray): An array of random samples from the lognormal distribution.
     """
     assert low > 0, "Low must be greater than 0 for lognormal distributions."
-    
+
     if confidence == 90:
         z = 1.645
     elif confidence == 95:
@@ -71,7 +71,7 @@ def sample_lognormal(low, high, n, confidence=99):
         raise ValueError("Confidence level must be 90, 95, or 99")
     logHigh = np.log(high)
     logLow = np.log(low)
-    
+
     mean = np.mean([logHigh, logLow])
     stdev = (logHigh - logLow) / (2 * z)
     scale = np.exp(mean)
@@ -95,7 +95,6 @@ def sample_gpd(shape_param, scale_param, loc_param=1.0, n=1000):
     """
     samples = genpareto.rvs(c=shape_param, loc=loc_param, scale=scale_param, size=n)
     return samples
-
 
 
 def run_simulation(
@@ -147,8 +146,12 @@ def run_simulation(
     assert isinstance(met, (int, float)), "MET must be a number."
     assert isinstance(watts, (int, float)), "Watts must be a number."
     assert isinstance(hill_polarity, str), "Hill polarity must be a string."
-    assert isinstance(urban_adjustment, (int, float)), "Urban adjustment must be a number."
-    assert isinstance(rural_adjustment, (int, float)), "Rural adjustment must be a number."
+    assert isinstance(
+        urban_adjustment, (int, float)
+    ), "Urban adjustment must be a number."
+    assert isinstance(
+        rural_adjustment, (int, float)
+    ), "Rural adjustment must be a number."
 
     df_countries, df_districts, df_zones = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,

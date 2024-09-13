@@ -330,7 +330,7 @@ def bicycle_data_manual_assumption(df):
     """
 
     manual_PBO_value = 62.97
-    
+
     # Create new rows if they don't exist, otherwise update existing ones
     for alpha3 in ["MAC", "HKG", "TWN"]:
         if alpha3 not in df["alpha3"].values:
@@ -339,10 +339,8 @@ def bicycle_data_manual_assumption(df):
         else:
             df.loc[df["alpha3"] == alpha3, "PBO"] = manual_PBO_value
 
-
     return df
-    
-    
+
 
 def import_and_select_latest_pbo(csv_path):
     """
@@ -389,6 +387,7 @@ def handle_japan_case(row):
         ) / ((100 - row["% urban"]) / 100)
     return row
 
+
 def handle_taiwan_case(df):
     """
     Handles missing data for Taiwan by creating a new row with assumed values.
@@ -401,13 +400,13 @@ def handle_taiwan_case(df):
         "% urban": 80.1,
         "TOTALPiped": 94.91,
         "URBANPiped": 100.0,
-        "RURALPiped": (94.91 - (80.1 * 100 / 100)) / ((100 - 80.1) / 100)
+        "RURALPiped": (94.91 - (80.1 * 100 / 100)) / ((100 - 80.1) / 100),
     }
-    
+
     # Create a new row for Taiwan and append it to the dataframe
     taiwan_row = pd.DataFrame([taiwan_data])
     df = pd.concat([df, taiwan_row], ignore_index=True)
-    
+
     return df
 
 
@@ -426,6 +425,30 @@ def handle_seychelles_case(row):
         row["URBANPiped"] = 100.0
         row["RURALPiped"] = 100.0
     return row
+
+
+def handle_western_sahara_case(df):
+    """
+    Handles missing data for Western Sahara by creating a new row with assumed values.
+    Total piped is provided using values from Mauritania so Western Sahara is not dropped,
+    but not used in modelling. URBAN and RURAL are interpolated later.
+    Data sources:
+    - 87.1% urban from https://population.un.org/wup/DataQuery/
+    - 61% overall piped from Mauritania JMP data
+    """
+    western_sahara_data = {
+        "Country": "Western Sahara",
+        "% urban": 87.1,
+        "TOTALPiped": 61.0,
+        "URBANPiped": None,
+        "RURALPiped": None,
+    }
+
+    # Create new row and append
+    western_sahara_row = pd.DataFrame([western_sahara_data])
+    df = pd.concat([df, western_sahara_row], ignore_index=True)
+
+    return df
 
 
 def process_water_data(df):
@@ -463,6 +486,7 @@ def process_water_data(df):
     df = df.apply(handle_japan_case, axis=1)
     df = df.apply(handle_seychelles_case, axis=1)
     df = handle_taiwan_case(df)
+    df = handle_western_sahara_case(df)
 
     # Fill missing rural and urban piped data where total piped is 100
     df.loc[(df["TOTALPiped"] == 100) & (df["RURALPiped"].isna()), "RURALPiped"] = 100
@@ -895,6 +919,12 @@ def main(
     # merge data with country regions
     df_cleaned_merge = df_cleaned_merge.merge(
         country_regions_df, on="alpha3", how="left"
+    )
+
+    # add region and subregion for Taiwan
+    df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "region"] = "Asia"
+    df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "subregion"] = (
+        "Eastern Asia"
     )
 
     # import weight data

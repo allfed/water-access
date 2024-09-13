@@ -12,7 +12,7 @@ sys.path.append(str(project_root))
 import src.gis_monte_carlo as mc
 
 # Results path
-RESULTS_PATH = project_root / "results"
+RESULTS_PATH = project_root / "water-access/results"
 PARQUET_PATH = RESULTS_PATH / "parquet_files"
 
 # -------------------------------------------------------------------------------
@@ -22,7 +22,7 @@ PARQUET_PATH = RESULTS_PATH / "parquet_files"
 # Define the number of simulations to run
 # Expect ~15-20 minutes for one simulation,
 # but multiprocessing will speed up large batches signimficantly
-NUM_ITERATIONS = 1
+NUM_ITERATIONS = 1000
 
 # Define maximum simultaneous processes to run for multiprocessing
 # 15 was the most that could run on a 32 core hyperthreaded machine
@@ -116,7 +116,10 @@ if __name__ == "__main__":
         URBAN_ADJUSTMENT_LOWER_ESTIMATE, URBAN_ADJUSTMENT_UPPER_ESTIMATE, NUM_ITERATIONS
     )
     rural_adjustments = mc.sample_gpd(
-        RURAL_PDR_PARETO_SHAPE, RURAL_PDR_PARETO_SCALE, RURAL_PDR_PARETO_LOC, NUM_ITERATIONS
+        RURAL_PDR_PARETO_SHAPE,
+        RURAL_PDR_PARETO_SCALE,
+        RURAL_PDR_PARETO_LOC,
+        NUM_ITERATIONS,
     )
 
     print(crr_adjustments)
@@ -155,7 +158,7 @@ if __name__ == "__main__":
                 hill_polarity,
                 urban_adjustment,
                 rural_adjustment,
-                use_sample_data=False  # Enable sample data
+                use_sample_data=False,  # Enable sample data
             )
             for crr_adjustment, time_gathering_water, practical_limit_bicycle, practical_limit_buckets, met, watts, hill_polarity, urban_adjustment, rural_adjustment in zip(
                 crr_adjustments,
@@ -177,7 +180,6 @@ if __name__ == "__main__":
             desc="Simulating",
         )
 
-
         for i, future in enumerate(concurrent.futures.as_completed(futures)):
             countries_result, district_result, zone_result = future.result()
 
@@ -185,26 +187,25 @@ if __name__ == "__main__":
             districts_simulation_results.append(district_result)
             countries_simulation_results.append(countries_result)
 
-            
             # keep only the columns needed for the zone results
-            filtered_zone_result = zone_result[['fid','zone_pop_with_water', 'zone_pop_without_water']]
+            filtered_zone_result = zone_result[
+                ["fid", "zone_pop_with_water", "zone_pop_without_water"]
+            ]
 
             # Save the filtered DataFrame to a Parquet file
-            output_file = PARQUET_PATH / f'zone_simulation_result_{i}.parquet'
+            output_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
             filtered_zone_result.to_parquet(output_file, index=False)
 
             futures_progress.update()  # Update the progress bar
 
-
     futures_progress.close()  # Close the progress bar
-
 
     mc.process_mc_results(countries_simulation_results)
     mc.process_districts_results(districts_simulation_results)
 
     # Record the end time
     end_time = time.time()
-    
+
     # Calculate and print the time taken by the simulations in minutes and hours
     time_taken = end_time - start_time
     print(f"Time taken: {time_taken / 60:.2f} minutes")

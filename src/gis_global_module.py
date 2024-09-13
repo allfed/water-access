@@ -1523,8 +1523,8 @@ def run_global_analysis(
         df_zones, time_gathering_water=time_gathering_water
     )
 
-    print("\n\n 1 \n\n")
-    print(len(df_zones["ISOCODE"].unique()))
+    # print("\n\n 1 \n\n")
+    # print(len(df_zones["ISOCODE"].unique()))
 
     # add df_districts
     df_zones_districts = df_zones.copy()
@@ -1537,9 +1537,9 @@ def run_global_analysis(
     if plot:
         plot_chloropleth(df_countries)
 
-    print("\n\n 5 \n\n")
-    print(len(df_districts["ISOCODE"].unique()))
-    print(len(df_countries["ISOCODE"].unique()))
+    # print("\n\n 5 \n\n")
+    # print(len(df_districts["ISOCODE"].unique()))
+    # print(len(df_countries["ISOCODE"].unique()))
 
     # TODO consider retuyrning df_zones here as well
     return df_countries, df_districts, df_zones
@@ -1563,5 +1563,5 @@ if __name__ == "__main__":
         use_sample_data=True,
     )
 
-    # df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
-    # df_districts.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
+    df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
+    df_districts.to_csv(DISTRICT_RESULTS_FILE_PATH, index=False)
