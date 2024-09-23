@@ -5,9 +5,9 @@ import rasterio
 from rasterio.features import rasterize
 from rasterio.transform import from_origin
 import numpy as np
-
-#time the script
 import time
+
+# Start timing the script
 start_time = time.time()
 
 # Load your data into a DataFrame
@@ -15,9 +15,12 @@ filename = "../../results/GIS_merged_output_processed_with_centroids_right.csv"
 df = pd.read_csv(filename)
 output_filename = "output_raster_5_arcmin_partial_percentage.tif"
 
-
 # Create a GeoDataFrame with the coordinates and specify the initial CRS (WGS84)
-gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.longitude_centroid, df.latitude_centroid), crs="EPSG:4326")
+gdf = gpd.GeoDataFrame(
+    df,
+    geometry=gpd.points_from_xy(df.longitude_centroid, df.latitude_centroid),
+    crs="EPSG:4326"
+)
 
 # Define the resolution: 5 arc-minutes is 5/60 degrees, which equals 0.08333 degrees
 resolution = 5 / 60  # 0.08333 degrees
@@ -38,16 +41,42 @@ height = int((y_max - y_min) / resolution)
 # Define the transform for the raster (top-left corner and resolution)
 transform = from_origin(x_min, y_max, resolution, resolution)
 
-# create percentage of people with water access
-gdf['percentage_with_water'] = gdf['zone_pop_with_water'] / (gdf['zone_pop_without_water'] + gdf['zone_pop_with_water'])
+# Create percentage of people with water access
+gdf['percentage_with_water'] = (
+    gdf['zone_pop_with_water'] /
+    (gdf['zone_pop_without_water'] + gdf['zone_pop_with_water'])
+)
 
-# Create a generator that yields the (geometry, value) pairs for rasterization
-def geometry_value_pairs():
-    for geom, value in zip(gdf.geometry, gdf['percentage_with_water']):
-        yield geom, value
+# Define the variables to rasterize
+variables_to_rasterize = [
+    'zone_pop_with_water',
+    'zone_pop_without_water',
+    'percentage_with_water'
+]
+num_bands = len(variables_to_rasterize)
 
-# Rasterize the GeoDataFrame, filling cells that don't have data with NaN
-raster = rasterize(geometry_value_pairs(), out_shape=(height, width), transform=transform, fill=np.nan)
+# Create an empty array to hold raster data
+raster_data = np.empty((num_bands, height, width), dtype=np.float32)
+
+for i, variable in enumerate(variables_to_rasterize):
+    print(f"Rasterizing variable: {variable}")
+
+    # Create a generator that yields the (geometry, value) pairs for rasterization
+    def geometry_value_pairs():
+        for geom, value in zip(gdf.geometry, gdf[variable]):
+            yield geom, value
+
+    # Rasterize the GeoDataFrame, filling cells that don't have data with -9999.0
+    raster = rasterize(
+        geometry_value_pairs(),
+        out_shape=(height, width),
+        transform=transform,
+        fill=-9999.0,
+        dtype='float32'
+    )
+
+    # Store the raster in the raster_data array
+    raster_data[i, :, :] = raster
 
 # Save the raster to a GeoTIFF file
 with rasterio.open(
@@ -56,16 +85,20 @@ with rasterio.open(
     driver='GTiff',
     height=height,
     width=width,
-    count=1,
-    dtype=raster.dtype,
+    count=num_bands,
+    dtype='float32',
     crs=gdf.crs.to_string(),
     transform=transform,
-    compress='deflate'  # Optional compression to save space
+    compress='deflate',
+    nodata=-9999.0  # Set nodata value
 ) as dst:
-    dst.write(raster, 1)
+    for i in range(num_bands):
+        dst.write(raster_data[i, :, :], i + 1)  # Bands are 1-indexed
+    # Set band descriptions
+    dst.descriptions = tuple(variables_to_rasterize)
 
 print(f"Raster file '{output_filename}' created successfully.")
 
-#time the script
+# End timing the script
 end_time = time.time()
 print(f"Time taken: {end_time - start_time} seconds")

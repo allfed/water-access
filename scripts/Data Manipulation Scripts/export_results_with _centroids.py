@@ -33,12 +33,12 @@ script_dir = data_script_dir.parent
 repo_root = script_dir.parent
 
 # Define the data directories relative to the repo root
-parquet_data_dir = repo_root / "results" / "parquet_files"
+parquet_data_dir = repo_root / "results" / "median_parquet"
 results_dir = repo_root / "results" 
 csv_data_dir = repo_root / "data" / "GIS"
 
 # Define the paths to the Parquet file and the original CSV file
-parquet_file_path = parquet_data_dir / "zone_simulation_result_0.parquet"
+parquet_file_path = parquet_data_dir / "zone_simulation_result_median.parquet"
 original_csv_file_path = csv_data_dir / "GIS_country_points_fid.csv"
 output_file_path = results_dir / "GIS_merged_output_processed_with_centroids_right.csv"
 
@@ -85,19 +85,3 @@ merged_df_no_nans['zone_pop_without_water'] = merged_df_no_nans['zone_pop_withou
 output_file_path_no_nans = results_dir / "GIS_merged_output_processed_with_centroids_no_nans.csv"
 # save the merged_df_no_nans to a new CSV file
 merged_df_no_nans.to_csv(output_file_path_no_nans, index=False)
-
-df = merged_df_no_nans
-import seaborn as sns
-
-# Heatmap: longitude and latitude with population without water
-plt.figure(figsize=(10, 6))
-sns.kdeplot(
-    x=df['longitude_centroid'], 
-    y=df['latitude_centroid'], 
-    weights=df['zone_pop_without_water'], 
-    cmap="Blues", fill=True
-)
-plt.title('Heatmap of Population Without Water by Location')
-plt.xlabel('Longitude')
-plt.ylabel('Latitude')
-plt.show()  
