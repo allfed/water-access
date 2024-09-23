@@ -39,9 +39,7 @@ URB_DATA_FILE = repo_root / "data" / "GIS" / "updated_GIS_output_cleaned.csv"
 URB_DATA_FILE_SAMPLE = (
     repo_root / "data" / "GIS" / "GIS_data_zones_sample_updated_stripped.csv"
 )
-# COUNTRY_DATA_FILE = (
-#     repo_root / "data" / "processed" / "country_data_master_interpolated.csv"
-# )
+
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
 EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
 CRR_FILE = repo_root / "data" / "lookup tables" / "Crr.csv"
