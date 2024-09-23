@@ -1,6 +1,23 @@
 from pathlib import Path
 import pandas as pd
 
+
+"""
+Output for the Septemeber 1000 run:
+
+Run closest to median 'zone_pop_without_water':
+Name: 85,
+
+Run closest to 95th percentile of 'zone_pop_without_water':
+Name: 54,
+
+
+Run closest to 95th percentile of 'zone_pop_without_water':
+Name: 211,
+
+
+"""
+
 # Define the root of the repository by going up one level from the script directory
 data_script_dir = Path(__file__).resolve().parent
 script_dir = data_script_dir.parent
@@ -69,3 +86,52 @@ print(median_run_with_water)
 
 print("\nRun closest to median 'zone_pop_without_water':")
 print(median_run_without_water)
+
+
+# Compute the 5th and 95th percentiles for 'zone_pop_with_water' and 'zone_pop_without_water'
+percentile_5_with_water = sums_df['sum_zone_pop_with_water'].quantile(0.05)
+percentile_95_with_water = sums_df['sum_zone_pop_with_water'].quantile(0.95)
+
+percentile_5_without_water = sums_df['sum_zone_pop_without_water'].quantile(0.05)
+percentile_95_without_water = sums_df['sum_zone_pop_without_water'].quantile(0.95)
+
+# Find the run closest to the 5th and 95th percentiles for 'zone_pop_with_water'
+sums_df['diff_to_5_with_water'] = (sums_df['sum_zone_pop_with_water'] - percentile_5_with_water).abs()
+sums_df['diff_to_95_with_water'] = (sums_df['sum_zone_pop_with_water'] - percentile_95_with_water).abs()
+
+run_closest_to_5_with_water = sums_df.loc[sums_df['diff_to_5_with_water'].idxmin()]
+run_closest_to_95_with_water = sums_df.loc[sums_df['diff_to_95_with_water'].idxmin()]
+
+# Find the run closest to the 5th and 95th percentiles for 'zone_pop_without_water'
+sums_df['diff_to_5_without_water'] = (sums_df['sum_zone_pop_without_water'] - percentile_5_without_water).abs()
+sums_df['diff_to_95_without_water'] = (sums_df['sum_zone_pop_without_water'] - percentile_95_without_water).abs()
+
+run_closest_to_5_without_water = sums_df.loc[sums_df['diff_to_5_without_water'].idxmin()]
+run_closest_to_95_without_water = sums_df.loc[sums_df['diff_to_95_without_water'].idxmin()]
+
+# Print the results
+print(f"Run closest to 5th percentile of 'zone_pop_with_water':")
+print(run_closest_to_5_with_water)
+
+print(f"\nRun closest to 95th percentile of 'zone_pop_with_water':")
+print(run_closest_to_95_with_water)
+
+print(f"\nRun closest to 5th percentile of 'zone_pop_without_water':")
+print(run_closest_to_5_without_water)
+
+print(f"\nRun closest to 95th percentile of 'zone_pop_without_water':")
+print(run_closest_to_95_without_water)
+
+# Optional: Save the runs closest to the 5th and 95th percentiles
+percentile_runs = {
+    'run_5th_with_water': run_closest_to_5_with_water['run_id'],
+    'run_95th_with_water': run_closest_to_95_with_water['run_id'],
+    'run_5th_without_water': run_closest_to_5_without_water['run_id'],
+    'run_95th_without_water': run_closest_to_95_without_water['run_id']
+}
+
+# Convert to DataFrame and save
+percentile_runs_df = pd.DataFrame([percentile_runs])
+percentile_runs_df.to_csv(parquet_data_dir / "percentile_runs_of_zone_populations.csv", index=False)
+
+print("\nPercentile run numbers have been saved to 'percentile_runs_of_zone_populations.csv'")
