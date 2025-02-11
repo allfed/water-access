@@ -31,5 +31,5 @@ jobs:
 
       # 3) Run pytest inside the activated conda env
       - name: Test with pytest
-        run: mamba run -n water-access pytest
+        run: conda run -n water-access pytest
 
