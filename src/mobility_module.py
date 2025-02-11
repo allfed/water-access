@@ -1,8 +1,7 @@
-# Importing NumPy for numerical operations.
 import numpy as np
 
-# Importing pandas for data manipulation and analysis.
 import pandas as pd
+import warnings
 
 # Importing matplotlib for plotting and visualization.
 import matplotlib.pyplot as plt
@@ -16,9 +15,6 @@ from scipy.optimize import fsolve
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-
-import numpy as np
 
 
 def linspace_creator(max_value_array, min_value, res):
@@ -189,7 +185,7 @@ class mobility_models:
 
         """
         ro, C_d, A, m_t, Crr, eta, P_t, g, s = data
-        v_solve = p[0]
+        v_solve = p
         return (
             1 / 2 * ro * v_solve**3 * C_d * A
             + v_solve * m_t * g * Crr
@@ -274,14 +270,25 @@ class mobility_models:
             mv.g,
             s * mo.ulhillpo,  # hill polarity, see model options
         )
-        V_guess = 1
+        V_guesses = [1, 10, 50]
+        unloaded_velocity = None
 
-        V_un = fsolve(model, V_guess, args=data, full_output=True)
-        # checks if the model was successful:
-        if V_un[2] == 1:
-            unloaded_velocity = V_un[0][0]
-        else:
-            unloaded_velocity = np.nan
+        for V_guess in V_guesses:
+            V_un = fsolve(model, V_guess, args=data, full_output=True)
+            V_un_status = V_un[2]
+            unloaded_velocity = V_un[0]
+            unloaded_velocity = unloaded_velocity.item()
+
+            # Check if the solution is non-negative
+            if unloaded_velocity >= 0:
+                break
+
+        # If no valid solution was found, raise an error
+        if unloaded_velocity is None or unloaded_velocity < 0:
+            raise ValueError("No valid solution found.")
+
+        # Limit velocity to a maximum of 7m/s
+        unloaded_velocity = min(unloaded_velocity, 7)
 
         data = (
             mv.ro,
@@ -292,16 +299,29 @@ class mobility_models:
             mv.eta,
             mv.P_t,
             mv.g,
-            s * mo.ulhillpo,  # hill polarity, see model options
+            s * mo.lhillpo,  # hill polarity, see model options
         )
-        V_guess = 1
 
-        V_load = fsolve(model, V_guess, args=data, full_output=True)
-        # checks if the model was successful:
-        if V_un[2] == 1:
-            loaded_velocity = V_load[0][0]
-        else:
-            loaded_velocity = np.nan
+        V_guesses = [1, 10, 50]
+        loaded_velocity = None
+
+        for V_guess in V_guesses:
+            V_un = fsolve(model, V_guess, args=data, full_output=True)
+            V_un_status = V_un[2]
+            loaded_velocity = V_un[0]
+            loaded_velocity = loaded_velocity.item()
+
+            # Check if the solution is non-negative
+            if loaded_velocity >= 0:
+                break
+
+        # If no valid solution was found, raise an error
+        if loaded_velocity is None or loaded_velocity < 0:
+            raise ValueError("No valid solution found.")
+
+        # Limit velocity to a maximum of 7m/s
+        loaded_velocity = min(loaded_velocity, 7)
+        assert loaded_velocity >= 0, "Loaded velocity cannot be negative."
 
         return loaded_velocity, unloaded_velocity, max_load_HPV
 
@@ -358,9 +378,9 @@ class mobility_models:
         D = np.pi**2 / (6 * mv.g * mv.L)  # leg component
 
         B1 = (
-            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]
+            m_HPV_load_pilot * mv.g * np.cos(np.arctan(s)) * hpv.Crr[:, 0, :]  # add g?
         )  # rolling resistance component
-        B2 = m_HPV_load_pilot * np.sin(np.arctan(s))  # slope component
+        B2 = m_HPV_load_pilot * mv.g * np.sin(np.arctan(s))  # slope component
         B = B1 + B2
 
         ##### velocities
@@ -381,6 +401,7 @@ class mobility_models:
     def numerical_mobility_model(mr, mv, mo, met, hpv):
         """
         Calculates the velocity and load matrix for different HPVs, slopes, and loads.
+        Used for sensitivity analysis.
 
         Parameters:
         - mr (object): Model results object
@@ -473,7 +494,11 @@ class mobility_models:
                 V_un = fsolve(model, V_guess, args=data, full_output=True)
                 # checks if the model was sucesful:
                 if V_un[2] == 1:
-                    mr.v_unload_matrix3d[i, j, :] = V_un[0][0]
+                    v_unload = V_un[0][0]
+
+                    # limit to max 7m/s
+                    v_unload = min(v_unload, 7)
+                    mr.v_unload_matrix3d[i, j, :] = v_unload
                 else:
                     mr.v_unload_matrix3d[i, j, :] = np.nan
 
@@ -498,7 +523,10 @@ class mobility_models:
 
                     V_r = fsolve(model, V_guess, args=data, full_output=True)
                     if V_r[2] == 1:
-                        mr.v_load_matrix3d[i, j, k] = V_r[0][0]
+                        v_load = V_r[0][0]
+                        # limit to max 7m/s
+                        v_load = min(v_load, 7)
+                        mr.v_load_matrix3d[i, j, k] = v_load
                         mr.load_matrix3d[i, j, k] = load_vector[
                             k
                         ]  # amount of water carried
@@ -555,7 +583,7 @@ class mobility_models:
             + (-0.05372 * G)
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
-            + (0.00320 * v_solve * G**3)
+            + (0.000320 * v_solve * G**3)  # this was previously 0.00320 - bug?
             - (met.budget_VO2 / m_load)
         )
         # add in rolling resistance stuff...
@@ -610,15 +638,15 @@ class HPV_variables:
 
 
 class model_variables:
-    def __init__(self):
+    def __init__(self, P_t=75, m1=62):
         #### variables (changeable)
         self.s_deg = 0  # slope in degrees (only used for loading scenario, is overriden in variable slope scenario)
-        self.m1 = 62  # mass of rider/person
-        self.P_t = 75  # power output of person (steady state average)
+        self.m1 = m1  # mass of rider/person
+        self.P_t = P_t  # power output of person (steady state average)
         self.F_max = 300  # maximum force exertion for pushing up a hill for a short amount of time
         self.L = 1  # leg length
         self.minimumViableLoad = 0  # in kg, the minimum useful load for such a trip
-        self.t_hours = 8  # number of hours to gather water
+        self.t_hours = 5.5  # number of hours to gather water (ONLY used in mobility and sensitivity notebooks. Defined separately in global analysis)
         self.L = 1  # leg length
         self.A = 0.51  # cross sectional area
         self.C_d = 0.9  # constant for wind
@@ -629,7 +657,7 @@ class model_variables:
 
 
 class model_options:
-    def __init__(self):
+    def __init__(self, ulhillpo=0, lhillpo=1):
         # model options
         self.model_selection = 2  # 1 is sprott, 2 is cycling 3 is lankford, 4 is LCDA
 
@@ -643,8 +671,8 @@ class model_options:
         self.slope_end = 10  # slope max degrees
 
         # is it uphill or downhill? -1 is downhill, +1 is uphill. Any value between 0 to 1 will lesson the impact of the "effective hill", useful for exploring/approximating braking on bikes for donwhill (otherwise we get up to 60km/h on an unloaded bike pleting down a 10 deg hill!)
-        self.lhillpo = 1  # loaded hill polarity
-        self.ulhillpo = 1  # unloaded hill polarity
+        self.lhillpo = lhillpo  # loaded hill polarity
+        self.ulhillpo = ulhillpo  # unloaded hill polarity
 
         # for plotting of single scenarios, likle on surf plots
         self.slope_scene = (
@@ -698,7 +726,7 @@ class MET_values:
         budget_watts (float): Watts budget for a person based on the MET value and body mass.
     """
 
-    def __init__(self, mv, met=3.3):
+    def __init__(self, mv, country_weight, met=4.5, use_country_specific_weights=True):
         # Metabolic Equivalent of Task
         self.MET_of_sustainable_excercise = (
             met  # # https://en.wikipedia.org/wiki/Metabolic_equivalent_of_task
@@ -706,12 +734,24 @@ class MET_values:
         self.MET_VO2_conversion = 3.5  # milliliters per minute per kilogram body mass
         self.MET_watt_conversion = 1.162  # watts per kg body mass
         # so 75 Watts output (from Marks textbook) is probably equivalent to about 6 METs
-        self.budget_VO2 = (
-            self.MET_VO2_conversion * self.MET_of_sustainable_excercise * mv.m1
-        )  # vo2 budget for a person
-        self.budget_watts = (
-            self.MET_watt_conversion * self.MET_of_sustainable_excercise * mv.m1
-        )  # vo2 budget for a person
+        if use_country_specific_weights == True:
+            self.budget_VO2 = (
+                self.MET_VO2_conversion
+                * self.MET_of_sustainable_excercise
+                * country_weight
+            )  # vo2 budget for a person
+            self.budget_watts = (
+                self.MET_watt_conversion
+                * self.MET_of_sustainable_excercise
+                * country_weight
+            )  # vo2 budget for a person
+        else:
+            self.budget_VO2 = (
+                self.MET_VO2_conversion * self.MET_of_sustainable_excercise * mv.m1
+            )  # vo2 budget for a person
+            self.budget_watts = (
+                self.MET_watt_conversion * self.MET_of_sustainable_excercise * mv.m1
+            )  # vo2 budget for a person
 
 
 class model_results:
@@ -719,7 +759,7 @@ class model_results:
         self.hpv_name = (hpv.name,)
 
         # create slope vector
-        self.slope_vector_deg = np.arange(0, 13)
+        self.slope_vector_deg = np.arange(0, 4)
 
         # = linspace_creator(
         #     np.array([mo.slope_end]), mo.slope_start, mo.slope_res
@@ -1324,76 +1364,6 @@ class plotting_hpv:
         fig.show()
         # py.iplot(fig, filename=chart_title)
 
-    def bar_plot_hpvs(mr, mo, hpv, mv):
-        """
-        Generate a bar plot showing the efficiency of water collection for different hpvs.
-
-        Args:
-            mr (object): model results object
-            mo (object): mobility options object
-            hpv (object): human-powered vehicle data
-            mv (object): model variables
-
-        Returns:
-            None
-        """
-
-        df = mr.create_dataframe_single_scenario(hpv, mv, mo.load_scene, mo.slope_scene)
-
-        # filter df to slope = 0
-        df = df[df["Slope"] == 0]
-
-        # Truncate the Viridis colormap to remove the last 20% of colors
-        truncated_viridis = px.colors.sequential.Viridis[
-            : -int(len(px.colors.sequential.Viridis) * 0.4)
-        ]
-
-        fig = px.bar(
-            df,
-            x="Name",
-            y="Water ration * Km",
-            hover_data=[
-                "Name",
-                "Average Trip Velocity",
-                "Loaded Velocity",
-                "Unloaded Velocity",
-                "Distance to Water Achievable",
-                "Total Round trip Distance Achievable",
-                "Load",
-                "Slope",
-                "Hours Collecting Water Max",
-                "Hours Spent Collecting Single Person Water",
-            ],
-            color="Water ration * Km",
-            labels={
-                "Name": "Human-Powered Vehicle",
-                "Water ration * Km": "Performance [15L.km.hr⁻¹]",
-            },
-            color_continuous_scale=truncated_viridis,
-        )
-
-        # Order from lowest to highest
-        fig.update_xaxes(categoryorder="total ascending")
-        fig.update_traces(showlegend=False)
-        fig.update_coloraxes(showscale=False)
-
-        fig.update_layout(
-            width=1500,
-            height=1000,
-            font=dict(size=30),
-            xaxis_tickangle=-45,
-            yaxis=dict(tickfont=dict(size=30)),
-            title=dict(font=dict(size=20)),
-        )
-
-        fig.update_layout(
-            margin=dict(l=100, r=30, t=30, b=165),
-        )
-        # save as tiff
-        fig.write_image("../results/hpv_performance.png")
-
-        fig.show()
-
     def new_slope_plot(mr, mo, hpv, mv):
         """
         Generate a bar plot showing the efficiency of water collection for different hpvs.
@@ -1478,7 +1448,7 @@ class plotting_hpv:
         )
 
         # save as tiff
-        fig.write_image("../results/hpv_performance_slope.png")
+        # fig.write_image("../results/hpv_performance_slope.png")
 
         fig.update_xaxes(title_standoff=40)
         fig.update_yaxes(title_standoff=40)
@@ -1583,7 +1553,7 @@ class plotting_hpv:
         )
 
         # save as tiff
-        fig.write_image("../results/hpv_load_performance.png")
+        # fig.write_image("../results/hpv_load_performance.png")
         fig.show()
 
 

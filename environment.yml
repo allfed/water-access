@@ -1,4 +1,4 @@
-name: water-access
+name: water-access-original
 channels:
   - conda-forge
   - defaults
@@ -9,20 +9,22 @@ dependencies:
   - matplotlib  # Latest compatible version
   - ipykernel 
   - ipywidgets>=7.6
-  - notebook>=6.4  # Updated notebook version
-  - jupyterlab  # For a modern Jupyter interface
-  - Flask>=2.3.2  # Latest stable version of Flask
-  - werkzeug>=2.3.7  # Latest stable version of Werkzeug
+  - notebook>=5.3
+  - Flask=3.0.3
   - pycountry 
   - pyarrow  # For Parquet support
   - scipy  # Latest compatible version
   - pyinterpolate
   - weightedstats
-  - dash
-  - pytest>=7.4.0  # Latest stable version of pytest
-  - pip
+  - pytest=8.0.2
+  - openpyxl=3.1.5
+  - rasterio
+  - geopandas
+  - scikit-learn
+  - rasterio
   - pip:
     - plotly
+    - tabulate
     - kaleido
     - chart_studio 
     - python-dotenv
@@ -30,3 +32,4 @@ dependencies:
     - jupyter-dash
     - jupyterlab-dash
     - countryinfo
+    - seaborn
