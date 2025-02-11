@@ -405,7 +405,7 @@ class mobility_models:
         Now for the ith HPV, the jth slope, and the kth load it will determine the velocity of the HPV given the metabolic/energy input
         Uses scipy.optimize's fsolve to solve the systems of equations int he walking models
         full_output=True means that a flag is returned to see if the solve was succesful.
-        Many solves are not successful if the agent 'rus out of energy' and physicaly can't carry the load up the incline with the energy budget provided, these are handled in the if statement using
+        Many solves are not successful if the agent 'runs out of energy' and physicaly can't carry the load up the incline with the energy budget provided, these are handled in the if statement using
         """
 
         limit_practical_load = True

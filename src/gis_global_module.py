@@ -97,8 +97,11 @@ def run_weighted_median_on_grouped_df(df, groupby_column, value_column, weight_c
 ##############################################################################################################################
 
 # Constants
+
+
+
 URB_DATA_FILE = "./data/GIS/GIS_data_zones.csv"
-COUNTRY_DATA_FILE = "./data/processed/country_data_master_interpolated.csv"
+COUNTRY_DATA_FILE = "./data/processed/merged_data.csv"
 EXPORT_FILE_LOCATION = "./data/processed/"
 CRR_FILE = "./data/lookup tables/Crr.csv"
 
