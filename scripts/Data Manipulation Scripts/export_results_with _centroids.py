@@ -34,7 +34,7 @@ repo_root = script_dir.parent
 
 # Define the data directories relative to the repo root
 parquet_data_dir = repo_root / "results" / "median_parquet"
-results_dir = repo_root / "results" 
+results_dir = repo_root / "results"
 csv_data_dir = repo_root / "data" / "GIS"
 
 # Define the paths to the Parquet file and the original CSV file
@@ -49,21 +49,23 @@ processed_df = pd.read_parquet(parquet_file_path)
 original_df = pd.read_csv(original_csv_file_path)
 
 # Step 3: Calculate the longitude and latitude centroids
-original_df['longitude_centroid'] = (original_df['left'] + original_df['right']) / 2
-original_df['latitude_centroid'] = (original_df['top'] + original_df['bottom']) / 2
+original_df["longitude_centroid"] = (original_df["left"] + original_df["right"]) / 2
+original_df["latitude_centroid"] = (original_df["top"] + original_df["bottom"]) / 2
 
 # Step 4: Keep only the fid and centroid columns
-original_df = original_df[['fid', 'longitude_centroid', 'latitude_centroid']]
+original_df = original_df[["fid", "longitude_centroid", "latitude_centroid"]]
 
 
 ## OPTION LEFT OR RIGHT
 # left treats non analsyies areas and ocean as the same (missing data)
-    # end result is minimum dataframe with just the analysis areas and centroid data
+# end result is minimum dataframe with just the analysis areas and centroid data
 # right treats non analsyses areas and ocean as different
-    # end result is a dataframe with all land mass areas and centroid data
+# end result is a dataframe with all land mass areas and centroid data
 # difference is due to dropping of non populated areas within the python model.
 # Step 5: Merge the processed DataFrame with the centroid data on the 'fid' column
-merged_df = pd.merge(processed_df, original_df, left_on='fid', right_on='fid', how='right')
+merged_df = pd.merge(
+    processed_df, original_df, left_on="fid", right_on="fid", how="right"
+)
 
 # Step 6: Save the merged DataFrame to a new CSV file
 merged_df.to_csv(output_file_path, index=False)
@@ -73,15 +75,20 @@ nan_count = merged_df.isna().sum()
 print(f"Number of NaN values in the merged DataFrame:\n{nan_count}")
 
 
-
 # alteanrive csv created with NaNs as zeros
 merged_df_no_nans = merged_df.fillna(0)
 
 # fix any negative values in the merged_df_no_nans in zone_pop_with_water and zone_pop_without_water
-merged_df_no_nans['zone_pop_with_water'] = merged_df_no_nans['zone_pop_with_water'].apply(lambda x: 0 if x < 0 else x)
-merged_df_no_nans['zone_pop_without_water'] = merged_df_no_nans['zone_pop_without_water'].apply(lambda x: 0 if x < 0 else x)    
+merged_df_no_nans["zone_pop_with_water"] = merged_df_no_nans[
+    "zone_pop_with_water"
+].apply(lambda x: 0 if x < 0 else x)
+merged_df_no_nans["zone_pop_without_water"] = merged_df_no_nans[
+    "zone_pop_without_water"
+].apply(lambda x: 0 if x < 0 else x)
 
 
-output_file_path_no_nans = results_dir / "GIS_merged_output_processed_with_centroids_no_nans.csv"
+output_file_path_no_nans = (
+    results_dir / "GIS_merged_output_processed_with_centroids_no_nans.csv"
+)
 # save the merged_df_no_nans to a new CSV file
 merged_df_no_nans.to_csv(output_file_path_no_nans, index=False)

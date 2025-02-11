@@ -3,10 +3,19 @@ from scipy.stats import genpareto
 from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 
-def fit_gpd(target_mean=1.34, target_upper_ci=2.5, initial_shape=0.2, initial_scale=0.2, loc_param=1.0, sample_size=1000, method='Powell'):
+
+def fit_gpd(
+    target_mean=1.34,
+    target_upper_ci=2.5,
+    initial_shape=0.2,
+    initial_scale=0.2,
+    loc_param=1.0,
+    sample_size=1000,
+    method="Powell",
+):
     """
     Fits a Generalized Pareto Distribution (GPD) to match a target mean and upper CI.
-    
+
     Parameters:
     - target_mean: Desired mean of the distribution.
     - target_upper_ci: Desired upper bound of the confidence interval.
@@ -15,7 +24,7 @@ def fit_gpd(target_mean=1.34, target_upper_ci=2.5, initial_shape=0.2, initial_sc
     - loc_param: Location parameter (fixed).
     - sample_size: Number of samples to generate for fitting.
     - method: Optimization method (default is 'Powell').
-    
+
     Returns:
     - shape_opt: Optimized shape parameter.
     - scale_opt: Optimized scale parameter.
@@ -27,7 +36,9 @@ def fit_gpd(target_mean=1.34, target_upper_ci=2.5, initial_shape=0.2, initial_sc
     # Define a function to optimize both the mean and upper CI
     def objective_gpd(params):
         shape_param, scale_param = params
-        samples = genpareto.rvs(c=shape_param, loc=loc_param, scale=scale_param, size=sample_size)
+        samples = genpareto.rvs(
+            c=shape_param, loc=loc_param, scale=scale_param, size=sample_size
+        )
         mean = np.mean(samples)
         high_99 = np.percentile(samples, 99.5)
         penalty = 0
@@ -35,7 +46,7 @@ def fit_gpd(target_mean=1.34, target_upper_ci=2.5, initial_shape=0.2, initial_sc
         # Add penalties if parameters go out of expected bounds
         if shape_param < 0 or scale_param < 0:
             penalty += 1e6  # Large penalty for invalid parameters
-        
+
         return (mean - target_mean) ** 2 + (high_99 - target_upper_ci) ** 2 + penalty
 
     # Initial guess for shape and scale
@@ -49,7 +60,9 @@ def fit_gpd(target_mean=1.34, target_upper_ci=2.5, initial_shape=0.2, initial_sc
     shape_opt, scale_opt = result.x
 
     # Generate sample data from the optimized GPD
-    samples_optimized = genpareto.rvs(c=shape_opt, loc=loc_param, scale=scale_opt, size=sample_size)
+    samples_optimized = genpareto.rvs(
+        c=shape_opt, loc=loc_param, scale=scale_opt, size=sample_size
+    )
 
     # Calculate mean and confidence intervals for the optimized distribution
     fitted_mean = np.mean(samples_optimized)
@@ -59,7 +72,9 @@ def fit_gpd(target_mean=1.34, target_upper_ci=2.5, initial_shape=0.2, initial_sc
     return shape_opt, scale_opt, fitted_mean, fitted_low_99, fitted_high_99, loc_param
 
 
-def plot_gpd(samples_optimized, shape_opt, loc_param, scale_opt, target_mean, target_upper_ci):
+def plot_gpd(
+    samples_optimized, shape_opt, loc_param, scale_opt, target_mean, target_upper_ci
+):
     """
     Plot the optimized Generalized Pareto Distribution (GPD) and the histogram of the samples.
 
@@ -72,21 +87,24 @@ def plot_gpd(samples_optimized, shape_opt, loc_param, scale_opt, target_mean, ta
     - target_upper_ci (float): Desired upper bound of the confidence interval.
     """
     # Plot the histogram of the samples
-    plt.hist(samples_optimized, bins=30, density=True, alpha=0.6, color='b')
+    plt.hist(samples_optimized, bins=30, density=True, alpha=0.6, color="b")
 
     # Plot the optimized GPD distribution
     xmin, xmax = plt.xlim()
     x = np.linspace(xmin, xmax, 100)
     p = genpareto.pdf(x, c=shape_opt, loc=loc_param, scale=scale_opt)
-    plt.plot(x, p, 'k', linewidth=2)
+    plt.plot(x, p, "k", linewidth=2)
 
     # Set the title and labels
-    plt.title(f"Optimized Generalized Pareto Distribution (Mean Target: {target_mean}, Upper CI Target: {target_upper_ci})")
+    plt.title(
+        f"Optimized Generalized Pareto Distribution (Mean Target: {target_mean}, Upper CI Target: {target_upper_ci})"
+    )
     plt.xlabel("Value")
     plt.ylabel("Density")
 
     # Show the plot
     plt.show()
+
 
 def sample_gpd(shape_param, scale_param, loc_param=1.0, n=1000):
     """
@@ -113,7 +131,7 @@ shape_opt, scale_opt, fitted_mean, fitted_low_99, fitted_high_99, loc_param = fi
     initial_scale=0.2,
     loc_param=1.0,
     sample_size=10000,
-    method='Nelder-Mead'  # More robust method than 'Nelder-Mead'
+    method="Nelder-Mead",  # More robust method than 'Nelder-Mead'
 )
 
 # Print the results
@@ -123,7 +141,6 @@ print(f"Upper 99% Confidence Interval: {fitted_high_99}")
 print(f"Location Parameter: {loc_param}")
 print(f"Optimized Shape Parameter: {shape_opt}")
 print(f"Optimized Scale Parameter: {scale_opt}")
-
 
 
 # shape = 0.20007812499999994
