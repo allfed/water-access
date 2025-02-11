@@ -19,6 +19,7 @@ dependencies:
   - pyinterpolate
   - weightedstats
   - pytest=8.0.2
+  - pytest-mock
   - openpyxl=3.1.5
   - rasterio
   - geopandas
