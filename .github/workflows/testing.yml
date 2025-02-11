@@ -19,8 +19,8 @@ jobs:
         python-version: ["3.9"]
     steps:
       - uses: actions/checkout@v3
-      with:
-        lfs: true
+        with:
+          lfs: true
 
       # 1) Set up Conda environment
       - name: Set up Miniconda ${{ matrix.python-version }}
