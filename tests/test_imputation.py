@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from scripts.Data_Manipulation_Scripts.imputation import test_append_country_info
+from scripts.Data_Manipulation_Scripts.imputation_script import test_append_country_info
 
 
 def test_append_country_info():
