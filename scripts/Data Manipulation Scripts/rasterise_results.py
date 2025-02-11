@@ -11,15 +11,17 @@ import time
 start_time = time.time()
 
 # Load your data into a DataFrame
-filename = "../../results/GIS_merged_output_processed_with_centroids_right.csv"
+filename = "./results/GIS_merged_output_processed_with_centroids_right.csv"
+# filename = "../../results/GIS_merged_output_processed_with_centroids_right.csv"
 df = pd.read_csv(filename)
-output_filename = "output_raster_5_arcmin_partial_percentage.tif"
+output_filename = "./results/output_raster_5_arcmin_partial_percentage.tif"
+# output_filename = "output_raster_5_arcmin_partial_percentage.tif"
 
 # Create a GeoDataFrame with the coordinates and specify the initial CRS (WGS84)
 gdf = gpd.GeoDataFrame(
     df,
     geometry=gpd.points_from_xy(df.longitude_centroid, df.latitude_centroid),
-    crs="EPSG:4326"
+    crs="EPSG:4326",
 )
 
 # Define the resolution: 5 arc-minutes is 5/60 degrees, which equals 0.08333 degrees
@@ -42,16 +44,15 @@ height = int((y_max - y_min) / resolution)
 transform = from_origin(x_min, y_max, resolution, resolution)
 
 # Create percentage of people with water access
-gdf['percentage_with_water'] = (
-    gdf['zone_pop_with_water'] /
-    (gdf['zone_pop_without_water'] + gdf['zone_pop_with_water'])
+gdf["percentage_with_water"] = gdf["zone_pop_with_water"] / (
+    gdf["zone_pop_without_water"] + gdf["zone_pop_with_water"]
 )
 
 # Define the variables to rasterize
 variables_to_rasterize = [
-    'zone_pop_with_water',
-    'zone_pop_without_water',
-    'percentage_with_water'
+    "zone_pop_with_water",
+    "zone_pop_without_water",
+    "percentage_with_water",
 ]
 num_bands = len(variables_to_rasterize)
 
@@ -72,7 +73,7 @@ for i, variable in enumerate(variables_to_rasterize):
         out_shape=(height, width),
         transform=transform,
         fill=-9999.0,
-        dtype='float32'
+        dtype="float32",
     )
 
     # Store the raster in the raster_data array
@@ -81,16 +82,16 @@ for i, variable in enumerate(variables_to_rasterize):
 # Save the raster to a GeoTIFF file
 with rasterio.open(
     output_filename,
-    'w',
-    driver='GTiff',
+    "w",
+    driver="GTiff",
     height=height,
     width=width,
     count=num_bands,
-    dtype='float32',
+    dtype="float32",
     crs=gdf.crs.to_string(),
     transform=transform,
-    compress='deflate',
-    nodata=-9999.0  # Set nodata value
+    compress="deflate",
+    nodata=-9999.0,  # Set nodata value
 ) as dst:
     for i in range(num_bands):
         dst.write(raster_data[i, :, :], i + 1)  # Bands are 1-indexed

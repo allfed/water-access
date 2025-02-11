@@ -685,9 +685,14 @@ def calculate_and_merge_bicycle_distance(
         )
         process_and_save_results(df_zones, results, export_file_location, "bicycle")
     else:
-        df_zones_bicycle = pd.read_csv(
-            export_file_location + "bicycle_velocity_by_zone.csv"
-        )
+        try:
+            df_zones_bicycle = pd.read_csv(
+                export_file_location / "bicycle_velocity_by_zone.csv"
+            )
+        except TypeError:
+            df_zones_bicycle = pd.read_csv(
+                export_file_location + "bicycle_velocity_by_zone.csv"
+            )
         df_zones = df_zones.merge(df_zones_bicycle, on="fid", how="left")
     return df_zones
 
@@ -786,9 +791,14 @@ def calculate_and_merge_walking_distance(
         )
         process_and_save_results(df_zones, results, export_file_location, "walk")
     else:
-        df_zones_walking = pd.read_csv(
-            export_file_location + "walk_velocity_by_zone.csv"
-        )
+        try:
+            df_zones_walking = pd.read_csv(
+                export_file_location / "walk_velocity_by_zone.csv"
+            )
+        except TypeError:
+            df_zones_walking = pd.read_csv(
+                export_file_location + "walk_velocity_by_zone.csv"
+            )
         df_zones = df_zones.merge(df_zones_walking, on="fid", how="left")
     return df_zones
 
@@ -1015,6 +1025,10 @@ def calculate_weighted_results(df_zones):
     """
     Calculate the weighted median for each country group.
     """
+    # return error if the input DataFrame is empty
+    if df_zones.empty:
+        raise ValueError("Input DataFrame is empty")
+
     df_median_group = (
         df_zones.groupby("ISOCODE")
         .apply(

@@ -23,6 +23,7 @@ dependencies:
   - rasterio
   - geopandas
   - scikit-learn
+  - rasterio
   - pip:
     - plotly
     - tabulate

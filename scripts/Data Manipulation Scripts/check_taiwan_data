@@ -9,34 +9,43 @@ data_dir = repo_root / "data" / "original_data"
 file_paths = {
     "water_JMP": "WHO Household Water Data - 2023 Data.csv",
     "bicycle": "global-bike-ownership.csv",
-    "gdp_per_capita": "gdp_data.csv",
+    # "gdp_per_capita": "gdp_data.csv",
     "bmi_women": "Mean BMI Women 2016.csv",
     "bmi_men": "Mean BMI Men 2016.csv",
     "height": "Human Height by Birth Year.csv",
     "population": "population.csv",
     "country_regions": "ISO-3166 Countries.csv",
-    "country_info": "countryInfo.txt"
+    # "country_info": "countryInfo.txt",
 }
+
 
 def load_dataframes(file_paths):
     dataframes = {}
     for name, filename in file_paths.items():
         path = data_dir / filename
         if path.suffix in [".csv", ".txt"]:
-            dataframes[name] = pd.read_csv(path, delimiter="\t" if path.suffix == ".txt" else ",")
+            dataframes[name] = pd.read_csv(
+                path, delimiter="\t" if path.suffix == ".txt" else ","
+            )
         elif path.suffix in [".xls", ".xlsx"]:
             dataframes[name] = pd.read_excel(path)
         else:
             print(f"Unsupported file format for {name}")
     return dataframes
 
+
 def search_countries(dataframes, countries):
     results = {}
     for name, df in dataframes.items():
-        matches = df[df.astype(str).apply(lambda x: x.str.contains('|'.join(countries), case=False)).any(axis=1)]
+        matches = df[
+            df.astype(str)
+            .apply(lambda x: x.str.contains("|".join(countries), case=False))
+            .any(axis=1)
+        ]
         if not matches.empty:
             results[name] = matches
     return results
+
 
 if __name__ == "__main__":
     dataframes = load_dataframes(file_paths)
@@ -46,3 +55,19 @@ if __name__ == "__main__":
     for name, result in search_results.items():
         print(f"\nResults in {name}:")
         print(result)
+
+    # Assume that 'dataframes' is a dictionary of DataFrames returned by the 'load_dataframes' function
+    population_df = dataframes["population"]
+    water_JMP_df = dataframes["water_JMP"]
+
+    # Get the unique countries in 'population' and 'water_JMP'
+    population_countries = population_df["Entity"].unique()
+    water_JMP_countries = water_JMP_df["Country"].unique()
+
+    # Find the countries that are in 'population' but not in 'water_JMP'
+    missing_countries = population_countries[
+        ~pd.Series(population_countries).isin(water_JMP_countries)
+    ]
+
+    print(f"Number of missing countries in JMP: {len(missing_countries)}")
+    print(f"Missing countries in JMP: {missing_countries}")

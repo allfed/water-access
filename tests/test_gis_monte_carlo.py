@@ -71,6 +71,8 @@ class TestRunSimulation:
         met = 3
         watts = 75
         hill_polarity = "flat_uphill"
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         result = run_simulation(
             crr_adjustment,
             time_gathering_water,
@@ -79,6 +81,8 @@ class TestRunSimulation:
             met,
             watts,
             hill_polarity,
+            urban_adjustment,
+            rural_adjustment,
             calculate_distance=False,
             use_sample_data=True,
         )
@@ -92,6 +96,8 @@ class TestRunSimulation:
         met = 3
         watts = 75
         hill_polarity = "flat_uphill"
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         with pytest.raises(AssertionError):
             run_simulation(
                 crr_adjustment,
@@ -101,7 +107,10 @@ class TestRunSimulation:
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
                 calculate_distance=False,
+                use_sample_data=True,
             )
 
     def test_invalid_time_gathering_water_raises_assertion_error(self):
@@ -112,6 +121,8 @@ class TestRunSimulation:
         met = 3
         watts = 75
         hill_polarity = "flat_uphill"
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         with pytest.raises(AssertionError):
             run_simulation(
                 crr_adjustment,
@@ -121,6 +132,8 @@ class TestRunSimulation:
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
                 calculate_distance=False,
             )
 
@@ -132,6 +145,8 @@ class TestRunSimulation:
         met = 3
         watts = 75
         hill_polarity = "flat_uphill"
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         with pytest.raises(AssertionError):
             run_simulation(
                 crr_adjustment,
@@ -141,6 +156,8 @@ class TestRunSimulation:
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
                 calculate_distance=False,
             )
 
@@ -152,6 +169,8 @@ class TestRunSimulation:
         met = 3
         watts = 75
         hill_polarity = "flat_uphill"
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         with pytest.raises(AssertionError):
             run_simulation(
                 crr_adjustment,
@@ -161,6 +180,8 @@ class TestRunSimulation:
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
                 calculate_distance=False,
             )
 
@@ -172,6 +193,8 @@ class TestRunSimulation:
         met = "invalid"
         watts = 75
         hill_polarity = "flat_uphill"
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         with pytest.raises(AssertionError):
             run_simulation(
                 crr_adjustment,
@@ -181,6 +204,8 @@ class TestRunSimulation:
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
                 calculate_distance=False,
             )
 
@@ -192,6 +217,8 @@ class TestRunSimulation:
         met = 3
         watts = np.array([75, 100])
         hill_polarity = "flat_uphill"
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         with pytest.raises(AssertionError):
             run_simulation(
                 crr_adjustment,
@@ -201,6 +228,8 @@ class TestRunSimulation:
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
                 calculate_distance=False,
             )
 
@@ -212,6 +241,8 @@ class TestRunSimulation:
         met = 3
         watts = 75
         hill_polarity = 1
+        urban_adjustment = 1.2
+        rural_adjustment = 1.5
         with pytest.raises(AssertionError):
             run_simulation(
                 crr_adjustment,
@@ -221,6 +252,8 @@ class TestRunSimulation:
                 met,
                 watts,
                 hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
                 calculate_distance=False,
             )
 

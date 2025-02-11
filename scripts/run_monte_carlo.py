@@ -57,8 +57,8 @@ METS_LOWER_ESTIMATE = 3
 METS_UPPER_ESTIMATE = 6
 
 # Average watts available for cycling to and from water source
-WATTS_LOWER_ESTIMATE = 50
-WATTS_UPPER_ESTIMATE = 100
+WATTS_LOWER_ESTIMATE = 20
+WATTS_UPPER_ESTIMATE = 80
 
 # Polarity options (randomly chosen from list each simulation run)
 # The first word defines the trip to the water source
@@ -76,8 +76,7 @@ POLARITY_OPTIONS = [
 # Adjustments for euclidean distance to account for paths taken to water not being straight lines
 URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
 URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-# RURAL_ADJUSTMENT_LOWER_ESTIMATE = 1       #TODO James can delete these lines
-# RURAL_ADJUSTMENT_UPPER_ESTIMATE = 1.3
+
 # Set the parameters for the GPD distribution for rural adjustments. Shape, scale, and loc
 # These values were obtained from the scripts/create_pareto_distribution.py
 RURAL_PDR_PARETO_SHAPE = 0.20007812499999994

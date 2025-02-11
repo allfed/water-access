@@ -307,7 +307,7 @@ def process_districts_results(districts_simulation_results, output_dir="results"
 
     # save all-column results
     all_medians.to_csv(os.path.join(output_dir, "districts_median_results.csv"))
-    all_means.to_csv(os.path.join(output_dir, "distrcts_mean_results.csv"))
+    all_means.to_csv(os.path.join(output_dir, "districts_mean_results.csv"))
     all_percentile_95s.to_csv(
         os.path.join(output_dir, "districts_95th_percentile_results.csv")
     )

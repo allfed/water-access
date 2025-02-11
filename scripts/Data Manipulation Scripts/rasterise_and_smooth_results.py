@@ -12,7 +12,8 @@ from scipy.ndimage import uniform_filter
 start_time = time.time()
 
 # Load your data into a DataFrame
-filename = "../../results/GIS_merged_output_processed_with_centroids_right.csv"
+# filename = "../../results/GIS_merged_output_processed_with_centroids_right.csv"
+filename = "./results/GIS_merged_output_processed_with_centroids_right.csv"
 df = pd.read_csv(filename)
 output_filename = "output_raster_5_arcmin_smoothed.tif"
 
@@ -20,7 +21,7 @@ output_filename = "output_raster_5_arcmin_smoothed.tif"
 gdf = gpd.GeoDataFrame(
     df,
     geometry=gpd.points_from_xy(df.longitude_centroid, df.latitude_centroid),
-    crs="EPSG:4326"
+    crs="EPSG:4326",
 )
 
 # Define the resolution: 5 arc-minutes is 5/60 degrees, which equals approximately 0.08333 degrees
@@ -43,16 +44,15 @@ height = int(np.ceil((y_max - y_min) / resolution))
 transform = from_origin(x_min, y_max, resolution, resolution)
 
 # Create percentage of people with water access
-gdf['percentage_with_water'] = (
-    gdf['zone_pop_with_water'] /
-    (gdf['zone_pop_without_water'] + gdf['zone_pop_with_water'])
+gdf["percentage_with_water"] = gdf["zone_pop_with_water"] / (
+    gdf["zone_pop_without_water"] + gdf["zone_pop_with_water"]
 )
 
 # Define the variables to rasterize
 variables_to_rasterize = [
-    'zone_pop_with_water',
-    'zone_pop_without_water',
-    'percentage_with_water'
+    "zone_pop_with_water",
+    "zone_pop_without_water",
+    "percentage_with_water",
 ]
 num_bands = len(variables_to_rasterize)
 
@@ -74,16 +74,16 @@ for i, variable in enumerate(variables_to_rasterize):
         out_shape=(height, width),
         transform=transform,
         fill=np.nan,
-        dtype='float32'
+        dtype="float32",
     )
 
     # Store the raster in the raster_data array
     raster_data[i, :, :] = raster
 
 # Smoothing parameters
-apply_second_smoothing = True  # Set to True to apply the second smoothing pass
-first_window_size = 3          # Window size for the first smoothing pass
-second_window_size = 5         # Window size for the second smoothing pass
+apply_second_smoothing = False  # Set to True to apply the second smoothing pass
+first_window_size = 3  # Window size for the first smoothing pass
+second_window_size = 5  # Window size for the second smoothing pass
 
 # Apply the smoothing filter to each band
 print("Applying first smoothing filter...")
@@ -98,11 +98,15 @@ for i in range(num_bands):
     data_filled = np.nan_to_num(band_data, nan=0.0)
 
     # Apply uniform filter to the data and the mask
-    smoothed_data = uniform_filter(data_filled, size=first_window_size, mode='constant', cval=0.0)
-    smoothed_mask = uniform_filter(valid_mask.astype(float), size=first_window_size, mode='constant', cval=0.0)
+    smoothed_data = uniform_filter(
+        data_filled, size=first_window_size, mode="constant", cval=0.0
+    )
+    smoothed_mask = uniform_filter(
+        valid_mask.astype(float), size=first_window_size, mode="constant", cval=0.0
+    )
 
     # Avoid division by zero
-    with np.errstate(invalid='ignore', divide='ignore'):
+    with np.errstate(invalid="ignore", divide="ignore"):
         smoothed_band = smoothed_data / smoothed_mask
         smoothed_band[smoothed_mask == 0] = np.nan
 
@@ -126,11 +130,15 @@ if apply_second_smoothing:
         data_filled = np.nan_to_num(band_data, nan=0.0)
 
         # Apply uniform filter to the data and the mask
-        smoothed_data = uniform_filter(data_filled, size=second_window_size, mode='constant', cval=0.0)
-        smoothed_mask = uniform_filter(valid_mask.astype(float), size=second_window_size, mode='constant', cval=0.0)
+        smoothed_data = uniform_filter(
+            data_filled, size=second_window_size, mode="constant", cval=0.0
+        )
+        smoothed_mask = uniform_filter(
+            valid_mask.astype(float), size=second_window_size, mode="constant", cval=0.0
+        )
 
         # Avoid division by zero
-        with np.errstate(invalid='ignore', divide='ignore'):
+        with np.errstate(invalid="ignore", divide="ignore"):
             smoothed_band = smoothed_data / smoothed_mask
             smoothed_band[smoothed_mask == 0] = np.nan
 
@@ -143,16 +151,16 @@ if apply_second_smoothing:
 # Save the raster to a GeoTIFF file
 with rasterio.open(
     output_filename,
-    'w',
-    driver='GTiff',
+    "w",
+    driver="GTiff",
     height=height,
     width=width,
     count=num_bands,
-    dtype='float32',
+    dtype="float32",
     crs=gdf.crs.to_string(),
     transform=transform,
-    compress='deflate',
-    nodata=np.nan  # Set nodata value to NaN
+    compress="deflate",
+    nodata=np.nan,  # Set nodata value to NaN
 ) as dst:
     for i in range(num_bands):
         dst.write(raster_data[i, :, :], i + 1)  # Bands are 1-indexed
