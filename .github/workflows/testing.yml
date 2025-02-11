@@ -25,11 +25,11 @@ jobs:
           python-version: 3.9
           auto-activate-base: false
           environment-file: environment.yml
-          activate-environment: water-env
+          activate-environment: water-access
           # use-mamba speeds up conda installs
           use-mamba: true
 
       # 3) Run pytest inside the activated conda env
       - name: Test with pytest
-        run: pytest
+        run: mamba run -n water-access pytest
 
