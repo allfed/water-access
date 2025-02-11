@@ -1,13 +1,87 @@
-# Demo
+# Water-Access
+---
 
-Can find working version on [heroku](https://allfed-water-access.herokuapp.com/)
 
-## Running the App
+<!-- [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6866654.svg)](https://doi.org/10.5281/zenodo.6866654) -->
+![Testing](https://github.com/allfed/water-access/actions/workflows/testing.yml/badge.svg)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Run `src/app.py` and navigate to http://127.0.0.1:8050/ in your browser.
+---
+The Water Access model is a tool that simulates global access to freshwater sources by walking or cycling in the event of global catastrophic industry loss (GCIL). The output of the model be used to identify areas at various resolutions (currently country-level and district-level) which will be at highest risk of water insecurity in a catastrophe. This model can be useful for researchers, developers, and disaster response teams who are interested in understanding the potential impact of GCIL on water access. The model is implemented in Python and its outputs have the potential to be integrated into other analysis and visualization tools.
 
-## Sensitivity Analysis
+## Installation
+To install the Water Access package, we recommend setting up a virtual environment using `mamba` (faster) or `conda`. This will ensure that the package and its dependencies are isolated from other projects on your machine, which can prevent conflicts and make it easier to manage your dependencies. Here are the steps to follow:
 
-[![Binder](https://mybinder.org/badge_logo.svg)]([https://mybinder.org/v2/gh/allfed/water-access/HEAD?labpath=blob%2Fmain%2Fsrc%2Fsensitivity_notebook.ipynb](https://mybinder.org/v2/gh/allfed/water-access/4150f54721d3a5c67eacfb3af10597f8f9186c5b?urlpath=lab%2Ftree%2Fsrc%2Fsensitivity_notebook.ipynb))
+* Create a virtual environment using either conda by running the command `mamba env create -f environment.yml`. This will create an environment called "water-access". A virtual environment is like a separate Python environment, which you can think of as a separate "room" for your project to live in, it's own space which is isolated from the rest of the system, and it will have it's own set of packages and dependencies, that way you can work on different projects with different versions of packages without interfering with each other.
 
-https://mybinder.org/v2/gh/allfed/water-access/4150f54721d3a5c67eacfb3af10597f8f9186c5b?urlpath=lab%2Ftree%2Fsrc%2Fsensitivity_notebook.ipynb
+* Activate the environment by running `mamba activate water-access`. This command will make the virtual environment you just created the active one, so that when you run any python command or install any package, it will do it within the environment.
+
+* Install the package by running `pip install -e .` in the main folder of the repository. This command will install the package you are currently in as a editable package, so that when you make changes to the package, you don't have to reinstall it again.
+
+* The code is split between python files and Jupytper notebooks. If you want to run the Jupyter notebooks, you'll need to create a kernel for the environment. First, if using Anaconda, install the necessary tools by running `conda install -c anaconda ipykernel`. This command will install the necessary tools to create a kernel for the Jupyter notebook. A kernel is a component of Jupyter notebook that allows you to run your code. It communicates with the notebook web application and the notebook document format to execute code and display the results.
+
+* Then, create the kernel by running `python -m ipykernel install --user --name=water-access`. This command will create a kernel with the name you specified "water-access" , which you can use to run the example notebook or play around with the model yourself.
+
+* Alternatively, you may wish to run the notebook in an IDE such as Visual Studio Code (instructions [here](https://code.visualstudio.com/docs/datascience/jupyter-notebooks))
+
+If you are using the kernel and it fails due an import error for the model package, you might have to rerun: `pip install -e .`.
+
+If you encounter any issues, feel free to open an issue in the repository.
+
+## How this model works in general
+
+At its most simple, this notebook uses the Lankford walking model and Martin cycling model to simulate water access. The mobility and sensitivity notebooks explore the models, the global files apply the models at a 5 arcminute resoltion worldwise, and the Monte Carlo files run simulations of the global model while varying key parameters.
+
+A quick start is provided at the end of this README, along with step-by-step instructions to repeat our analysis in the `docs` folder.
+
+## Getting the data
+
+The data is stored using [Git Large File Storage (LFS)](https://git-lfs.com/).
+
+### Pickle Format
+
+The model simulation results are stored in the pickle format to ensure a quick read time, as the overall results are several gigabytes large. Learn more about pickle [here](https://www.youtube.com/watch?v=Pl4Hp8qwwes).
+
+## Structure
+
+├── `data` All input data\
+│   ├── `GIS` Spatial data\
+│   ├── `lookup tables` Parameters read into models\
+│   ├── `original_data` Source data not directly used by models\
+│   └── `processed` Data used and generated by models\
+│       └── `semi-processed` Data not used directly by models\
+├── `docs` Step-by-step guidance on re-running analysis\
+├── `results` Tables and plots\
+├── `scripts` Scripts to process data, explore modelling, run models, and generate results\
+│   ├── `Data Manipulation Scripts` Scripts to process data\
+├── `src` Source code\
+└── `tests` Tests
+
+## Quick Start
+
+This section provides a basic way to run some of the model scripts and results, without getting into the more complex aspects of re-generating the processed datasets.
+
+### Exploring mobility models
+
+If you want to understand how the performance of different models changes with a single set of inputs, these scripts are a good place to start.
+
+* `scripts/mobility_notebook.ipynb`: Explores running different models (walking; cycling) with a single set of parameters. Visualises examples of how these affect results, such as the impact of load.
+
+* `scripts/sensitivity_notebook.ipynb`: Sensitivity analysis to formally analyze the impact of changing key input parameters. Used to create the sensitivity analysis figure in the associated manuscript.
+
+
+### Global model (use existing results)
+
+To explore the models with pre-generated results, the following script can be used for insight into the Lankford and Martin models being run at a global scale:
+
+* `scripts/key_results.ipynb`: Generates key results (data and plots) used in publication.
+
+### Re-run the global model with new assumptions (create new results)
+
+If you want to re-run the model while inputting your own assumptions, the scripts below provide the simplest way to achieve this.
+
+* `scripts/run_monte_carlo.ipynb`: Performs Monte Carlo simulations of the global model runs. A set of constants at the start of the file are used to define the 90% confidence intervals for the Monte Carlo parameters, and can be changed to the users preferences. Running the model is resource-intensive, and guidance for settings is detailed in the code. 
+
+* `scripts/key_results.ipynb`: As before, this generates key results (data and plots). The results from the new model run can then be directly compared to those used in publication.
+
+* `src/gis_global_module.py`: Alternatively, if you would like to run the global model once without Monte Carlo simulations, the main function in this file can be used.

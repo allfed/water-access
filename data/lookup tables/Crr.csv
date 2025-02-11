@@ -1,8 +1,7 @@
 Surface Crr,Crr,Assigned Zone Surface
-Bitumen,0.002,"Highway,"
+Bitumen,0.002,"Highways"
 Bitumen,0.003,Primary Roads
 Lower Grade Bitumen,0.004,Secondary Roads
-High Grade Gravel,0.100,Tertiary Roads
-Gravel,0.150,No Roads
-Gravel,0.150,Local Roads
-Sand,0.030,
+High Grade Gravel,0.006,Tertiary Roads
+Gravel,0.01,Local Roads
+Gravel,0.03,No Roads
