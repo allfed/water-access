@@ -125,14 +125,14 @@ class TestWeightedMedian:
 
 class TestLoadData:
     def test_load_data_returns_dataframes(self):
-        urb_data_file = "./data/GIS/GIS_data_zones_sample_updated_stripped.csv"
+        urb_data_file = "./data/GIS/GIS_data_zones_sample.csv"
         country_data_file = "./data/processed/merged_data.csv"
         df_zones_input, df_input = load_data(urb_data_file, country_data_file)
         assert isinstance(df_zones_input, pd.DataFrame)
         assert isinstance(df_input, pd.DataFrame)
 
     def test_load_data_loads_correct_data(self):
-        urb_data_file = "./data/GIS/GIS_data_zones_sample_updated_stripped.csv"
+        urb_data_file = "./data/GIS/GIS_data_zones_sample.csv"
         country_data_file = "./data/processed/merged_data.csv"
         df_zones_input, df_input = load_data(urb_data_file, country_data_file)
         # Add assertions to check if the loaded data is correct

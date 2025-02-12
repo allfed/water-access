@@ -7,10 +7,10 @@ print(os.getcwd())
 # Define the input and output file paths
 try:
     input_file = "../../data/GIS/updated_GIS_output_cleaned.csv"
-    output_file = "../../data/GIS/GIS_data_zones_sample_updated_stripped.csv"
+    output_file = "../../data/GIS/GIS_data_zones_sample.csv"
 except:
     input_file = "./data/GIS/updated_GIS_output_cleaned.csv"
-    output_file = "./data/GIS/GIS_data_zones_sample_updated_stripped.csv"
+    output_file = "./data/GIS/GIS_data_zones_sample.csv"
 
 
 # Step 1: Load the dataset

@@ -36,9 +36,7 @@ results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
 URB_DATA_FILE = repo_root / "data" / "GIS" / "updated_GIS_output_cleaned.csv"
-URB_DATA_FILE_SAMPLE = (
-    repo_root / "data" / "GIS" / "GIS_data_zones_sample_updated_stripped.csv"
-)
+URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
 
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
 EXPORT_FILE_LOCATION = repo_root / "data" / "processed"
