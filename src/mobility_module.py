@@ -75,7 +75,7 @@ def linspace_creator(max_value_array, min_value, res):
                 dtype=None,
             )
             # place the vector in to a matrix
-            load_matrix[i:] = load_vector
+            load_matrix[i, :] = load_vector
             i += 1
     else:
         print("Error: unexpected loading resolution, setting default")
@@ -246,7 +246,7 @@ class mobility_models:
         """
         model = mobility_models.bike_power_solution
 
-        s = (slope / 360) * (2 * np.pi)  # determine slope in radians
+        s = (slope / 360) * (2 * np.pi)  # Convert slope to radians
 
         # determine safe loading for hilly scenarios
         max_load_HPV = max_safe_load(
@@ -264,7 +264,7 @@ class mobility_models:
             mv.C_d,
             mv.A,
             mv.m1 + hpv.m_HPV_only.flatten(),  #
-            hpv.Crr,  # CRR related to the HPV
+            hpv.Crr.flatten()[0],  # CRR related to the HPV - fixed to extract scalar
             mv.eta,
             mv.P_t,
             mv.g,
@@ -295,7 +295,7 @@ class mobility_models:
             mv.C_d,
             mv.A,
             mv.m1 + hpv.m_HPV_only.flatten() + max_load_HPV,  #
-            hpv.Crr,  # CRR related to the HPV
+            hpv.Crr.flatten()[0],  # CRR related to the HPV - fixed to extract scalar
             mv.eta,
             mv.P_t,
             mv.g,
@@ -447,7 +447,7 @@ class mobility_models:
             for j, slope in enumerate(
                 mr.slope_vector_deg.reshape(mr.slope_vector_deg.size, 1)
             ):
-                s = (slope / 360) * (2 * np.pi)  # determine slope in radians
+                s = (slope / 360) * (2 * np.pi)  # Convert slope to radians
 
                 # determine safe loading for hilly scenarios
                 max_load_HPV = max_safe_load(

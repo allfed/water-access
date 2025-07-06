@@ -67,13 +67,19 @@ def weighted_median_series(val, weight):
     If the sum of the weights is zero, or if the weights are not positive.
     """
     try:
+        if len(val) == 0 or len(weight) == 0:
+            return np.nan
+        if np.sum(weight) == 0:
+            return np.nan
+        
         df = pd.DataFrame({"val": val, "weight": weight})
         df_sorted = df.sort_values("val")
         cumsum = df_sorted["weight"].cumsum()
         cutoff = df_sorted["weight"].sum() / 2.0
         result = df_sorted[cumsum >= cutoff]["val"].iloc[0]
         # return just the value
-    except:
+    except (ValueError, IndexError, KeyError) as e:
+        print(f"Warning: weighted_median_series failed with error: {e}")
         result = np.nan
     return result
 
@@ -133,9 +139,13 @@ def load_data(urb_data_file, country_data_file):
     try:
         df_zones_input = pd.read_csv(urb_data_file)
         df_input = pd.read_csv(country_data_file)
-    except:
-        df_zones_input = pd.read_csv("." + urb_data_file)
-        df_input = pd.read_csv("." + country_data_file)
+    except (FileNotFoundError, pd.errors.EmptyDataError) as e:
+        # Try relative path as fallback
+        try:
+            df_zones_input = pd.read_csv(Path(".") / urb_data_file)
+            df_input = pd.read_csv(Path(".") / country_data_file)
+        except Exception as fallback_e:
+            raise FileNotFoundError(f"Could not load data files: {e}, fallback error: {fallback_e}")
 
     return df_zones_input, df_input
 
@@ -230,8 +240,9 @@ def merge_and_adjust_population(df_zones_input, df_input):
     )
 
     # convert population density to percent of national population on a per country basis, grouped by ISO_CC
+    # Prevent division by zero when country population sum is zero
     df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["pop_density"].apply(
-        lambda x: x / x.sum()
+        lambda x: x / x.sum() if x.sum() > 0 else 0
     )
     # multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
@@ -930,8 +941,11 @@ def calculate_water_rations(df_zones):
     >>> df = calculate_water_rations(df_zones)
     """
 
-    df_zones["water_rations_per_bike"] = (
-        df_zones["water_ration_kms"] / df_zones["dtw_1"]
+    # Prevent division by zero when distance to water is zero
+    df_zones["water_rations_per_bike"] = np.where(
+        df_zones["dtw_1"] > 0,
+        df_zones["water_ration_kms"] / df_zones["dtw_1"],
+        np.inf  # Infinite water access when distance is zero
     )
     df_zones["bikes_in_zone"] = (
         df_zones["pop_zone"]
