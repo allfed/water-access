@@ -14,8 +14,8 @@ start_time = time.time()
 filename = "./results/GIS_merged_output_processed_with_centroids_right.csv"
 # filename = "../../results/GIS_merged_output_processed_with_centroids_right.csv"
 df = pd.read_csv(filename)
-output_filename = "./results/output_raster_5_arcmin_partial_percentage.tif"
-# output_filename = "output_raster_5_arcmin_partial_percentage.tif"
+output_filename = "./results/TIFs/output_raster_5_arcmin_partial_percentage.tif"
+# output_filename = "./results/TIFs/output_raster_5_arcmin_partial_percentage.tif"
 
 # Create a GeoDataFrame with the coordinates and specify the initial CRS (WGS84)
 gdf = gpd.GeoDataFrame(

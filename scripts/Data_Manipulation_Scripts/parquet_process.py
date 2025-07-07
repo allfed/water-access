@@ -3,6 +3,18 @@ import pandas as pd
 
 
 """
+Output for the Feb 12th 1000 run (simulations used in paper):
+
+Run closest to median 'zone_pop_without_water':
+Name: 950,
+
+Run closest to 95th percentile of 'zone_pop_without_water':
+Name: 787,
+
+Run closest to 5th percentile of 'zone_pop_without_water':
+Name: 413,
+
+
 Output for the Feb 10th 1000 run:
 
 Run closest to median 'zone_pop_without_water':
