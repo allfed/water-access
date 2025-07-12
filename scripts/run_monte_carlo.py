@@ -108,9 +108,7 @@ if __name__ == "__main__":
         PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
         NUM_ITERATIONS,
     )
-    mets = mc.sample_normal(
-        METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS
-    )
+    mets = mc.sample_normal(METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS)
     watts_values = mc.sample_normal(
         WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
     )
@@ -151,9 +149,7 @@ if __name__ == "__main__":
     print("Start time:", time.strftime("%H:%M:%S", time.localtime()))
     print("\n\n")
 
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=MAX_WORKERS
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # Submit all simulations to the executor
         futures = [
             executor.submit(

@@ -6,9 +6,7 @@ import pandas as pd
 """
 
 input_file = "../../data/GIS/updated_GIS_output.csv"
-country_input_file = (
-    "../../data/processed/merged_data.csv"  # contains population data
-)
+country_input_file = "../../data/processed/merged_data.csv"  # contains population data
 output_file_path = "../../results/GIS_data_country_slice_for_results_pop.csv"
 
 

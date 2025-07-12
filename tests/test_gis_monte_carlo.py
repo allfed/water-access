@@ -293,12 +293,8 @@ class TestProcessMCResults:
         process_mc_results(simulation_results, plot=False, output_dir=temp_dir)
 
         # Assert
-        assert os.path.exists(
-            os.path.join(temp_dir, "country_median_results.csv")
-        )
-        assert os.path.exists(
-            os.path.join(temp_dir, "country_mean_results.csv")
-        )
+        assert os.path.exists(os.path.join(temp_dir, "country_median_results.csv"))
+        assert os.path.exists(os.path.join(temp_dir, "country_mean_results.csv"))
         assert os.path.exists(
             os.path.join(temp_dir, "country_5th_percentile_results.csv")
         )
@@ -312,9 +308,7 @@ class TestProcessMCResults:
         # Remove the temporary directory when you're done
         shutil.rmtree(temp_dir)
 
-    def test_process_mc_results_plots_chloropleth_maps_when_plot_is_true(
-        self, mocker
-    ):
+    def test_process_mc_results_plots_chloropleth_maps_when_plot_is_true(self, mocker):
         # Arrange
         simulation_results = [
             pd.DataFrame(
@@ -345,18 +339,14 @@ class TestProcessMCResults:
             ),
         ]
         # Mock the plot_chloropleth function
-        mock_plot_chloropleth = mocker.patch(
-            "src.gis_monte_carlo.gis.plot_chloropleth"
-        )
+        mock_plot_chloropleth = mocker.patch("src.gis_monte_carlo.gis.plot_chloropleth")
 
         # Create a temporary directory
         temp_dir = tempfile.mkdtemp()
 
         # Act
         try:
-            process_mc_results(
-                simulation_results, plot=False, output_dir=temp_dir
-            )
+            process_mc_results(simulation_results, plot=False, output_dir=temp_dir)
 
             # Assert
             assert mock_plot_chloropleth.call_count == 0
@@ -403,9 +393,7 @@ class TestProcessMCResults:
 
         # Act
         try:
-            process_mc_results(
-                simulation_results, plot=False, output_dir=temp_dir
-            )
+            process_mc_results(simulation_results, plot=False, output_dir=temp_dir)
         finally:
             # Remove the temporary directory when you're done
             shutil.rmtree(temp_dir)
@@ -459,6 +447,4 @@ class TestProcessMCResults:
 
         # Act & Assert
         with pytest.raises(TypeError):
-            process_mc_results(
-                simulation_results, plot=False, output_dir=output_dir
-            )
+            process_mc_results(simulation_results, plot=False, output_dir=output_dir)

@@ -32,9 +32,7 @@ def count_single_nan_columns(df, columns):
     counts = {}
     for col in columns:
         other_cols = [c for c in columns if c != col]
-        counts[col] = len(
-            df[df[col].isna() & df[other_cols].notna().all(axis=1)]
-        )
+        counts[col] = len(df[df[col].isna() & df[other_cols].notna().all(axis=1)])
     return counts
 
 

@@ -44,9 +44,7 @@ csv_data_dir = repo_root / "data" / "GIS"
 # Define the paths to the Parquet file and the original CSV file
 parquet_file_path = parquet_data_dir / "zone_simulation_result_median.parquet"
 original_csv_file_path = csv_data_dir / "GIS_country_points_fid.csv"
-output_file_path = (
-    results_dir / "GIS_merged_output_processed_with_centroids_right.csv"
-)
+output_file_path = results_dir / "GIS_merged_output_processed_with_centroids_right.csv"
 
 # Step 1: Read the Parquet file into a DataFrame
 processed_df = pd.read_parquet(parquet_file_path)
@@ -55,12 +53,8 @@ processed_df = pd.read_parquet(parquet_file_path)
 original_df = pd.read_csv(original_csv_file_path)
 
 # Step 3: Calculate the longitude and latitude centroids
-original_df["longitude_centroid"] = (
-    original_df["left"] + original_df["right"]
-) / 2
-original_df["latitude_centroid"] = (
-    original_df["top"] + original_df["bottom"]
-) / 2
+original_df["longitude_centroid"] = (original_df["left"] + original_df["right"]) / 2
+original_df["latitude_centroid"] = (original_df["top"] + original_df["bottom"]) / 2
 
 # Step 4: Keep only the fid and centroid columns
 original_df = original_df[["fid", "longitude_centroid", "latitude_centroid"]]

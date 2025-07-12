@@ -83,9 +83,7 @@ def weighted_median(df, val_column, weight_column):
     return df_sorted[cumsum >= cutoff][val_column].iloc[0]
 
 
-def run_weighted_median_on_grouped_df(
-    df, groupby_column, value_column, weight_column
-):
+def run_weighted_median_on_grouped_df(df, groupby_column, value_column, weight_column):
     """Calculate the weighted median of a dataframe grouped by a column.
 
     Args:
@@ -158,9 +156,7 @@ def manage_urban_rural(df_zones_input):
     # from here: https://ghsl.jrc.ec.europa.eu/download.php?ds=smod
     # create new binary column for urban / rural. Rural is below 15, Urban
     # above 15
-    df_zones_input["urban_rural"] = np.where(
-        df_zones_input["GHS_SMOD"] > 15, 1, 0
-    )
+    df_zones_input["urban_rural"] = np.where(df_zones_input["GHS_SMOD"] > 15, 1, 0)
     return df_zones_input
 
 
@@ -236,23 +232,19 @@ def merge_and_adjust_population(df_zones_input, df_input):
 
     # convert population density to percent of national population on a per
     # country basis, grouped by ISO_CC
-    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")[
-        "pop_density"
-    ].apply(lambda x: x / x.sum())
-    # multiply population density by population on a per country basis
-    df_zones["pop_zone"] = (
-        df_zones["pop_density_perc"] * df_zones["Population"]
+    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["pop_density"].apply(
+        lambda x: x / x.sum()
     )
+    # multiply population density by population on a per country basis
+    df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
 
     # sum the population in each zone
-    df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")[
-        "pop_zone"
-    ].transform("sum")
+    df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")["pop_zone"].transform(
+        "sum"
+    )
 
     # trim the dataframe to only include rows where there is a population
-    df_zones["any_pop"] = df_zones["pop_zone"].apply(
-        lambda x: 1 if x > 10 else 0
-    )
+    df_zones["any_pop"] = df_zones["pop_zone"].apply(lambda x: 1 if x > 10 else 0)
     df_zones = df_zones[df_zones["any_pop"] == 1]
 
     return df_zones
@@ -408,9 +400,7 @@ def road_analysis(df_zones, crr_adjustment=0):
     df_crr["Crr"] = df_crr["Crr"].ffill().bfill()
 
     # Create a series from the DataFrame
-    crr_mapping = pd.Series(
-        df_crr.Crr.values, index=df_crr["Assigned Zone Surface"]
-    )
+    crr_mapping = pd.Series(df_crr.Crr.values, index=df_crr["Assigned Zone Surface"])
 
     # Create a dictionary from the series
     crr_mapping = crr_mapping.to_dict()
@@ -693,9 +683,7 @@ def calculate_and_merge_bicycle_distance(
         mo.model_selection = 2  # Cycling model
 
         # Extract values, initalise vars, and run model
-        slope_zones, Crr_values, country_average_weights = extract_slope_crr(
-            df_zones
-        )
+        slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
         mv = mm.model_variables(P_t=watts)
         hpv = mm.HPV_variables(param_df, mv)
 
@@ -708,9 +696,7 @@ def calculate_and_merge_bicycle_distance(
             country_average_weights,
             load_attempt=15,
         )
-        process_and_save_results(
-            df_zones, results, export_file_location, "bicycle"
-        )
+        process_and_save_results(df_zones, results, export_file_location, "bicycle")
     else:
         try:
             df_zones_bicycle = pd.read_csv(
@@ -812,9 +798,7 @@ def calculate_and_merge_walking_distance(
         hpv = mm.HPV_variables(param_df, mv)
 
         # Run model for each zone with country-specific weights
-        slope_zones, Crr_values, country_average_weights = extract_slope_crr(
-            df_zones
-        )
+        slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
         results = run_walking_model(
             mv,
             mo,
@@ -824,9 +808,7 @@ def calculate_and_merge_walking_distance(
             country_average_weights,
             load_attempt=15,
         )
-        process_and_save_results(
-            df_zones, results, export_file_location, "walk"
-        )
+        process_and_save_results(df_zones, results, export_file_location, "walk")
     else:
         try:
             df_zones_walking = pd.read_csv(
@@ -893,10 +875,7 @@ def calculate_population_water_access(df_zones):
     # unpiped
     # Use the urban_rural column to do this
     df_zones["zone_pop_piped"] = (
-        df_zones["pop_zone"]
-        * df_zones["urban_rural"]
-        * df_zones["URBANPiped"]
-        / 100
+        df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANPiped"] / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
         * df_zones["RURALPiped"]
@@ -922,22 +901,18 @@ def calculate_population_water_access(df_zones):
     ) * 1
 
     # Calculate the fraction of the zone that can collect water by cycling
-    df_zones["fraction_of_zone_with_cycling_access"] = df_zones[
-        "zone_cycling_okay"
-    ] * (df_zones["PBO"] / 100)
-    df_zones["fraction_of_zone_with_walking_access"] = (
-        df_zones["zone_walking_okay"] * 1
+    df_zones["fraction_of_zone_with_cycling_access"] = df_zones["zone_cycling_okay"] * (
+        df_zones["PBO"] / 100
     )
+    df_zones["fraction_of_zone_with_walking_access"] = df_zones["zone_walking_okay"] * 1
 
     # Calculate the population that can access piped water by cycling and
     # walking
     df_zones["population_piped_with_cycling_access"] = (
-        df_zones["fraction_of_zone_with_cycling_access"]
-        * df_zones["zone_pop_piped"]
+        df_zones["fraction_of_zone_with_cycling_access"] * df_zones["zone_pop_piped"]
     )
     df_zones["population_piped_with_walking_access"] = (
-        df_zones["fraction_of_zone_with_walking_access"]
-        * df_zones["zone_pop_piped"]
+        df_zones["fraction_of_zone_with_walking_access"] * df_zones["zone_pop_piped"]
     )
     # Select the maximum between the two, if walkable, max will always be
     # walking
@@ -1127,9 +1102,7 @@ def aggregate_global(df_zones):
         "country_pop_raw": df_zones["pop_zone"].sum(),
         "zone_pop_with_water": df_zones["zone_pop_with_water"].sum(),
         "zone_pop_without_water": df_zones["zone_pop_without_water"].sum(),
-        "population_piped_with_access": df_zones[
-            "population_piped_with_access"
-        ].sum(),
+        "population_piped_with_access": df_zones["population_piped_with_access"].sum(),
         "population_piped_with_cycling_access": df_zones[
             "population_piped_with_cycling_access"
         ].sum(),
@@ -1207,9 +1180,7 @@ def clean_up_data(df_countries):
         countries_further_than_libya = df_countries[
             df_countries["weighted_med"] > max_distance
         ]
-        df_countries = df_countries[
-            df_countries["weighted_med"] < max_distance
-        ]
+        df_countries = df_countries[df_countries["weighted_med"] < max_distance]
     else:
         countries_further_than_libya = pd.DataFrame()
         print(
@@ -1300,9 +1271,7 @@ def process_country_data(df_zones):
         )
 
     df_countries["percent_with_water"] = (
-        df_countries["country_pop_with_water"]
-        / df_countries["country_pop_raw"]
-        * 100
+        df_countries["country_pop_with_water"] / df_countries["country_pop_raw"] * 100
     )
     df_countries["percent_without_water"] = (
         df_countries["country_pop_without_water"]
@@ -1335,8 +1304,8 @@ def process_country_data(df_zones):
         * 100
     )
 
-    df_countries, removed_further_than_libya, removed_countries_list = (
-        clean_up_data(df_countries)
+    df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
+        df_countries
     )
 
     # Log or print summary of removed countries
@@ -1369,9 +1338,9 @@ def aggregate_district_level_data(df_zones):
         summaries.
     """
 
-    df_zones["district_pop_raw"] = df_zones.groupby("shapeID")[
-        "pop_zone"
-    ].transform("sum")
+    df_zones["district_pop_raw"] = df_zones.groupby("shapeID")["pop_zone"].transform(
+        "sum"
+    )
 
     df_districts = (
         df_zones.groupby("shapeID")
@@ -1437,9 +1406,7 @@ def process_district_data(df_zones):
     # needs to use apply because the function required two columns as
     # input
     df_median_group = df_zones.groupby(["shapeID"]).apply(
-        lambda x: pd.Series(
-            {"weighted_med": weighted_median(x, "dtw_1", "pop_zone")}
-        )
+        lambda x: pd.Series({"weighted_med": weighted_median(x, "dtw_1", "pop_zone")})
     )
 
     # merge the weighted median back into the df_districts dataframe
@@ -1459,9 +1426,7 @@ def process_district_data(df_zones):
 
     # create percent
     df_districts["percent_with_water"] = (
-        df_districts["district_pop_with_water"]
-        / df_districts["district_pop_raw"]
-        * 100
+        df_districts["district_pop_with_water"] / df_districts["district_pop_raw"] * 100
     )
     df_districts["percent_without_water"] = (
         df_districts["district_pop_without_water"]
@@ -1640,9 +1605,7 @@ def run_global_analysis(
     df_countries = process_country_data(df_zones)
 
     # drop countries in df_distciricts if they don't appear in df_copuntries
-    df_districts = df_districts[
-        df_districts["ISOCODE"].isin(df_countries["ISOCODE"])
-    ]
+    df_districts = df_districts[df_districts["ISOCODE"].isin(df_countries["ISOCODE"])]
 
     if plot:
         plot_chloropleth(df_countries)

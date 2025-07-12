@@ -85,9 +85,7 @@ for i, variable in enumerate(variables_to_rasterize):
     raster_data[i, :, :] = raster
 
 # Smoothing parameters
-apply_second_smoothing = (
-    False  # Set to True to apply the second smoothing pass
-)
+apply_second_smoothing = False  # Set to True to apply the second smoothing pass
 first_window_size = 3  # Window size for the first smoothing pass
 second_window_size = 5  # Window size for the second smoothing pass
 

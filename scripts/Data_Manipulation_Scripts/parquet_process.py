@@ -97,10 +97,7 @@ median_with_water = sums_df["sum_zone_pop_with_water"].median()
 median_without_water = sums_df["sum_zone_pop_without_water"].median()
 
 print(f"Median sum of 'zone_pop_with_water' across runs: {median_with_water}")
-print(
-    f"Median sum of 'zone_pop_without_water' across runs: "
-    f"{median_without_water}"
-)
+print(f"Median sum of 'zone_pop_without_water' across runs: " f"{median_without_water}")
 
 # Identify the run closest to the median sum
 sums_df["diff_with_water"] = (
@@ -126,12 +123,8 @@ print(median_run_without_water)
 percentile_5_with_water = sums_df["sum_zone_pop_with_water"].quantile(0.05)
 percentile_95_with_water = sums_df["sum_zone_pop_with_water"].quantile(0.95)
 
-percentile_5_without_water = sums_df["sum_zone_pop_without_water"].quantile(
-    0.05
-)
-percentile_95_without_water = sums_df["sum_zone_pop_without_water"].quantile(
-    0.95
-)
+percentile_5_without_water = sums_df["sum_zone_pop_without_water"].quantile(0.05)
+percentile_95_without_water = sums_df["sum_zone_pop_without_water"].quantile(0.95)
 
 # Find the run closest to the 5th and 95th percentiles for
 # 'zone_pop_with_water'
@@ -142,12 +135,8 @@ sums_df["diff_to_95_with_water"] = (
     sums_df["sum_zone_pop_with_water"] - percentile_95_with_water
 ).abs()
 
-run_closest_to_5_with_water = sums_df.loc[
-    sums_df["diff_to_5_with_water"].idxmin()
-]
-run_closest_to_95_with_water = sums_df.loc[
-    sums_df["diff_to_95_with_water"].idxmin()
-]
+run_closest_to_5_with_water = sums_df.loc[sums_df["diff_to_5_with_water"].idxmin()]
+run_closest_to_95_with_water = sums_df.loc[sums_df["diff_to_95_with_water"].idxmin()]
 
 # Find the run closest to the 5th and 95th percentiles for
 # 'zone_pop_without_water'

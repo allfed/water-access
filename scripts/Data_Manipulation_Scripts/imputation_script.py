@@ -81,9 +81,7 @@ country_regions_file_path = data_dir / "ISO-3166 Countries.csv"
 
 # http://download.geonames.org/export/dump/countryInfo.txt
 country_info_csv_path = data_dir / "countryInfo.txt"
-country_info_output_file_path = (
-    semi_processed_dir / "preprocessed_countryInfo.txt"
-)
+country_info_output_file_path = semi_processed_dir / "preprocessed_countryInfo.txt"
 
 # https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
 # https://ourworldindata.org/grapher/mean-body-mass-index
@@ -192,9 +190,7 @@ def load_gdp_per_capita(file_path):
     return df_recent_gdp
 
 
-def spatial_imputation(
-    df, list_of_vars, alpha2_col="alpha2", alpha3_col="alpha3"
-):
+def spatial_imputation(df, list_of_vars, alpha2_col="alpha2", alpha3_col="alpha3"):
     """Interpolates missing values in the dataframe using bordering countries
     and continent.
 
@@ -205,9 +201,7 @@ def spatial_imputation(
     df_output = df.copy()
 
     # Initialize df_interp_track with an additional column for alpha3 codes
-    df_interp_track = pd.DataFrame(
-        index=df.index, columns=[alpha3_col] + list_of_vars
-    )
+    df_interp_track = pd.DataFrame(index=df.index, columns=[alpha3_col] + list_of_vars)
     df_interp_track[alpha3_col] = df[
         alpha3_col
     ]  # Copy alpha3 codes into df_interp_track
@@ -222,16 +216,12 @@ def spatial_imputation(
             if isinstance(neighbors, str):
                 # Ensure both neighbor codes and alpha2_col are consistently
                 # uppercase
-                neighbor_list = [
-                    n.strip().upper() for n in neighbors.split(",")
-                ]
+                neighbor_list = [n.strip().upper() for n in neighbors.split(",")]
                 alpha2_values = df[alpha2_col].str.upper().values
 
                 # Filter valid neighbors by checking against the existing
                 # country codes
-                valid_neighbors = [
-                    n for n in neighbor_list if n in alpha2_values
-                ]
+                valid_neighbors = [n for n in neighbor_list if n in alpha2_values]
 
                 if valid_neighbors:  # Check if there are any valid neighbors
                     neighbor_values = df.loc[
@@ -240,9 +230,7 @@ def spatial_imputation(
                     ].dropna()
                     if not neighbor_values.empty:
                         df_output.at[idx, variable] = neighbor_values.mean()
-                        df_interp_track.at[idx, variable] = (
-                            "neighbor interpolated"
-                        )
+                        df_interp_track.at[idx, variable] = "neighbor interpolated"
 
         # Second pass: Impute using continent's original data
         for idx in df_output[df_output[variable].isna()].index:
@@ -339,9 +327,7 @@ def import_and_select_latest_household_size(
     latest_household_size_df = df.drop_duplicates(subset=["ISO"], keep="first")
 
     # Select only the 'ISO' and 'Household_Size' columns
-    latest_household_size_df = latest_household_size_df[
-        ["ISO", "Household_Size"]
-    ]
+    latest_household_size_df = latest_household_size_df[["ISO", "Household_Size"]]
 
     # Return the resulting DataFrame
     return latest_household_size_df
@@ -363,9 +349,7 @@ def bicycle_data_manual_assumption(df):
     # Create new rows if they don't exist, otherwise update existing ones
     for alpha3 in ["MAC", "HKG", "TWN"]:
         if alpha3 not in df["alpha3"].values:
-            new_row = pd.DataFrame(
-                {"alpha3": [alpha3], "PBO": [manual_PBO_value]}
-            )
+            new_row = pd.DataFrame({"alpha3": [alpha3], "PBO": [manual_PBO_value]})
             df = pd.concat([df, new_row], ignore_index=True)
         else:
             df.loc[df["alpha3"] == alpha3, "PBO"] = manual_PBO_value
@@ -502,9 +486,7 @@ def process_water_data(df):
         "Population \r\n(thousands)",
         "% urban",
     ]
-    df[columns_to_convert] = df[columns_to_convert].replace(
-        {" ": ""}, regex=True
-    )
+    df[columns_to_convert] = df[columns_to_convert].replace({" ": ""}, regex=True)
     df[columns_to_convert] = df[columns_to_convert].apply(
         pd.to_numeric, errors="coerce"
     )
@@ -515,9 +497,9 @@ def process_water_data(df):
 
     # If % urban is 100 and RURALPiped is NaN, set RURALPiped equal to
     # URBANPiped
-    df.loc[
-        (df["% urban"] == 100) & (df["RURALPiped"].isna()), "RURALPiped"
-    ] = df["URBANPiped"]
+    df.loc[(df["% urban"] == 100) & (df["RURALPiped"].isna()), "RURALPiped"] = df[
+        "URBANPiped"
+    ]
 
     # Handle Japan's special case
     df = df.apply(handle_japan_case, axis=1)
@@ -526,12 +508,8 @@ def process_water_data(df):
     df = handle_western_sahara_case(df)
 
     # Fill missing rural and urban piped data where total piped is 100
-    df.loc[
-        (df["TOTALPiped"] == 100) & (df["RURALPiped"].isna()), "RURALPiped"
-    ] = 100
-    df.loc[
-        (df["TOTALPiped"] == 100) & (df["URBANPiped"].isna()), "URBANPiped"
-    ] = 100
+    df.loc[(df["TOTALPiped"] == 100) & (df["RURALPiped"].isna()), "RURALPiped"] = 100
+    df.loc[(df["TOTALPiped"] == 100) & (df["URBANPiped"].isna()), "URBANPiped"] = 100
 
     # Sort by country and year
     df = df.sort_values(["Country", "Year"])
@@ -554,14 +532,12 @@ def process_water_data(df):
     )
 
     # Recalculate TOTALPiped for all years
-    df["TOTALPiped_Recalculated"] = (df["% urban"] / 100) * df[
-        "URBANPiped"
-    ] + ((100 - df["% urban"]) / 100) * df["RURALPiped"]
+    df["TOTALPiped_Recalculated"] = (df["% urban"] / 100) * df["URBANPiped"] + (
+        (100 - df["% urban"]) / 100
+    ) * df["RURALPiped"]
 
     # Filter to keep only the most recent non-empty data entry per country
-    df = df.dropna(
-        subset=["URBANPiped", "RURALPiped", "TOTALPiped"], how="all"
-    )
+    df = df.dropna(subset=["URBANPiped", "RURALPiped", "TOTALPiped"], how="all")
     df = df.sort_values(["Country", "Year"], ascending=[True, False])
     df = df.drop_duplicates("Country", keep="first").reset_index(drop=True)
 
@@ -589,16 +565,13 @@ def add_back_percentage_urban_data(df, df_water):
     return df
 
 
-def merge_gdp_data(
-    df_cleaned, df_gdp, alpha2_col="alpha2", alpha3_col="Country Code"
-):
+def merge_gdp_data(df_cleaned, df_gdp, alpha2_col="alpha2", alpha3_col="Country Code"):
     """Merges df_cleaned with df_gdp using the Alpha-2 code from df_cleaned
     and Alpha-3 code from df_gdp."""
     # Ensure the Alpha-3 code exists in df_cleaned for the merge
     if "alpha3" not in df_cleaned.columns:
         raise ValueError(
-            "df_cleaned must contain 'alpha3' column for merging with GDP "
-            "data."
+            "df_cleaned must contain 'alpha3' column for merging with GDP " "data."
         )
 
     # Merge on the Alpha-3 code
@@ -627,9 +600,7 @@ def impute_using_gdp(
     df_output = df.copy()
 
     # Initialize df_interp_track with an additional column for alpha3 codes
-    df_interp_track = pd.DataFrame(
-        index=df.index, columns=[alpha3_col] + list_of_vars
-    )
+    df_interp_track = pd.DataFrame(index=df.index, columns=[alpha3_col] + list_of_vars)
     df_interp_track[alpha3_col] = df[
         alpha3_col
     ]  # Copy alpha3 codes into df_interp_track
@@ -750,16 +721,12 @@ def load_country_info(preprocessed_file_path):
 def append_country_info(df, country_info_df):
     """Appends continent and neighboring countries to the dataframe using the
     pre-loaded country info DataFrame."""
-    df = df.merge(
-        country_info_df, how="left", left_on="alpha3", right_on="alpha3"
-    )
+    df = df.merge(country_info_df, how="left", left_on="alpha3", right_on="alpha3")
     # df.drop(columns=['alpha3'], inplace=True)
     return df
 
 
-def calculate_average_weight_per_country(
-    bmi_women_file, bmi_men_file, height_file
-):
+def calculate_average_weight_per_country(bmi_women_file, bmi_men_file, height_file):
     """This script calculates the average weight per country using BMI and
     height data for men and women.
 
@@ -799,9 +766,7 @@ def calculate_average_weight_per_country(
     height_df = pd.read_csv(height_file)
 
     # Step 1: Filter for the most recent year data in the height dataset
-    most_recent_height_df = height_df.loc[
-        height_df.groupby("Entity")["Year"].idxmax()
-    ]
+    most_recent_height_df = height_df.loc[height_df.groupby("Entity")["Year"].idxmax()]
 
     # Step 2: Align BMI data to the most recent year from height data
     # Keep only the data for the most recent year in the height dataset for
@@ -809,9 +774,7 @@ def calculate_average_weight_per_country(
     merged_df = pd.merge(
         most_recent_height_df, bmi_women_df, on=["Entity", "Year"], how="left"
     )
-    merged_df = pd.merge(
-        merged_df, bmi_men_df, on=["Entity", "Year"], how="left"
-    )
+    merged_df = pd.merge(merged_df, bmi_men_df, on=["Entity", "Year"], how="left")
 
     # Step 3: Remove non-country entities by checking for the presence of an
     # ISO3 country code
@@ -822,8 +785,7 @@ def calculate_average_weight_per_country(
     # Step 4: Calculate the weight using the formula: Weight (kg) = BMI *
     # (Height in meters)^2
     merged_df["Average Weight (male, kg)"] = (
-        merged_df["Mean BMI (male)"]
-        * (merged_df["Mean male height (cm)"] / 100) ** 2
+        merged_df["Mean BMI (male)"] * (merged_df["Mean male height (cm)"] / 100) ** 2
     )
     merged_df["Average Weight (female, kg)"] = (
         merged_df["Mean BMI (female)"]
@@ -839,14 +801,10 @@ def calculate_average_weight_per_country(
 
     # Step 6: Select relevant columns for the final output and drop the 'Year'
     # column
-    average_weight_df = merged_df[
-        ["Entity", "Code", "Overall Average Weight (kg)"]
-    ]
+    average_weight_df = merged_df[["Entity", "Code", "Overall Average Weight (kg)"]]
 
     # Drop duplicates to ensure only one entry per country
-    average_weight_df = average_weight_df.drop_duplicates(
-        subset=["Entity", "Code"]
-    )
+    average_weight_df = average_weight_df.drop_duplicates(subset=["Entity", "Code"])
 
     # Rename columns from Code to alpha3 and Entity to Country, Average Weight
     # to Weight
@@ -886,9 +844,7 @@ def load_latest_population_data(population_file_path):
     )
 
     # Drop duplicates to keep the latest population value for each country
-    latest_population_df = df_population.drop_duplicates(
-        subset=["Code"], keep="first"
-    )
+    latest_population_df = df_population.drop_duplicates(subset=["Code"], keep="first")
 
     # Select only relevant columns: 'Code' (alpha-3), 'Entity' (Country), and
     # 'Population (historical estimates)'
@@ -965,9 +921,7 @@ def main(
     # check duplicates again for alpha3
     duplicates_2 = df[df.duplicated(subset=["alpha3"], keep=False)]
 
-    assert (
-        duplicates_2.empty
-    ), "There are still duplicates in the alpha3 column."
+    assert duplicates_2.empty, "There are still duplicates in the alpha3 column."
 
     df = add_alpha2_from_alpha3(df, "alpha3")
 
@@ -1011,9 +965,7 @@ def main(
     )
 
     # add region and subregion for Taiwan
-    df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "region"] = (
-        "Asia"
-    )
+    df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "region"] = "Asia"
     df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "subregion"] = (
         "Eastern Asia"
     )
@@ -1024,9 +976,7 @@ def main(
     )
 
     # merge weight df with df_cleaned_merge
-    df_cleaned_merge = df_cleaned_merge.merge(
-        df_weight, on="alpha3", how="left"
-    )
+    df_cleaned_merge = df_cleaned_merge.merge(df_weight, on="alpha3", how="left")
 
     # List of variables to impute
     list_of_vars = [
@@ -1085,19 +1035,13 @@ def main(
     if output == "spatial":
         df_output = df_output[["alpha3"] + spatial_list_of_vars + extra_vars]
         # rename columns
-        df_output.columns = [
-            var.replace("_spatial", "") for var in df_output.columns
-        ]
+        df_output.columns = [var.replace("_spatial", "") for var in df_output.columns]
     elif output == "gdp":
         df_output = df_output[["alpha3"] + gdp_list_of_vars + extra_vars]
         # rename columns
-        df_output.columns = [
-            var.replace("_gdp", "") for var in df_output.columns
-        ]
+        df_output.columns = [var.replace("_gdp", "") for var in df_output.columns]
     else:
-        df_output = df_output[
-            ["alpha3"] + spatial_list_of_vars + gdp_list_of_vars
-        ]
+        df_output = df_output[["alpha3"] + spatial_list_of_vars + gdp_list_of_vars]
 
     # Add back % urban data
     df_output = add_back_percentage_urban_data(df_output, df_water)
@@ -1117,9 +1061,7 @@ def main(
         )
 
 
-preprocess_country_info_file(
-    country_info_csv_path, country_info_output_file_path
-)
+preprocess_country_info_file(country_info_csv_path, country_info_output_file_path)
 main(
     water_JMP_file_path,
     bicycle_file_path,

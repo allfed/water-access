@@ -105,9 +105,7 @@ class TestWeightedMedian:
 
     def test_weighted_median_returns_error_when_df_is_empty(self):
         with pytest.raises(ValueError):
-            df = pd.DataFrame(
-                {"value": [], "weight": [0.1, 0.2, 0.3, 0.2, 0.2]}
-            )
+            df = pd.DataFrame({"value": [], "weight": [0.1, 0.2, 0.3, 0.2, 0.2]})
             weighted_median(df, "value", "weight")
 
     def test_weighted_median_returns_error_when_weight_is_empty(self):
@@ -384,9 +382,7 @@ class TestExtractSlopeCrr:
                 "Average Weight": [60, 60, 60, 60, 60],
             }
         )
-        slope_zones, Crr_values, country_average_weights = extract_slope_crr(
-            df_zones
-        )
+        slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
         expected_slope_zones = pd.Series([1, 2, 3, 4, 5], name="slope_1")
         expected_Crr_values = pd.Series([0.1, 0.2, 0.3, 0.4, 0.5], name="Crr")
         pd.testing.assert_series_equal(slope_zones, expected_slope_zones)
@@ -511,9 +507,7 @@ def test_process_and_save_results_saves_csv(tmp_path):
     )
 
     # Check if the CSV file is saved
-    expected_csv_file = (
-        export_file_location / f"{velocity_type}_velocity_by_zone.csv"
-    )
+    expected_csv_file = export_file_location / f"{velocity_type}_velocity_by_zone.csv"
     assert expected_csv_file.exists(), "CSV file was not saved"
 
     # Check if the DataFrame is updated with the new columns
@@ -1225,9 +1219,7 @@ class TestProcessCountryData:
         assert "percent_with_water" in result.columns
         assert "percent_without_water" in result.columns
 
-    def test_process_country_data_prints_summary_of_removed_countries(
-        self, capsys
-    ):
+    def test_process_country_data_prints_summary_of_removed_countries(self, capsys):
         df_zones = pd.DataFrame(
             {
                 "ISOCODE": ["USA", "CAN", "LBY"],
@@ -1324,9 +1316,7 @@ class TestAdjustEuclidean:
         )
 
         with pytest.raises(ValueError):
-            adjust_euclidean(
-                df_zones_input, urban_adjustment=4, rural_adjustment=3
-            )
+            adjust_euclidean(df_zones_input, urban_adjustment=4, rural_adjustment=3)
 
 
 # Add test cases for run_global_analysis
