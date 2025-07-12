@@ -1,7 +1,8 @@
 from pathlib import Path
 import pandas as pd
 
-# Define the root of the repository by going up one level from the script directory
+# Define the root of the repository by going up one level from the script
+# directory
 data_script_dir = Path(__file__).resolve().parent
 script_dir = data_script_dir.parent
 repo_root = script_dir.parent
@@ -27,13 +28,18 @@ processed_df = pd.read_parquet(parquet_file_path)
 
 original_df = pd.read_csv(original_csv_file_path)
 
-# Step 3: Merge the processed DataFrame with the original data on the 'fid' column
+# Step 3: Merge the processed DataFrame with the original data on the
+# 'fid' column
 merged_df = pd.merge(processed_df, original_df, on="fid", how="left")
 
 
 country_data_df = pd.read_csv(country_data)
 merged_df = pd.merge(
-    merged_df, country_data_df, left_on="ISOCODE", right_on="alpha3", how="outer"
+    merged_df,
+    country_data_df,
+    left_on="ISOCODE",
+    right_on="alpha3",
+    how="outer",
 )
 
 

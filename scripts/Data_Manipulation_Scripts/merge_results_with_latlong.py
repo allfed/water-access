@@ -1,7 +1,8 @@
 from pathlib import Path
 import pandas as pd
 
-# Define the root of the repository by going up one level from the script directory
+# Define the root of the repository by going up one level from the script
+# directory
 data_script_dir = Path(__file__).resolve().parent
 script_dir = data_script_dir.parent
 repo_root = script_dir.parent
@@ -33,7 +34,8 @@ columns_to_keep = [
 
 original_df = pd.read_csv(original_csv_file_path, usecols=columns_to_keep)
 
-# Step 3: Merge the processed DataFrame with the original data on the 'fid' column
+# Step 3: Merge the processed DataFrame with the original data on the
+# 'fid' column
 merged_df = pd.merge(processed_df, original_df, on="fid", how="left")
 
 # Step 4: Save the merged DataFrame to a new CSV file

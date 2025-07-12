@@ -1,6 +1,5 @@
 import pandas as pd
 import geopandas as gpd
-from shapely.geometry import Point
 import rasterio
 from rasterio.features import rasterize
 from rasterio.transform import from_origin
@@ -12,23 +11,27 @@ start_time = time.time()
 
 # Load your data into a DataFrame
 filename = "./results/GIS_merged_output_processed_with_centroids_right.csv"
-# filename = "../../results/GIS_merged_output_processed_with_centroids_right.csv"
 df = pd.read_csv(filename)
-output_filename = "./results/TIFs/output_raster_5_arcmin_partial_percentage.tif"
-# output_filename = "./results/TIFs/output_raster_5_arcmin_partial_percentage.tif"
+output_filename = (
+    "./results/TIFs/output_raster_5_arcmin_partial_percentage.tif"
+)
 
-# Create a GeoDataFrame with the coordinates and specify the initial CRS (WGS84)
+# Create a GeoDataFrame with the coordinates and specify the initial CRS
+# (WGS84)
 gdf = gpd.GeoDataFrame(
     df,
     geometry=gpd.points_from_xy(df.longitude_centroid, df.latitude_centroid),
     crs="EPSG:4326",
 )
 
-# Define the resolution: 5 arc-minutes is 5/60 degrees, which equals 0.08333 degrees
+# Define the resolution: 5 arc-minutes is 5/60 degrees, which equals
+# 0.08333 degrees
 resolution = 5 / 60  # 0.08333 degrees
 
-# Calculate the raster bounds based on the extent of the data (minx, miny, maxx, maxy)
-bounds = gdf.total_bounds  # (min_longitude, min_latitude, max_longitude, max_latitude)
+# Calculate the raster bounds based on the extent of the data (minx, miny,
+# maxx, maxy)
+# (min_longitude, min_latitude, max_longitude, max_latitude)
+bounds = gdf.total_bounds
 
 # Ensure the bounds are aligned to the 5 arc-minute grid
 x_min = bounds[0] - (bounds[0] % resolution)
@@ -62,12 +65,14 @@ raster_data = np.empty((num_bands, height, width), dtype=np.float32)
 for i, variable in enumerate(variables_to_rasterize):
     print(f"Rasterizing variable: {variable}")
 
-    # Create a generator that yields the (geometry, value) pairs for rasterization
+    # Create a generator that yields the (geometry, value) pairs for
+    # rasterization
     def geometry_value_pairs():
         for geom, value in zip(gdf.geometry, gdf[variable]):
             yield geom, value
 
-    # Rasterize the GeoDataFrame, filling cells that don't have data with -9999.0
+    # Rasterize the GeoDataFrame, filling cells that don't have data with
+    # -9999.0
     raster = rasterize(
         geometry_value_pairs(),
         out_shape=(height, width),

@@ -4,12 +4,12 @@ from pathlib import Path
 import sys
 from tqdm import tqdm
 import time
-import pandas as pd
 
 # Resolve project root and update sys.path
 project_root = Path().resolve().parent
 sys.path.append(str(project_root))
-import src.gis_monte_carlo as mc
+import src.gis_monte_carlo as mc  # noqa
+
 
 # Results path
 RESULTS_PATH = project_root / "water-access/results"
@@ -73,11 +73,13 @@ POLARITY_OPTIONS = [
     "downhill_uphill",
 ]
 
-# Adjustments for euclidean distance to account for paths taken to water not being straight lines
+# Adjustments for euclidean distance to account for paths taken to water
+# not being straight lines
 URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
 URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
 
-# Set the parameters for the GPD distribution for rural adjustments. Shape, scale, and loc
+# Set the parameters for the GPD distribution for rural adjustments.
+# Shape, scale, and loc
 # These values were obtained from the scripts/create_pareto_distribution.py
 RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
 RURAL_PDR_PARETO_SCALE = 0.19953125000000005
@@ -92,7 +94,9 @@ if __name__ == "__main__":
         CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
     )
     time_gatherings = mc.sample_normal(
-        TIME_GATHERING_LOWER_ESTIMATE, TIME_GATHERING_UPPER_ESTIMATE, NUM_ITERATIONS
+        TIME_GATHERING_LOWER_ESTIMATE,
+        TIME_GATHERING_UPPER_ESTIMATE,
+        NUM_ITERATIONS,
     )
     practical_limits_bicycle = mc.sample_normal(
         PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
@@ -104,7 +108,9 @@ if __name__ == "__main__":
         PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
         NUM_ITERATIONS,
     )
-    mets = mc.sample_normal(METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS)
+    mets = mc.sample_normal(
+        METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS
+    )
     watts_values = mc.sample_normal(
         WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
     )
@@ -112,7 +118,9 @@ if __name__ == "__main__":
     hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
 
     urban_adjustments = mc.sample_normal(
-        URBAN_ADJUSTMENT_LOWER_ESTIMATE, URBAN_ADJUSTMENT_UPPER_ESTIMATE, NUM_ITERATIONS
+        URBAN_ADJUSTMENT_LOWER_ESTIMATE,
+        URBAN_ADJUSTMENT_UPPER_ESTIMATE,
+        NUM_ITERATIONS,
     )
     rural_adjustments = mc.sample_gpd(
         RURAL_PDR_PARETO_SHAPE,
@@ -143,7 +151,9 @@ if __name__ == "__main__":
     print("Start time:", time.strftime("%H:%M:%S", time.localtime()))
     print("\n\n")
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=MAX_WORKERS
+    ) as executor:
         # Submit all simulations to the executor
         futures = [
             executor.submit(
@@ -159,7 +169,17 @@ if __name__ == "__main__":
                 rural_adjustment,
                 use_sample_data=False,  # Enable sample data
             )
-            for crr_adjustment, time_gathering_water, practical_limit_bicycle, practical_limit_buckets, met, watts, hill_polarity, urban_adjustment, rural_adjustment in zip(
+            for (
+                crr_adjustment,
+                time_gathering_water,
+                practical_limit_bicycle,
+                practical_limit_buckets,
+                met,
+                watts,
+                hill_polarity,
+                urban_adjustment,
+                rural_adjustment,
+            ) in zip(
                 crr_adjustments,
                 time_gatherings,
                 practical_limits_bicycle,
@@ -168,7 +188,7 @@ if __name__ == "__main__":
                 watts_values,
                 hill_polarities,
                 urban_adjustments,
-                rural_adjustments,
+                rural_adjustments,  # type: ignore
             )
         ]
 
@@ -205,7 +225,8 @@ if __name__ == "__main__":
     # Record the end time
     end_time = time.time()
 
-    # Calculate and print the time taken by the simulations in minutes and hours
+    # Calculate and print the time taken by the simulations in minutes and
+    # hours
     time_taken = end_time - start_time
     print(f"Time taken: {time_taken / 60:.2f} minutes")
     print(f"Time taken: {time_taken / 3600:.2f} hours")

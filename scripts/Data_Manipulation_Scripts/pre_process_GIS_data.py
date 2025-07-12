@@ -32,7 +32,9 @@ def count_single_nan_columns(df, columns):
     counts = {}
     for col in columns:
         other_cols = [c for c in columns if c != col]
-        counts[col] = len(df[df[col].isna() & df[other_cols].notna().all(axis=1)])
+        counts[col] = len(
+            df[df[col].isna() & df[other_cols].notna().all(axis=1)]
+        )
     return counts
 
 
@@ -87,7 +89,8 @@ def main():
     df = drop_nan_rows(df, nan_columns)
     print(f"Number of rows dropped: {pre_len - len(df)}")
 
-    # export two files, one with the original columns and one with the new columns
+    # export two files, one with the original columns and one with the new
+    # columns
     # drop columns left, top, right, bottom for the first
     df_to_process = df.drop(columns=["left", "top", "right", "bottom"])
     # only keep fid left top right bottom for the second

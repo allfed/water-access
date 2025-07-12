@@ -1,8 +1,7 @@
+# flake8: noqa: E501
 import numpy as np
 import pandas as pd
-import numpy as np
 import pytest
-import pdb
 from pathlib import Path
 import sys
 
@@ -78,23 +77,20 @@ class TestWeightedMedianSeries:
         val = np.array([])
         weight = np.array([0.1, 0.2, 0.3, 0.2, 0.2])
         result = weighted_median_series(val, weight)
-        expected_result = np.nan
         assert np.isnan(result)
 
     def test_weighted_median_series_returns_nan_when_weight_is_empty(self):
         val = np.array([1, 2, 3, 4, 5])
         weight = np.array([])
         result = weighted_median_series(val, weight)
-        expected_result = np.nan
         assert np.isnan(result)
 
-    def test_weighted_median_series_returns_nan_when_both_val_and_weight_are_empty(
+    def test_weighted_median_series_returns_nan_when_both_val_and_weight_empty(
         self,
     ):
         val = np.array([])
         weight = np.array([])
         result = weighted_median_series(val, weight)
-        expected_result = np.nan
         assert np.isnan(result)
 
 
@@ -109,18 +105,22 @@ class TestWeightedMedian:
 
     def test_weighted_median_returns_error_when_df_is_empty(self):
         with pytest.raises(ValueError):
-            df = pd.DataFrame({"value": [], "weight": [0.1, 0.2, 0.3, 0.2, 0.2]})
-            result = weighted_median(df, "value", "weight")
+            df = pd.DataFrame(
+                {"value": [], "weight": [0.1, 0.2, 0.3, 0.2, 0.2]}
+            )
+            weighted_median(df, "value", "weight")
 
     def test_weighted_median_returns_error_when_weight_is_empty(self):
         with pytest.raises(ValueError):
             df = pd.DataFrame({"value": [1, 2, 3, 4, 5], "weight": []})
-            result = weighted_median(df, "value", "weight")
+            weighted_median(df, "value", "weight")
 
-    def test_weighted_median_returns_error_when_both_df_and_weight_are_empty(self):
+    def test_weighted_median_returns_error_when_both_df_and_weight_are_empty(
+        self,
+    ):
         with pytest.raises(IndexError):
             df = pd.DataFrame({"value": [], "weight": []})
-            result = weighted_median(df, "value", "weight")
+            weighted_median(df, "value", "weight")
 
 
 class TestLoadData:
@@ -240,7 +240,7 @@ class TestCrrAddUncertainty:
         expected_result = "Secondary Roads"
         assert result == expected_result
 
-    def test_crr_add_uncertainty_returns_highest_road_type_when_adjustment_exceeds_upper_bound(
+    def test_crr_add_uncertainty_returns_highest_road_type_when_adjustment_exceeds_upper(
         self,
     ):
         road_type = "Local Roads"
@@ -249,7 +249,7 @@ class TestCrrAddUncertainty:
         expected_result = "No Roads"
         assert result == expected_result
 
-    def test_crr_add_uncertainty_returns_lowest_road_type_when_adjustment_exceeds_lower_bound(
+    def test_crr_add_uncertainty_returns_lowest_road_type_when_adjustment_exceeds_lower(
         self,
     ):
         road_type = "Primary Roads"
@@ -258,7 +258,9 @@ class TestCrrAddUncertainty:
         expected_result = "Highways"
         assert result == expected_result
 
-    def test_crr_add_uncertainty_returns_same_road_type_when_adjustment_is_zero(self):
+    def test_crr_add_uncertainty_returns_same_road_type_when_adjustment_is_zero(
+        self,
+    ):
         road_type = "Tertiary Roads"
         adjustment = 0
         result = crr_add_uncertainty(road_type, adjustment)
@@ -298,7 +300,11 @@ class TestRoadAnalysis:
                 "grip_3_1": [1, 0, 0],
                 "grip_4_1": [0, 0, 0],
                 "grip_5_1": [0, 0, 0],
-                "dominant_road_type": ["Secondary Roads", "Highways", "Primary Roads"],
+                "dominant_road_type": [
+                    "Secondary Roads",
+                    "Highways",
+                    "Primary Roads",
+                ],
                 "Crr": [0.004, 0.002, 0.003],
             }
         )
@@ -336,7 +342,11 @@ class TestRoadAnalysis:
                 "grip_3_1": [1, 0, 0],
                 "grip_4_1": [0, 0, 0],
                 "grip_5_1": [0, 0, 0],
-                "dominant_road_type": ["Secondary Roads", "Highways", "Primary Roads"],
+                "dominant_road_type": [
+                    "Secondary Roads",
+                    "Highways",
+                    "Primary Roads",
+                ],
                 "Crr": [0.006, 0.003, 0.004],
             }
         )
@@ -374,7 +384,9 @@ class TestExtractSlopeCrr:
                 "Average Weight": [60, 60, 60, 60, 60],
             }
         )
-        slope_zones, Crr_values, country_average_weights = extract_slope_crr(df_zones)
+        slope_zones, Crr_values, country_average_weights = extract_slope_crr(
+            df_zones
+        )
         expected_slope_zones = pd.Series([1, 2, 3, 4, 5], name="slope_1")
         expected_Crr_values = pd.Series([0.1, 0.2, 0.3, 0.4, 0.5], name="Crr")
         pd.testing.assert_series_equal(slope_zones, expected_slope_zones)
@@ -383,7 +395,6 @@ class TestExtractSlopeCrr:
 
 class TestRunBicycleModel:
     def test_run_bicycle_model_returns_numpy_array(self):
-
         project_root = Path().resolve().parent
         sys.path.append(str(project_root))
         import src.mobility_module as mm
@@ -400,11 +411,19 @@ class TestRunBicycleModel:
         country_average_weights = [60, 50, 70]
         load_attempt = 1
         result = run_bicycle_model(
-            mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt
+            mv,
+            mo,
+            hpv,
+            slope_zones,
+            Crr_values,
+            country_average_weights,
+            load_attempt,
         )
         assert isinstance(result, np.ndarray)
 
-    def test_run_bicycle_model_adjusts_project_root_and_imports_mobility_module(self):
+    def test_run_bicycle_model_adjusts_project_root_and_imports_mobility_module(
+        self,
+    ):
         project_root = Path().resolve().parent
         sys.path.append(str(project_root))
         import src.mobility_module as mm
@@ -420,13 +439,19 @@ class TestRunBicycleModel:
         Crr_values = [0.01, 0.02, 0.03]
         country_average_weights = [60, 50, 70]
         load_attempt = 1
-        result = run_bicycle_model(
-            mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt
+        run_bicycle_model(
+            mv,
+            mo,
+            hpv,
+            slope_zones,
+            Crr_values,
+            country_average_weights,
+            load_attempt,
         )
         assert str(project_root) in sys.path
         assert "src.mobility_module" in sys.modules
 
-    def test_run_bicycle_model_calls_single_bike_run_for_each_slope_zone_and_Crr_value(
+    def test_run_bicycle_model_calls_single_bike_run_for_each_slope_zone_and_crr(
         self, monkeypatch
     ):
         project_root = Path().resolve().parent
@@ -451,11 +476,18 @@ class TestRunBicycleModel:
             calls.append((slope, hpv.Crr))
 
         monkeypatch.setattr(
-            "src.mobility_module.mobility_models.single_bike_run", mock_single_bike_run
+            "src.mobility_module.mobility_models.single_bike_run",
+            mock_single_bike_run,
         )
 
         run_bicycle_model(
-            mv, mo, hpv, slope_zones, Crr_values, country_average_weights, load_attempt
+            mv,
+            mo,
+            hpv,
+            slope_zones,
+            Crr_values,
+            country_average_weights,
+            load_attempt,
         )
 
         expected_calls = [(0, 0.01), (1, 0.02), (2, 0.03)]
@@ -479,7 +511,9 @@ def test_process_and_save_results_saves_csv(tmp_path):
     )
 
     # Check if the CSV file is saved
-    expected_csv_file = export_file_location / f"{velocity_type}_velocity_by_zone.csv"
+    expected_csv_file = (
+        export_file_location / f"{velocity_type}_velocity_by_zone.csv"
+    )
     assert expected_csv_file.exists(), "CSV file was not saved"
 
     # Check if the DataFrame is updated with the new columns
@@ -517,7 +551,7 @@ def test_process_and_save_results_does_not_save_csv(tmp_path):
 
 
 class TestCalculateAndMergeBicycleDistance:
-    def test_calculate_and_merge_bicycle_distance_calculates_distance_when_flag_is_true(
+    def test_calculate_and_merge_bicycle_distance_calculates_distance_when_flag_true(
         self,
     ):
         df_zones = pd.DataFrame(
@@ -534,12 +568,15 @@ class TestCalculateAndMergeBicycleDistance:
         practical_limit_bicycle = 40
 
         result = calculate_and_merge_bicycle_distance(
-            df_zones, calculate_distance, export_file_location, practical_limit_bicycle
+            df_zones,
+            calculate_distance,
+            export_file_location,
+            practical_limit_bicycle,
         )
 
         assert "loaded_velocity_bicycle" in result.columns
 
-    def test_calculate_and_merge_bicycle_distance_merges_bicycle_distance_from_file(
+    def test_calculate_and_merge_bicycle_distance_merges_from_file(
         self,
     ):
         df_zones = pd.DataFrame(
@@ -556,7 +593,10 @@ class TestCalculateAndMergeBicycleDistance:
         practical_limit_bicycle = 40
 
         result = calculate_and_merge_bicycle_distance(
-            df_zones, calculate_distance, export_file_location, practical_limit_bicycle
+            df_zones,
+            calculate_distance,
+            export_file_location,
+            practical_limit_bicycle,
         )
 
         assert "loaded_velocity_bicycle" in result.columns
@@ -583,7 +623,13 @@ class TestRunWalkingModel:
         country_average_weights = [60, 50, 70]
 
         result = run_walking_model(
-            mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt=20
+            mv,
+            mo,
+            met,
+            hpv,
+            slope_zones,
+            country_average_weights,
+            load_attempt=20,
         )
         assert isinstance(result, np.ndarray)
 
@@ -617,7 +663,13 @@ class TestRunWalkingModel:
         )
 
         run_walking_model(
-            mv, mo, met, hpv, slope_zones, country_average_weights, load_attempt
+            mv,
+            mo,
+            met,
+            hpv,
+            slope_zones,
+            country_average_weights,
+            load_attempt,
         )
 
         expected_calls = [0, 1, 2]
@@ -625,7 +677,7 @@ class TestRunWalkingModel:
 
 
 class TestCalculateAndMergeWalkingDistance:
-    def test_calculate_and_merge_walking_distance_calculates_distance_when_flag_is_true(
+    def test_calculate_and_merge_walking_distance_calculates_distance_when_flag_true(
         self,
     ):
         df_zones = pd.DataFrame(
@@ -642,12 +694,15 @@ class TestCalculateAndMergeWalkingDistance:
         practical_limit_walking = 20
 
         result = calculate_and_merge_walking_distance(
-            df_zones, calculate_distance, export_file_location, practical_limit_walking
+            df_zones,
+            calculate_distance,
+            export_file_location,
+            practical_limit_walking,
         )
 
         assert "loaded_velocity_walk" in result.columns
 
-    def test_calculate_and_merge_walking_distance_merges_walking_distance_from_file(
+    def test_calculate_and_merge_walking_distance_merges_from_file(
         self,
     ):
         df_zones = pd.DataFrame({"fid": [1, 2, 3], "zone": ["A", "B", "C"]})
@@ -656,7 +711,10 @@ class TestCalculateAndMergeWalkingDistance:
         practical_limit_walking = 20
 
         result = calculate_and_merge_walking_distance(
-            df_zones, calculate_distance, export_file_location, practical_limit_walking
+            df_zones,
+            calculate_distance,
+            export_file_location,
+            practical_limit_walking,
         )
 
         assert "loaded_velocity_walk" in result.columns
@@ -752,10 +810,18 @@ class TestCalculatePopulationWaterAccess:
                 "zone_walking_okay": [1, 1, 0],
                 "fraction_of_zone_with_cycling_access": [0.8, 0.9, 1.0],
                 "fraction_of_zone_with_walking_access": [1, 1, 0],
-                "population_piped_with_cycling_access": [240.0, 1080.0, 2100.0],
+                "population_piped_with_cycling_access": [
+                    240.0,
+                    1080.0,
+                    2100.0,
+                ],
                 "population_piped_with_walking_access": [300.0, 1200.0, 0.0],
                 "population_piped_with_access": [300.0, 1200.0, 2100.0],
-                "population_piped_with_only_cycling_access": [0.0, 0.0, 2100.0],
+                "population_piped_with_only_cycling_access": [
+                    0.0,
+                    0.0,
+                    2100.0,
+                ],
                 "zone_pop_with_water": [1000.0, 2000.0, 3000.0],
                 "zone_pop_without_water": [0.0, 0.0, 0.0],
             }
@@ -833,18 +899,33 @@ class TestAggregateCountryLevelData:
         df_zones = pd.DataFrame(
             {
                 "ISOCODE": ["USA", "USA", "CAN", "CAN"],
-                "Entity": ["United States", "United States", "Canada", "Canada"],
+                "Entity": [
+                    "United States",
+                    "United States",
+                    "Canada",
+                    "Canada",
+                ],
                 "country_pop_raw": [1000000, 1000000, 2000000, 2000000],
                 "zone_pop_with_water": [250000, 250000, 500000, 500000],
                 "zone_pop_without_water": [250000, 250000, 500000, 500000],
-                "population_piped_with_access": [150000, 150000, 200000, 200000],
+                "population_piped_with_access": [
+                    150000,
+                    150000,
+                    200000,
+                    200000,
+                ],
                 "population_piped_with_cycling_access": [
                     100000,
                     100000,
                     150000,
                     150000,
                 ],
-                "population_piped_with_walking_access": [50000, 50000, 100000, 100000],
+                "population_piped_with_walking_access": [
+                    50000,
+                    50000,
+                    100000,
+                    100000,
+                ],
                 "population_piped_with_only_cycling_access": [
                     50000,
                     50000,
@@ -893,7 +974,10 @@ class TestAggregateCountryLevelData:
 class TestCleanUpData:
     def test_clean_up_data_removes_nan_rows(self):
         df_countries = pd.DataFrame(
-            {"ISOCODE": ["USA", "CAN", "LBY"], "weighted_med": [1.0, None, 3.0]}
+            {
+                "ISOCODE": ["USA", "CAN", "LBY"],
+                "weighted_med": [1.0, None, 3.0],
+            }
         )
         cleaned_df, _, _ = clean_up_data(df_countries)
         assert len(cleaned_df) == 2
@@ -902,7 +986,10 @@ class TestCleanUpData:
 
     def test_clean_up_data_removes_outliers(self):
         df_countries = pd.DataFrame(
-            {"ISOCODE": ["USA", "CAN", "LBY"], "weighted_med": [1.0, 10.0, 3.0]}
+            {
+                "ISOCODE": ["USA", "CAN", "LBY"],
+                "weighted_med": [1.0, 10.0, 3.0],
+            }
         )
         cleaned_df, _, _ = clean_up_data(df_countries)
         assert len(cleaned_df) == 2
@@ -1005,9 +1092,24 @@ class TestProcessCountryData:
                 "weighted_95th_walking": [10, 15, 5, 15],
                 "percent_with_water": [100.0, 0.0, 100.0, (2 / 3) * 100],
                 "percent_without_water": [0.0, 100.0, 0.0, (1 / 3) * 100],
-                "percent_piped_with_cycling_access": [100.0, 0.0, 100.0, (2 / 3) * 100],
-                "percent_piped_with_walking_access": [100.0, 0.0, 100.0, (2 / 3) * 100],
-                "proportion_piped_access_from_cycling": [0.0, np.nan, 0.0, 0.0],
+                "percent_piped_with_cycling_access": [
+                    100.0,
+                    0.0,
+                    100.0,
+                    (2 / 3) * 100,
+                ],
+                "percent_piped_with_walking_access": [
+                    100.0,
+                    0.0,
+                    100.0,
+                    (2 / 3) * 100,
+                ],
+                "proportion_piped_access_from_cycling": [
+                    0.0,
+                    np.nan,
+                    0.0,
+                    0.0,
+                ],
                 "percent_with_only_cycling_access": [0.0, 0.0, 0.0, 0.0],
             },
             index=pd.Int64Index([0, 1, 2, 3], dtype="int64"),
@@ -1018,12 +1120,14 @@ class TestProcessCountryData:
 
         pd.testing.assert_frame_equal(result, expected_result)
 
-    def test_process_country_data_raises_assertion_error_when_df_zones_is_empty(self):
+    def test_process_country_data_raises_assertion_error_when_df_zones_empty(
+        self,
+    ):
         df_zones = pd.DataFrame()
         with pytest.raises(AssertionError):
             process_country_data(df_zones)
 
-    def test_process_country_data_issues_warning_when_df_zones_contains_nan_values(
+    def test_process_country_data_issues_warning_when_df_zones_contains_nan(
         self, capsys
     ):
         df_zones = pd.DataFrame(
@@ -1055,12 +1159,14 @@ class TestProcessCountryData:
             captured = capsys.readouterr()
             assert "Input dataframe contains NaN values" in captured.err
 
-    def test_process_country_data_raises_error_when_df_countries_is_empty(self):
+    def test_process_country_data_raises_error_when_df_countries_is_empty(
+        self,
+    ):
         df_zones = pd.DataFrame()
         with pytest.raises(AssertionError):
             process_country_data(df_zones)
 
-    def test_process_country_data_raises_index_error_when_df_countries_contains_nan_values(
+    def test_process_country_data_raises_index_error_when_df_countries_contains_nan(
         self,
     ):
         df_zones = pd.DataFrame(
@@ -1119,7 +1225,9 @@ class TestProcessCountryData:
         assert "percent_with_water" in result.columns
         assert "percent_without_water" in result.columns
 
-    def test_process_country_data_prints_summary_of_removed_countries(self, capsys):
+    def test_process_country_data_prints_summary_of_removed_countries(
+        self, capsys
+    ):
         df_zones = pd.DataFrame(
             {
                 "ISOCODE": ["USA", "CAN", "LBY"],
@@ -1160,7 +1268,9 @@ class TestMapHillPolarity:
         expected_result = (1, -1)
         assert result == expected_result
 
-    def test_map_hill_polarity_returns_correct_result_for_downhill_uphill(self):
+    def test_map_hill_polarity_returns_correct_result_for_downhill_uphill(
+        self,
+    ):
         hill_polarity = "downhill_uphill"
         result = map_hill_polarity(hill_polarity)
         expected_result = (-1, 1)
@@ -1206,20 +1316,24 @@ class TestAdjustEuclidean:
 
         pd.testing.assert_frame_equal(result, expected_result)
 
-    def test_adjust_euclidean_raises_error_when_urban_rural_is_non_binary(self):
+    def test_adjust_euclidean_raises_error_when_urban_rural_is_non_binary(
+        self,
+    ):
         df_zones_input = pd.DataFrame(
             {"dtw_1": [1000, 2000, 3000], "urban_rural": [1, 2, 1]}
         )
 
         with pytest.raises(ValueError):
-            adjust_euclidean(df_zones_input, urban_adjustment=4, rural_adjustment=3)
+            adjust_euclidean(
+                df_zones_input, urban_adjustment=4, rural_adjustment=3
+            )
 
 
 # Add test cases for run_global_analysis
 class TestRunGlobalAnalysis:
     def test_run_global_analysis_null_run(self):
-        # If time gathering water is 0, percentage of population without water access
-        # should be equal to percentage piped
+        # If time gathering water is 0, percentage of population without water
+        # access should be equal to percentage piped
         df_countries, df_districts, df_zones = run_global_analysis(
             crr_adjustment=0,
             time_gathering_water=0,
@@ -1246,8 +1360,10 @@ class TestRunGlobalAnalysis:
         y_true, y_pred = np.array(y_true), np.array(y_pred)
         mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
-        # As we are using national urban and rural piped percentages, we gain better accuracy for the zonal
-        # results at the expense of the country level results. Country MAPE should average out at 19% globally
+        # As we are using national urban and rural piped percentages,
+        # we gain better accuracy for the zonal
+        # results at the expense of the country level results.
+        # Country MAPE should average out at 19% globally
         # when using *national* piped data
         assert mape < 20.0
 
@@ -1263,7 +1379,7 @@ class TestRunGlobalAnalysis:
         y_calc = np.array(y_calc)
         mae_calc = np.mean(np.abs(y_calc - y_pred))
 
-        # This should be approx zero, as no areas modelled as piped should receive any water
+        # This should be approx 0 (no areas modelled as piped should get water)
         assert mae_calc < 0.01
 
 

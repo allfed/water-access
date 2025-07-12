@@ -8,7 +8,7 @@ print(os.getcwd())
 try:
     input_file = "../../data/GIS/updated_GIS_output_cleaned.csv"
     output_file = "../../data/GIS/GIS_data_zones_sample.csv"
-except:
+except BaseException:
     input_file = "./data/GIS/updated_GIS_output_cleaned.csv"
     output_file = "./data/GIS/GIS_data_zones_sample.csv"
 

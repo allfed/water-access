@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 
 # Define the input file path
 input_file = "../../data/GIS/NaN_count_with_centroids.csv"
@@ -69,22 +68,22 @@ antarctica_df = df[df["latitude_centroid"] < -60]
 # Total
 
 
-print(
-    f"Number of population less than 0.1 in World: {len(df_no_antarctica[df_no_antarctica['pop_density'] < 0.1])}"
-)
+pop_less_than_01 = len(df_no_antarctica[df_no_antarctica["pop_density"] < 0.1])
+print(f"Number of population less than 0.1 in World: {pop_less_than_01}")
 
 # NaN
-print(
-    f"Number of NaN in World: {len(df_no_antarctica[df_no_antarctica['pop_density'].isna()])}"
-)
+pop_nan_count = len(df_no_antarctica[df_no_antarctica["pop_density"].isna()])
+print(f"Number of NaN in World: {pop_nan_count}")
 
 # Total
 print(f"Total number of World: {len(df_no_antarctica)}")
 
 # percentage of the total
 print(
-    f"Percentage of population less than 0.1 in World: {len(df_no_antarctica[df_no_antarctica['pop_density'] < 0.1]) / len(df_no_antarctica) * 100:.2f}%"
+    f"Percentage of population less than 0.1 in World: "
+    f"{pop_less_than_01 / len(df_no_antarctica) * 100:.2f}%"
 )
 print(
-    f"Percentage of NaN in World: {len(df_no_antarctica[df_no_antarctica['pop_density'].isna()]) / len(df_no_antarctica) * 100:.2f}%"
+    f"Percentage of NaN in World: "
+    f"{pop_nan_count / len(df_no_antarctica) * 100:.2f}%"
 )

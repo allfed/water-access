@@ -7,7 +7,6 @@ import src.gis_monte_carlo
 
 import numpy as np
 import pandas as pd
-from pathlib import Path
 import pytest
 import os
 import tempfile
@@ -15,7 +14,6 @@ import shutil
 
 
 class TestSampleNormal:
-
     # The function returns a numpy array of size n.
     def test_returns_array_of_size_n(self):
         low = 0
@@ -36,7 +34,6 @@ class TestSampleNormal:
 
 
 class TestSampleLognormal:
-
     def test_returns_array_of_size_n(self):
         low = 1
         high = 10
@@ -62,7 +59,6 @@ class TestSampleLognormal:
 
 
 class TestRunSimulation:
-
     def test_valid_input_returns_result(self):
         crr_adjustment = 1
         time_gathering_water = 5
@@ -259,7 +255,6 @@ class TestRunSimulation:
 
 
 class TestProcessMCResults:
-
     def test_process_mc_results_saves_results_to_output_dir(self):
         # Arrange
         simulation_results = [
@@ -298,8 +293,12 @@ class TestProcessMCResults:
         process_mc_results(simulation_results, plot=False, output_dir=temp_dir)
 
         # Assert
-        assert os.path.exists(os.path.join(temp_dir, "country_median_results.csv"))
-        assert os.path.exists(os.path.join(temp_dir, "country_mean_results.csv"))
+        assert os.path.exists(
+            os.path.join(temp_dir, "country_median_results.csv")
+        )
+        assert os.path.exists(
+            os.path.join(temp_dir, "country_mean_results.csv")
+        )
         assert os.path.exists(
             os.path.join(temp_dir, "country_5th_percentile_results.csv")
         )
@@ -313,7 +312,9 @@ class TestProcessMCResults:
         # Remove the temporary directory when you're done
         shutil.rmtree(temp_dir)
 
-    def test_process_mc_results_plots_chloropleth_maps_when_plot_is_true(self, mocker):
+    def test_process_mc_results_plots_chloropleth_maps_when_plot_is_true(
+        self, mocker
+    ):
         # Arrange
         simulation_results = [
             pd.DataFrame(
@@ -344,14 +345,18 @@ class TestProcessMCResults:
             ),
         ]
         # Mock the plot_chloropleth function
-        mock_plot_chloropleth = mocker.patch("src.gis_monte_carlo.gis.plot_chloropleth")
+        mock_plot_chloropleth = mocker.patch(
+            "src.gis_monte_carlo.gis.plot_chloropleth"
+        )
 
         # Create a temporary directory
         temp_dir = tempfile.mkdtemp()
 
         # Act
         try:
-            process_mc_results(simulation_results, plot=False, output_dir=temp_dir)
+            process_mc_results(
+                simulation_results, plot=False, output_dir=temp_dir
+            )
 
             # Assert
             assert mock_plot_chloropleth.call_count == 0
@@ -359,7 +364,7 @@ class TestProcessMCResults:
             # Remove the temporary directory when you're done
             shutil.rmtree(temp_dir)
 
-    def test_process_mc_results_does_not_plot_chloropleth_maps_when_plot_is_false(
+    def test_process_mc_results_does_not_plot_chloropleth_maps_when_plot_is_false(  # noqa: E501
         self, mocker
     ):
         # Arrange
@@ -398,7 +403,9 @@ class TestProcessMCResults:
 
         # Act
         try:
-            process_mc_results(simulation_results, plot=False, output_dir=temp_dir)
+            process_mc_results(
+                simulation_results, plot=False, output_dir=temp_dir
+            )
         finally:
             # Remove the temporary directory when you're done
             shutil.rmtree(temp_dir)
@@ -406,7 +413,9 @@ class TestProcessMCResults:
         # Assert
         assert src.gis_monte_carlo.gis.plot_chloropleth.call_count == 0
 
-    def test_process_mc_results_raises_error_when_simulation_results_is_not_list(self):
+    def test_process_mc_results_raises_error_when_simulation_results_is_not_list(  # noqa: E501
+        self,
+    ):
         # Arrange
         simulation_results = "invalid_results"
 
@@ -414,7 +423,9 @@ class TestProcessMCResults:
         with pytest.raises(TypeError):
             process_mc_results(simulation_results, plot=False, output_dir=None)
 
-    def test_process_mc_results_raises_error_when_output_dir_is_not_string(self):
+    def test_process_mc_results_raises_error_when_output_dir_is_not_string(
+        self,
+    ):
         # Arrange
         simulation_results = [
             pd.DataFrame(
@@ -448,4 +459,6 @@ class TestProcessMCResults:
 
         # Act & Assert
         with pytest.raises(TypeError):
-            process_mc_results(simulation_results, plot=False, output_dir=output_dir)
+            process_mc_results(
+                simulation_results, plot=False, output_dir=output_dir
+            )

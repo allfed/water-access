@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
-from src.mobility_module import linspace_creator
-import pdb
-import sys
-from pathlib import Path
+from src.mobility_module import (
+    linspace_creator,
+    max_safe_load,
+    mobility_models,
+)
 
 
 class TestLinspaceCreator:
-
     def test_returns_numpy_array(self):
         max_values = np.array([10, 20, 30])
         min_value = 5
@@ -74,11 +74,7 @@ class TestLinspaceCreator:
             linspace_creator(max_values, min_value, resolution)
 
 
-from src.mobility_module import linspace_creator, max_safe_load
-
-
 class TestMaxSafeLoad:
-
     def test_returns_numpy_array(self):
         m_HPV_only = np.array([50, 60, 70])
         LoadCapacity = np.array([100, 120, 150])
@@ -138,11 +134,7 @@ class TestMaxSafeLoad:
         assert np.allclose(result, expected_result)
 
 
-from src.mobility_module import mobility_models
-import src.mobility_module as mm
-
 mobility_models = mobility_models()
 sprott_model = mobility_models.sprott_model
 bike_power_solution = mobility_models.bike_power_solution
 sprott_solution = mobility_models.sprott_solution
-from scipy.optimize import fsolve

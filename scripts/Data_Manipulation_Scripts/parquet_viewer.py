@@ -1,7 +1,8 @@
 from pathlib import Path
 import pandas as pd
 
-# Define the root of the repository by going up one level from the script directory
+# Define the root of the repository by going up one level from the script
+# directory
 data_script_dir = Path(__file__).resolve().parent
 script_dir = data_script_dir.parent
 repo_root = script_dir.parent
