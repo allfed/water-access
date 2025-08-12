@@ -122,7 +122,7 @@ class RefactoredSensitivityAnalyzer:
             # Initialize model components
             mo = mm.model_options()
             mv = mm.model_variables()
-            met = mm.MET_values(mv, country_weight=60, met=3.5, use_country_specific_weights=False)
+            met = mm.MET_values(mv, country_weight=60, met=4.5, use_country_specific_weights=False)
             hpv = mm.HPV_variables(param_df, mv)
             mr = mm.model_results(hpv, mo)
             
@@ -206,16 +206,31 @@ class RefactoredSensitivityAnalyzer:
         for slope in test_slopes:
             try:
                 if mo.model_selection == 2:  # Cycling (Martin model)
-                    loaded_velocity, unloaded_velocity, max_load = mm.mobility_models.single_bike_run(
+                    result = mm.mobility_models.single_bike_run(
                         mv, mo, hpv, slope, self.fixed_water_capacity
                     )
+                    if isinstance(result, tuple) and len(result) == 3:
+                        loaded_velocity, unloaded_velocity, max_load = result
+                    else:
+                        logger.error(f"Unexpected result format from single_bike_run: {type(result)}, {result}")
+                        continue
                 elif mo.model_selection == 3:  # Walking (Lankford model)
-                    loaded_velocity, unloaded_velocity, max_load = mm.mobility_models.single_lankford_run(
+                    result = mm.mobility_models.single_lankford_run(
                         mv, mo, met, hpv, slope, self.fixed_water_capacity
                     )
+                    if isinstance(result, tuple) and len(result) == 3:
+                        loaded_velocity, unloaded_velocity, max_load = result
+                    else:
+                        logger.error(f"Unexpected result format from single_lankford_run: {type(result)}, {result}")
+                        continue
                 else:
                     logger.warning(f"Unknown model selection: {mo.model_selection}")
                     continue
+                
+                # Ensure scalar values
+                loaded_velocity = float(loaded_velocity) if not np.isnan(loaded_velocity) else np.nan
+                unloaded_velocity = float(unloaded_velocity) if not np.isnan(unloaded_velocity) else np.nan
+                max_load = float(max_load) if not np.isnan(max_load) else np.nan
                 
                 # Calculate average velocity (like global model)
                 avg_velocity = (loaded_velocity + unloaded_velocity) / 2
