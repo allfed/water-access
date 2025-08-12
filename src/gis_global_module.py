@@ -71,7 +71,7 @@ def weighted_median_series(val, weight):
             return np.nan
         if np.sum(weight) == 0:
             return np.nan
-        
+
         df = pd.DataFrame({"val": val, "weight": weight})
         df_sorted = df.sort_values("val")
         cumsum = df_sorted["weight"].cumsum()
@@ -145,7 +145,9 @@ def load_data(urb_data_file, country_data_file):
             df_zones_input = pd.read_csv(Path(".") / urb_data_file)
             df_input = pd.read_csv(Path(".") / country_data_file)
         except Exception as fallback_e:
-            raise FileNotFoundError(f"Could not load data files: {e}, fallback error: {fallback_e}")
+            raise FileNotFoundError(
+                f"Could not load data files: {e}, fallback error: {fallback_e}"
+            )
 
     return df_zones_input, df_input
 
@@ -946,7 +948,7 @@ def calculate_water_rations(df_zones):
     df_zones["water_rations_per_bike"] = np.where(
         df_zones["dtw_1"] > 0,
         df_zones["water_ration_kms"] / df_zones["dtw_1"],
-        np.inf  # Infinite water access when distance is zero
+        np.inf,  # Infinite water access when distance is zero
     )
     df_zones["bikes_in_zone"] = (
         df_zones["pop_zone"]
