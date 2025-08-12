@@ -832,11 +832,12 @@ def calculate_max_distances(df_zones, time_gathering_water):
 
     """
     # Max distance achievable (not round trip, just the distance from home to water source)
+    # Convert velocity from m/s to km/h: multiply by 3600/1000
     df_zones["max distance cycling"] = (
-        df_zones["average_velocity_bicycle"] * time_gathering_water / 2
+        df_zones["average_velocity_bicycle"] * time_gathering_water * 3600 / 2 / 1000
     )
     df_zones["max distance walking"] = (
-        df_zones["average_velocity_walk"] * time_gathering_water / 2
+        df_zones["average_velocity_walk"] * time_gathering_water * 3600 / 2 / 1000
     )
     # Use water_ration_kms to calculate the water ration achievable per bike per zone
     df_zones["water_ration_kms"] = (
