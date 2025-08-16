@@ -108,9 +108,9 @@ def save_checkpoint(completed_iterations, parameters):
         "completed_iterations": completed_iterations,
         "total_iterations": NUM_ITERATIONS,
         "parameters": parameters,
-        "timestamp": time.time()
+        "timestamp": time.time(),
     }
-    with open(CHECKPOINT_FILE, 'w') as f:
+    with open(CHECKPOINT_FILE, "w") as f:
         json.dump(checkpoint, f, indent=2)
     print(f"✅ Checkpoint saved: {len(completed_iterations)} iterations completed")
 
@@ -118,9 +118,11 @@ def save_checkpoint(completed_iterations, parameters):
 def load_checkpoint():
     """Load checkpoint if it exists"""
     if CHECKPOINT_FILE.exists():
-        with open(CHECKPOINT_FILE, 'r') as f:
+        with open(CHECKPOINT_FILE, "r") as f:
             checkpoint = json.load(f)
-        print(f"📂 Resuming from checkpoint: {len(checkpoint['completed_iterations'])} iterations already completed")
+        print(
+            f"📂 Resuming from checkpoint: {len(checkpoint['completed_iterations'])} iterations already completed"
+        )
         return checkpoint
     return None
 
@@ -132,36 +134,38 @@ def get_completed_iterations():
         zone_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
         district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
         countries_file = PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
-        
+
         # Only consider iteration complete if all three files exist
         if zone_file.exists() and district_file.exists() and countries_file.exists():
             completed.append(i)
-    
+
     return completed
 
 
 def process_saved_results():
     """Process all saved parquet files"""
     print("\n📊 Processing saved results...")
-    
+
     # Load all saved district results
     districts_simulation_results = []
     countries_simulation_results = []
-    
+
     completed = get_completed_iterations()
-    
+
     for i in completed:
         district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
         countries_file = PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
-        
+
         if district_file.exists():
             import pandas as pd
+
             districts_simulation_results.append(pd.read_parquet(district_file))
-        
+
         if countries_file.exists():
             import pandas as pd
+
             countries_simulation_results.append(pd.read_parquet(countries_file))
-    
+
     if districts_simulation_results and countries_simulation_results:
         mc.process_mc_results(countries_simulation_results)
         mc.process_districts_results(districts_simulation_results)
@@ -173,25 +177,25 @@ def process_saved_results():
 if __name__ == "__main__":
     # Set up signal handler for Spot VM preemption
     signal.signal(signal.SIGTERM, handle_preemption)
-    
+
     # Create parquet directory if it doesn't exist
     PARQUET_PATH.mkdir(parents=True, exist_ok=True)
-    
+
     # Check for existing completed iterations
     completed_iterations = get_completed_iterations()
-    
+
     # Load checkpoint if it exists
     checkpoint = load_checkpoint()
-    
+
     if completed_iterations:
         print(f"🔍 Found {len(completed_iterations)} completed iterations")
-        
+
         # If we've completed all iterations, just process and exit
         if len(completed_iterations) >= NUM_ITERATIONS:
             print("✅ All iterations complete! Processing results...")
             process_saved_results()
             sys.exit(0)
-    
+
     # Generate or restore parameters
     if checkpoint and "parameters" in checkpoint:
         # Restore parameters from checkpoint
@@ -226,7 +230,9 @@ if __name__ == "__main__":
             PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
             NUM_ITERATIONS,
         )
-        mets = mc.sample_normal(METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS)
+        mets = mc.sample_normal(
+            METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS
+        )
         watts_values = mc.sample_normal(
             WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
         )
@@ -242,7 +248,7 @@ if __name__ == "__main__":
             RURAL_PDR_PARETO_LOC,
             NUM_ITERATIONS,
         )
-        
+
         # Save parameters for potential resume
         parameters = {
             "crr_adjustments": crr_adjustments.tolist(),
@@ -253,13 +259,15 @@ if __name__ == "__main__":
             "watts_values": watts_values.tolist(),
             "hill_polarities": hill_polarities.tolist(),
             "urban_adjustments": urban_adjustments.tolist(),
-            "rural_adjustments": rural_adjustments.tolist()
+            "rural_adjustments": rural_adjustments.tolist(),
         }
         save_checkpoint(completed_iterations, parameters)
 
     # Determine which iterations to run
-    iterations_to_run = [i for i in range(NUM_ITERATIONS) if i not in completed_iterations]
-    
+    iterations_to_run = [
+        i for i in range(NUM_ITERATIONS) if i not in completed_iterations
+    ]
+
     if not iterations_to_run:
         print("✅ All iterations already complete! Processing results...")
         process_saved_results()
@@ -272,7 +280,9 @@ if __name__ == "__main__":
     # Record the start time
     start_time = time.time()
     print(f"\n🚀 Starting Monte Carlo simulations...")
-    print(f"📊 Running {len(iterations_to_run)} remaining iterations (out of {NUM_ITERATIONS} total)")
+    print(
+        f"📊 Running {len(iterations_to_run)} remaining iterations (out of {NUM_ITERATIONS} total)"
+    )
     print(f"⚡ Running {MAX_WORKERS} simulations concurrently...")
     print(f"🕐 Start time: {time.strftime('%H:%M:%S', time.localtime())}")
     print("\n")
@@ -283,7 +293,7 @@ if __name__ == "__main__":
         for idx in iterations_to_run:
             if shutdown_requested:
                 break
-                
+
             future = executor.submit(
                 mc.run_simulation,
                 crr_adjustments[idx],
@@ -311,9 +321,9 @@ if __name__ == "__main__":
                 print("\n⚠️  Shutting down gracefully...")
                 executor.shutdown(wait=False)
                 break
-                
+
             i = futures[future]
-            
+
             try:
                 countries_result, district_result, zone_result = future.result()
 
@@ -329,22 +339,24 @@ if __name__ == "__main__":
                 # Save all results to Parquet files
                 output_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
                 filtered_zone_result.to_parquet(output_file, index=False)
-                
+
                 district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
                 district_result.to_parquet(district_file, index=False)
-                
-                countries_file = PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
+
+                countries_file = (
+                    PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
+                )
                 countries_result.to_parquet(countries_file, index=False)
 
                 # Update completed iterations
                 completed_iterations.append(i)
-                
+
                 # Save checkpoint periodically (every 10 iterations)
                 if len(completed_iterations) % 10 == 0:
                     save_checkpoint(completed_iterations, parameters)
 
                 futures_progress.update()
-                
+
             except Exception as e:
                 print(f"\n❌ Error in iteration {i}: {e}")
                 continue
@@ -363,9 +375,11 @@ if __name__ == "__main__":
 
     # Calculate and print the time taken
     time_taken = end_time - start_time
-    print(f"\n⏱️  Session time: {time_taken / 60:.2f} minutes ({time_taken / 3600:.2f} hours)")
+    print(
+        f"\n⏱️  Session time: {time_taken / 60:.2f} minutes ({time_taken / 3600:.2f} hours)"
+    )
     print(f"✅ Completed {len(completed_iterations)} total iterations")
-    
+
     if shutdown_requested:
         print("\n⚠️  Script interrupted but progress saved. Run again to continue.")
         sys.exit(1)

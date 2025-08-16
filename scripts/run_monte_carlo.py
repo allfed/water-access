@@ -210,11 +210,11 @@ if __name__ == "__main__":
             # Save all results to Parquet files for interruption resilience
             output_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
             filtered_zone_result.to_parquet(output_file, index=False)
-            
+
             # Also save district and countries results progressively
             district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
             district_result.to_parquet(district_file, index=False)
-            
+
             countries_file = PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
             countries_result.to_parquet(countries_file, index=False)
 
