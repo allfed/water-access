@@ -80,10 +80,10 @@ if __name__ == "__main__":
     print("This is for testing GCP setup, not production runs")
     print("=" * 60)
     print()
-    
+
     # Create test results directory
     PARQUET_PATH.mkdir(parents=True, exist_ok=True)
-    
+
     # Monte Carlo parameters
     crr_adjustments = np.random.randint(
         CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
@@ -208,13 +208,13 @@ if __name__ == "__main__":
             # Save all results to Parquet files (testing progressive save)
             output_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
             filtered_zone_result.to_parquet(output_file, index=False)
-            
+
             district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
             district_result.to_parquet(district_file, index=False)
-            
+
             countries_file = PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
             countries_result.to_parquet(countries_file, index=False)
-            
+
             print(f"✅ Saved test results for iteration {i}")
 
             futures_progress.update()
@@ -236,10 +236,10 @@ if __name__ == "__main__":
     print(f"Time taken: {time_taken / 60:.2f} minutes")
     print(f"Results saved in: {PARQUET_PATH}")
     print(f"{'='*60}")
-    
+
     # List saved files
     print("\nSaved test files:")
     for f in PARQUET_PATH.glob("*.parquet"):
         print(f"  - {f.name}")
-    
+
     print("\n✅ Test simulation successful! GCP setup is working correctly.")
