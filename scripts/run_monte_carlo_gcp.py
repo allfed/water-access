@@ -29,8 +29,8 @@ CHECKPOINT_FILE = PARQUET_PATH / "checkpoint.json"
 NUM_ITERATIONS = 1000
 
 # Define maximum simultaneous processes to run for multiprocessing
-# 15 was the most that could run on a 32 core hyperthreaded machine
-MAX_WORKERS = 15
+# 30 for n2-highcpu-64 (64 vCPUs); reduce if the VM runs out of memory
+MAX_WORKERS = 30
 
 # -------------------------------------------------------------------------------
 

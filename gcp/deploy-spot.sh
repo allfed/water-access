@@ -6,11 +6,11 @@
 set -e
 
 # Configuration
-PROJECT_ID="water-access-compute"
+PROJECT_ID="water-access-james-2026"
 ZONE="us-central1-a"
 INSTANCE_NAME="water-access-compute-spot"
-MACHINE_TYPE="e2-highcpu-16"  # Change to e2-highcpu-32 for faster completion
-BUCKET_NAME="water-access-data"
+MACHINE_TYPE="n2-highcpu-64"  # 64 vCPUs, ~1 day for 1000 iterations on Spot
+BUCKET_NAME="water-access-james-data"
 MAX_RUN_DURATION="24h"
 BOOT_DISK_SIZE="100GB"
 
@@ -135,11 +135,11 @@ cd $HOME/water-access
 
 # Download code from GCS
 echo "Downloading code from GCS..." | tee -a /startup.log
-gsutil -m cp -r gs://water-access-data/code/* .
+gsutil -m cp -r gs://__BUCKET_NAME__/code/* .
 
 # Download data from GCS
 echo "Downloading data from GCS..." | tee -a /startup.log
-gsutil -m cp -r gs://water-access-data/input/data .
+gsutil -m cp -r gs://__BUCKET_NAME__/input/data .
 
 # Setup Python environment
 echo "Setting up Python environment..." | tee -a /startup.log
@@ -152,15 +152,15 @@ mkdir -p results/parquet_files
 
 # Check for existing checkpoint and results
 echo "Checking for existing checkpoints..." | tee -a /startup.log
-gsutil -m cp -r gs://water-access-data/checkpoints/* results/parquet_files/ 2>/dev/null || true
-gsutil -m cp -r gs://water-access-data/results/parquet_files/*.parquet results/parquet_files/ 2>/dev/null || true
+gsutil -m cp -r gs://__BUCKET_NAME__/checkpoints/* results/parquet_files/ 2>/dev/null || true
+gsutil -m cp -r gs://__BUCKET_NAME__/results/parquet_files/*.parquet results/parquet_files/ 2>/dev/null || true
 
 # Count existing results
 EXISTING_COUNT=$(ls results/parquet_files/*_simulation_result_*.parquet 2>/dev/null | wc -l)
 echo "Found $EXISTING_COUNT existing simulation results" | tee -a /startup.log
 
 # Setup automatic result sync every 30 minutes
-(crontab -l 2>/dev/null || true; echo "*/30 * * * * cd $HOME/water-access && gsutil -m -q rsync -r results/ gs://water-access-data/results/") | crontab -
+(crontab -l 2>/dev/null || true; echo "*/30 * * * * cd $HOME/water-access && gsutil -m -q rsync -r results/ gs://__BUCKET_NAME__/results/") | crontab -
 
 # Run simulation
 echo "Starting Monte Carlo simulation at $(date)" | tee -a /startup.log
@@ -170,6 +170,9 @@ nohup python scripts/run_monte_carlo_gcp.py > simulation.log 2>&1 &
 echo "Simulation started. PID: $(pgrep -f run_monte_carlo_gcp.py)" | tee -a /startup.log
 echo "Setup completed at $(date)" | tee -a /startup.log
 EOF
+
+    sed "s/__BUCKET_NAME__/${BUCKET_NAME}/g" /tmp/startup-script.sh > /tmp/startup-script.sh.tmp
+    mv /tmp/startup-script.sh.tmp /tmp/startup-script.sh
     
     print_status "Startup script created"
 }
@@ -211,7 +214,7 @@ create_instance() {
     
     print_status "Instance created successfully"
     print_status "Machine type: $MACHINE_TYPE"
-    print_status "Spot pricing: ~\$0.12/hour (70-90% cheaper than on-demand)"
+    print_status "Spot pricing: ~\$0.72/hour (70-90% cheaper than on-demand; ~\$18-25 total)"
     
     # Clean up
     rm /tmp/startup-script.sh

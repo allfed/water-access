@@ -6,10 +6,10 @@
 set -e
 
 # Configuration
-PROJECT_ID="water-access-compute"
+PROJECT_ID="water-access-james-2026"
 ZONE="us-central1-a"
 INSTANCE_NAME="water-access-compute-spot"
-BUCKET_NAME="water-access-data"
+BUCKET_NAME="water-access-james-data"
 TOTAL_ITERATIONS=1000
 
 # Colors for output
@@ -85,7 +85,7 @@ get_instance_details() {
             echo -e "${BLUE}● Uptime:${NC} ${UPTIME_HOURS}h ${UPTIME_MINUTES}m"
             
             # Estimate cost
-            HOURLY_RATE=0.12  # Approximate for e2-highcpu-16 spot
+            HOURLY_RATE=0.72  # Approximate for n2-highcpu-64 spot
             COST=$(echo "scale=2; $UPTIME_HOURS * $HOURLY_RATE" | bc)
             echo -e "${BLUE}● Estimated Cost:${NC} \$${COST} (at ~\$${HOURLY_RATE}/hour spot pricing)"
         fi

@@ -6,11 +6,11 @@
 set -e
 
 # Configuration
-PROJECT_ID="water-access-compute"
+PROJECT_ID="water-access-james-2026"
 ZONE="us-central1-a"
 INSTANCE_NAME="water-access-test"
 MACHINE_TYPE="e2-micro"  # Smallest instance for testing
-BUCKET_NAME="water-access-data"
+BUCKET_NAME="water-access-james-data"
 MAX_RUN_DURATION="1h"  # Auto-terminate after 1 hour for safety
 BOOT_DISK_SIZE="20GB"  # Smaller disk for test
 
