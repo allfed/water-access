@@ -9,9 +9,9 @@ set -e
 PROJECT_ID="water-access-james-2026"
 ZONE="us-central1-a"
 INSTANCE_NAME="water-access-compute-spot"
-MACHINE_TYPE="n2-highcpu-64"  # 64 vCPUs, ~1 day for 1000 iterations on Spot
+MACHINE_TYPE="e2-highcpu-32"
 BUCKET_NAME="water-access-james-data"
-MAX_RUN_DURATION="24h"
+MAX_RUN_DURATION="96h" # 4 days
 BOOT_DISK_SIZE="100GB"
 
 # Colors for output
