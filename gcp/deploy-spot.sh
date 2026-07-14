@@ -69,11 +69,7 @@ create_bucket() {
         gsutil mb -p $PROJECT_ID -c STANDARD -l us-central1 gs://$BUCKET_NAME
     fi
     
-    # Create directories
-    gsutil -m mkdir -p gs://$BUCKET_NAME/input/
-    gsutil -m mkdir -p gs://$BUCKET_NAME/results/
-    gsutil -m mkdir -p gs://$BUCKET_NAME/checkpoints/
-    gsutil -m mkdir -p gs://$BUCKET_NAME/code/
+    # GCS has no real folders; paths are created automatically on upload.
     
     print_status "Storage bucket ready"
 }
