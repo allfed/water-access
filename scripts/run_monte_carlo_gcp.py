@@ -12,6 +12,7 @@ import os
 project_root = Path().resolve().parent
 sys.path.append(str(project_root))
 import src.gis_monte_carlo as mc  # noqa
+import src.monte_carlo_config as cfg  # noqa
 
 
 # Results path
@@ -34,62 +35,14 @@ MAX_WORKERS = 15
 
 # -------------------------------------------------------------------------------
 
-
-# -------------------------------------------------------------------------------
-# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
-# -------------------------------------------------------------------------------
-
-# CRR adjustments.
-# 1 means one road type better, -1 means one road type worse
-CRR_LOWER_ESTIMATE = -1
-CRR_UPPER_ESTIMATE = 1
-
-# Time gathering water in hours
-TIME_GATHERING_LOWER_ESTIMATE = 4
-TIME_GATHERING_UPPER_ESTIMATE = 7
-
-# Practical load limits for cycling in kg
-PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
-PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
-
-# Practical load limits for walking with buckets in kg
-PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
-PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
-
-# Average METS available for walking with buckets to and from water source
-METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 6
-
-# Average watts available for cycling to and from water source
-WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 80
-
-# Polarity options (randomly chosen from list each simulation run)
-# The first word defines the trip to the water source
-# The second word defines the trip from the water source
-# Options to include: "uphill_downhill", "downhill_uphill", "uphill_flat",
-# "flat_uphill", "downhill_flat", "flat_downhill", "flat_flat"
-
-POLARITY_OPTIONS = [
-    "uphill_downhill",
-    "uphill_flat",
-    "flat_uphill",
-    "downhill_uphill",
-]
-
-# Adjustments for euclidean distance to account for paths taken to water
-# not being straight lines
-URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
-URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-
-# Set the parameters for the GPD distribution for rural adjustments.
-# Shape, scale, and loc
-# These values were obtained from the scripts/create_pareto_distribution.py
-RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
-RURAL_PDR_PARETO_SCALE = 0.19953125000000005
-RURAL_PDR_PARETO_LOC = 1.0
-
-# -------------------------------------------------------------------------------
+# Walking/cycling sensitivity parameters are defined once in
+# src/monte_carlo_config.py and shared across all three run scripts so they can
+# never drift apart. See that module for the PROVISIONAL parameter values.
+#
+# ⚠️  If you change any parameter value/distribution in monte_carlo_config.py,
+# you MUST delete the existing checkpoint.json (below) before the next run --
+# it serialises the sampled parameter arrays and would otherwise override the
+# new parameters on resume.
 
 # Global flag for graceful shutdown
 shutdown_requested = False
@@ -213,39 +166,41 @@ if __name__ == "__main__":
     else:
         # Generate new parameters
         crr_adjustments = np.random.randint(
-            CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
+            cfg.CRR_LOWER_ESTIMATE, cfg.CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
         )
-        time_gatherings = mc.sample_normal(
-            TIME_GATHERING_LOWER_ESTIMATE,
-            TIME_GATHERING_UPPER_ESTIMATE,
+        # Time gathering water is sampled LOGNORMAL (not normal) -- see config.
+        time_gatherings = mc.sample_lognormal(
+            cfg.TIME_GATHERING_LOWER_ESTIMATE,
+            cfg.TIME_GATHERING_UPPER_ESTIMATE,
             NUM_ITERATIONS,
         )
         practical_limits_bicycle = mc.sample_normal(
-            PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
+            cfg.PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
+            cfg.PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
             NUM_ITERATIONS,
         )
         practical_limits_buckets = mc.sample_normal(
-            PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
+            cfg.PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
+            cfg.PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
             NUM_ITERATIONS,
         )
         mets = mc.sample_normal(
-            METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS
+            cfg.METS_LOWER_ESTIMATE, cfg.METS_UPPER_ESTIMATE, NUM_ITERATIONS
         )
-        watts_values = mc.sample_normal(
-            WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
-        )
-        hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
+        # Mechanical cycling watts are DERIVED from the sampled METs via the
+        # ACSM cycle-ergometry inversion (62 kg reference), not sampled
+        # independently. PROVISIONAL -- see config.derive_watts_from_mets.
+        watts_values = cfg.derive_watts_from_mets(mets)
+        hill_polarities = np.random.choice(cfg.POLARITY_OPTIONS, NUM_ITERATIONS)
         urban_adjustments = mc.sample_normal(
-            URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-            URBAN_ADJUSTMENT_UPPER_ESTIMATE,
+            cfg.URBAN_ADJUSTMENT_LOWER_ESTIMATE,
+            cfg.URBAN_ADJUSTMENT_UPPER_ESTIMATE,
             NUM_ITERATIONS,
         )
         rural_adjustments = mc.sample_gpd(
-            RURAL_PDR_PARETO_SHAPE,
-            RURAL_PDR_PARETO_SCALE,
-            RURAL_PDR_PARETO_LOC,
+            cfg.RURAL_PDR_PARETO_SHAPE,
+            cfg.RURAL_PDR_PARETO_SCALE,
+            cfg.RURAL_PDR_PARETO_LOC,
             NUM_ITERATIONS,
         )
 

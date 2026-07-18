@@ -15,6 +15,7 @@ import time
 project_root = Path().resolve().parent
 sys.path.append(str(project_root))
 import src.gis_monte_carlo as mc  # noqa
+import src.monte_carlo_config as cfg  # noqa
 
 
 # Results path
@@ -33,45 +34,8 @@ MAX_WORKERS = 2  # Only 2 for testing
 
 # -------------------------------------------------------------------------------
 
-
-# -------------------------------------------------------------------------------
-# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
-# -------------------------------------------------------------------------------
-
-# Using same parameters as production for realistic test
-CRR_LOWER_ESTIMATE = -1
-CRR_UPPER_ESTIMATE = 1
-
-TIME_GATHERING_LOWER_ESTIMATE = 4
-TIME_GATHERING_UPPER_ESTIMATE = 7
-
-PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
-PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
-
-PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
-PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
-
-METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 6
-
-WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 80
-
-POLARITY_OPTIONS = [
-    "uphill_downhill",
-    "uphill_flat",
-    "flat_uphill",
-    "downhill_uphill",
-]
-
-URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
-URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-
-RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
-RURAL_PDR_PARETO_SCALE = 0.19953125000000005
-RURAL_PDR_PARETO_LOC = 1.0
-
-# -------------------------------------------------------------------------------
+# Uses the same shared walking/cycling parameters as production, imported from
+# src/monte_carlo_config.py (only NUM_ITERATIONS / MAX_WORKERS differ here).
 
 
 if __name__ == "__main__":
@@ -86,39 +50,43 @@ if __name__ == "__main__":
 
     # Monte Carlo parameters
     crr_adjustments = np.random.randint(
-        CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
+        cfg.CRR_LOWER_ESTIMATE, cfg.CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
     )
-    time_gatherings = mc.sample_normal(
-        TIME_GATHERING_LOWER_ESTIMATE,
-        TIME_GATHERING_UPPER_ESTIMATE,
+    # Time gathering water is sampled LOGNORMAL (not normal) -- see config.
+    time_gatherings = mc.sample_lognormal(
+        cfg.TIME_GATHERING_LOWER_ESTIMATE,
+        cfg.TIME_GATHERING_UPPER_ESTIMATE,
         NUM_ITERATIONS,
     )
     practical_limits_bicycle = mc.sample_normal(
-        PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-        PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
+        cfg.PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
+        cfg.PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
         NUM_ITERATIONS,
     )
     practical_limits_buckets = mc.sample_normal(
-        PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-        PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
+        cfg.PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
+        cfg.PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
         NUM_ITERATIONS,
     )
-    mets = mc.sample_normal(METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS)
-    watts_values = mc.sample_normal(
-        WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
+    mets = mc.sample_normal(
+        cfg.METS_LOWER_ESTIMATE, cfg.METS_UPPER_ESTIMATE, NUM_ITERATIONS
     )
+    # Mechanical cycling watts are DERIVED from the sampled METs via the ACSM
+    # cycle-ergometry inversion (62 kg reference), not sampled independently.
+    # PROVISIONAL -- see config.derive_watts_from_mets.
+    watts_values = cfg.derive_watts_from_mets(mets)
 
-    hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
+    hill_polarities = np.random.choice(cfg.POLARITY_OPTIONS, NUM_ITERATIONS)
 
     urban_adjustments = mc.sample_normal(
-        URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-        URBAN_ADJUSTMENT_UPPER_ESTIMATE,
+        cfg.URBAN_ADJUSTMENT_LOWER_ESTIMATE,
+        cfg.URBAN_ADJUSTMENT_UPPER_ESTIMATE,
         NUM_ITERATIONS,
     )
     rural_adjustments = mc.sample_gpd(
-        RURAL_PDR_PARETO_SHAPE,
-        RURAL_PDR_PARETO_SCALE,
-        RURAL_PDR_PARETO_LOC,
+        cfg.RURAL_PDR_PARETO_SHAPE,
+        cfg.RURAL_PDR_PARETO_SCALE,
+        cfg.RURAL_PDR_PARETO_LOC,
         NUM_ITERATIONS,
     )
 

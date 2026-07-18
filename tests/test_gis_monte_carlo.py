@@ -4,6 +4,7 @@ from src.gis_monte_carlo import sample_lognormal
 from src.gis_monte_carlo import run_simulation
 from src.gis_monte_carlo import process_mc_results
 import src.gis_monte_carlo
+from src.monte_carlo_config import derive_watts_from_mets
 
 import numpy as np
 import pandas as pd
@@ -56,6 +57,50 @@ class TestSampleLognormal:
         n = 5
         with pytest.raises(AssertionError):
             sample_lognormal(low, high, n)
+
+
+class TestSamplerMedians:
+    """Sanity checks so a parameter/sampler swap does not silently misbehave.
+
+    See REVIEW_AND_IMPLEMENTATION_PLAN.md §1.9. sample_lognormal / sample_normal
+    treat [low, high] as a 90% CI, so the median is the geometric mean
+    (lognormal) or arithmetic mean (normal) of the bounds.
+    """
+
+    def test_lognormal_median_time_gathering(self):
+        # Time gathering: lognormal(2, 5) -> median ~= sqrt(2 * 5) = 3.162
+        np.random.seed(42)
+        samples = sample_lognormal(2, 5, 200000)
+        expected_median = np.sqrt(2 * 5)  # ~3.162
+        assert np.isclose(np.median(samples), expected_median, atol=0.05)
+
+    def test_normal_median_mets(self):
+        # METs: normal(3, 5) -> median ~= mean of bounds = 4
+        np.random.seed(42)
+        samples = sample_normal(3, 5, 200000)
+        assert np.isclose(np.median(samples), 4.0, atol=0.02)
+
+
+class TestDeriveWattsFromMets:
+    """Guards the ACSM watts-from-METs derivation (§1.7 Option A)."""
+
+    def test_scalar_check_values(self):
+        # Check values at 62 kg reference: MET 3->~20 W, 4->~39 W, 5->~59 W.
+        assert np.isclose(derive_watts_from_mets(3.0), 19.63, atol=0.5)
+        assert np.isclose(derive_watts_from_mets(4.0), 39.35, atol=0.5)
+        assert np.isclose(derive_watts_from_mets(5.0), 59.08, atol=0.5)
+
+    def test_low_met_is_floored(self):
+        # MET 2 is below the ~2-MET unloaded cost, so watts floor at 5 W.
+        assert derive_watts_from_mets(2.0) == 5.0
+
+    def test_array_input_and_floor(self):
+        mets = np.array([2.0, 3.0, 4.0, 5.0])
+        watts = derive_watts_from_mets(mets)
+        assert isinstance(watts, np.ndarray)
+        assert np.all(watts >= 5.0)
+        # Monotonic non-decreasing in METs.
+        assert np.all(np.diff(watts) >= 0)
 
 
 class TestRunSimulation:
