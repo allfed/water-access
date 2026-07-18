@@ -162,6 +162,9 @@ if __name__ == "__main__":
         hill_polarities = np.array(params["hill_polarities"])
         urban_adjustments = np.array(params["urban_adjustments"])
         rural_adjustments = np.array(params["rural_adjustments"])
+        # Keep `parameters` bound so the periodic/final save_checkpoint calls
+        # below work on a resumed run (previously undefined -> NameError).
+        parameters = params
         print("📂 Parameters restored from checkpoint")
     else:
         # Generate new parameters

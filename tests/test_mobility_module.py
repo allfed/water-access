@@ -200,8 +200,12 @@ class TestLankfordSolution:
         for prev, curr in zip(loaded_velocities, loaded_velocities[1:]):
             assert curr <= prev + 1e-9
 
-        # Sanity: the fix actually makes speed slope-sensitive (not near-flat).
-        assert loaded_velocities[-1] < loaded_velocities[0]
+        # Pin the units/sign fix by MAGNITUDE, not just direction: with the
+        # correct percentage-grade units, loaded speed at 20 deg falls to well
+        # under half the flat value (measured ~0.20 vs ~1.12 m/s). The old
+        # slope-blind code (degrees/45) produced only a ~4% drop, which a mere
+        # "20deg < flat" check would still pass -- so require a real collapse.
+        assert loaded_velocities[-1] < 0.5 * loaded_velocities[0]
 
     def test_velocities_non_negative_across_met_sweep(self):
         """Guards the velocity floor (1.5): across a MET sweep including a low
