@@ -216,9 +216,11 @@ Line numbers refer to the markdown file (see header). All are low-effort unless 
 
 ---
 
-## 2.2 🔴 Eq 5 (Lankford) cubic-term sign — likely `+` should be `−`
+## 2.2 🔴 Eq 5 (Lankford) cubic-term sign — `+` must become `−` (CONFIRMED via PDF)
 
-**Lines 119–120.** Manuscript writes `+0.000320vsp3`. The authors' fitted model gives this coefficient as **negative**. Change to `−0.000320·v·sp³` **iff** confirmed against the Lankford 2020 full text (see §1.2). Keep code and manuscript in sync. (All other Eq 5 coefficients verified correct: intercept 5.43483, +6.47383·v, −0.05372·sp, +0.652298·v·sp, +0.023761·v·sp².)
+**Lines 119–120.** Manuscript writes `+0.000320vsp3`. **Confirmed against the Lankford 2020 PDF:** Table 4 (the fitted coefficient table, p. 2102) lists this term as **−0.0001431 with the entire 95% CI below zero**, so the true sign is unambiguously **negative**. The published paper prints its mph-form equation with a `+` sign typo, which the manuscript inherited. Change to `−0.000320·v·sp³`. The code (src/mobility_module.py, §1.2) is already correct (negative) on the branch. All other Eq 5 coefficients verified correct AND are the genuine **m/s-form** coefficients (intercept 5.43483, +6.47383·v, −0.05372·sp, +0.652298·v·sp, +0.023761·v·sp²) — the "v is velocity (m.s⁻¹)" label at line ~117 is correct.
+
+**Resolved non-issue (do not re-raise):** a concern that the code used mph coefficients while treating the solved speed as m/s was investigated and dismissed. By unit invariance the code's larger coefficients ARE the m/s form (mph coeffs would be smaller: ×0.44704); solved speeds (~4.8–5.7 km/h flat) and cached velocities are realistic only as m/s. The walking velocity is correctly in m/s throughout — no change needed.
 
 ---
 
