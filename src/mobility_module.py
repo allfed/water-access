@@ -225,14 +225,14 @@ class mobility_models:
         max_load_HPV = min(hpv.load_capacity.flatten()[0], load_attempted)
 
         # Calculate unloaded velocity
-        data_unloaded = (mv.m1, met, s)
+        data_unloaded = (mv.m1, met, s * mo.ulhillpo)
         V_guess = 1  # Initial guess for velocity
         V_un = fsolve(model, V_guess, args=data_unloaded, full_output=True)
         unloaded_velocity = V_un[0][0] if V_un[2] == 1 else np.nan
 
         # Calculate loaded velocity
         total_load = mv.m1 + max_load_HPV
-        data_loaded = (total_load, met, s)
+        data_loaded = (total_load, met, s * mo.lhillpo)
         V_load = fsolve(model, V_guess, args=data_loaded, full_output=True)
         loaded_velocity = V_load[0][0] if V_load[2] == 1 else np.nan
 
@@ -597,14 +597,18 @@ class mobility_models:
         """
         m_load, met, s = data
         v_solve = p[0]
-        G = (s * 360 / (2 * np.pi)) / 45
+        # s is slope in radians. Lankford (2020) expects the slope as a true
+        # percentage grade (rise/run * 100), validated over -18% to +40%.
+        # Clip to that envelope so the polynomial does not misbehave in the
+        # steep tail (and to handle downhill/negative grades from polarity).
+        G = np.clip(np.tan(s) * 100, -18, 40)
         return (
             5.43483
             + (6.47383 * v_solve)
             + (-0.05372 * G)
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
-            + (0.000320 * v_solve * G**3)  # this was previously 0.00320 - bug?
+            - (0.000320 * v_solve * G**3)  # this was previously 0.00320 - bug?
             - (met.budget_VO2 / m_load)
         )
         # add in rolling resistance stuff...

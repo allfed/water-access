@@ -244,7 +244,7 @@ def merge_and_adjust_population(df_zones_input, df_input):
     # convert population density to percent of national population on a per country basis, grouped by ISO_CC
     # Prevent division by zero when country population sum is zero
     df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["pop_density"].apply(
-        lambda x: x / x.sum() if x.sum() > 0 else 0
+        lambda x: x / x.sum() if x.sum() > 0 else x * 0
     )
     # multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
@@ -577,8 +577,8 @@ def process_and_save_results(
     # Unpack results
     loaded_velocity_vec, unloaded_velocity_vec, max_load_vec = results.T
 
-    # Average velocity between loaded and unloaded
-    average_velocity = (loaded_velocity_vec + unloaded_velocity_vec) / 2
+    # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
+    average_velocity = 2 / (1 / loaded_velocity_vec + 1 / unloaded_velocity_vec)
 
     # Customizing column names based on the type of velocity
     loaded_velocity_col = f"loaded_velocity_{velocity_type}"
@@ -1576,18 +1576,18 @@ if __name__ == "__main__":
 
     df_countries, df_districts, zones_results = run_global_analysis(
         crr_adjustment=0,
-        time_gathering_water=5.5,
+        time_gathering_water=2.84,
         practical_limit_bicycle=40,
         practical_limit_buckets=20,
-        met=4.5,
-        watts=75,
+        met=4,
+        watts=40,
         hill_polarity="downhill_uphill",
         urban_adjustment=1.3,
         rural_adjustment=1.4,
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
-        use_sample_data=True,
+        use_sample_data=False,
     )
 
     df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)
