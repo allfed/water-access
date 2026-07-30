@@ -272,8 +272,8 @@ class RefactoredSensitivityAnalyzer:
                 )
                 max_load = float(max_load) if not np.isnan(max_load) else np.nan
 
-                # Calculate average velocity (like global model)
-                avg_velocity = (loaded_velocity + unloaded_velocity) / 2
+                # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
+                avg_velocity = 2 / (1 / loaded_velocity + 1 / unloaded_velocity)
 
                 results.append(
                     {

@@ -1,4 +1,4 @@
-import concurrent.futures
+import multiprocessing
 import numpy as np
 from pathlib import Path
 import sys
@@ -29,8 +29,15 @@ CHECKPOINT_FILE = PARQUET_PATH / "checkpoint.json"
 NUM_ITERATIONS = 1000
 
 # Define maximum simultaneous processes to run for multiprocessing
-# 30 for n2-highcpu-64 (64 vCPUs); reduce if the VM runs out of memory
-MAX_WORKERS = 30
+# Each worker peaks at roughly 3 GB, so this is limited by RAM as well as
+# vCPUs: 24 for n2-standard-32 (32 vCPUs / 128 GB), 4 for n2-standard-8
+# (8 vCPUs / 32 GB). Reduce if the VM runs out of memory.
+MAX_WORKERS = 24
+
+# Give up on a single iteration if no result arrives within this many seconds
+# (protects the run from hanging if a worker process is killed, e.g. by the
+# kernel OOM killer). A normal iteration takes ~15-30 minutes.
+ITERATION_TIMEOUT = 2 * 60 * 60
 
 # -------------------------------------------------------------------------------
 
@@ -45,8 +52,8 @@ CRR_LOWER_ESTIMATE = -1
 CRR_UPPER_ESTIMATE = 1
 
 # Time gathering water in hours
-TIME_GATHERING_LOWER_ESTIMATE = 4
-TIME_GATHERING_UPPER_ESTIMATE = 7
+TIME_GATHERING_LOWER_ESTIMATE = 2
+TIME_GATHERING_UPPER_ESTIMATE = 4
 
 # Practical load limits for cycling in kg
 PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
@@ -58,11 +65,11 @@ PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
 
 # Average METS available for walking with buckets to and from water source
 METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 6
+METS_UPPER_ESTIMATE = 5
 
 # Average watts available for cycling to and from water source
 WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 80
+WATTS_UPPER_ESTIMATE = 60
 
 # Polarity options (randomly chosen from list each simulation run)
 # The first word defines the trip to the water source
@@ -167,11 +174,64 @@ def process_saved_results():
             countries_simulation_results.append(pd.read_parquet(countries_file))
 
     if districts_simulation_results and countries_simulation_results:
-        mc.process_mc_results(countries_simulation_results)
+        # plot=False: plotting calls fig.show(), which needs a browser and
+        # crashes on the headless VM before the CSVs get written
+        mc.process_mc_results(countries_simulation_results, plot=False)
         mc.process_districts_results(districts_simulation_results)
         print(f"✅ Processed {len(completed)} simulation results")
     else:
         print("⚠️  No results to process yet")
+
+
+def run_and_save_simulation(
+    i,
+    crr_adjustment,
+    time_gathering_water,
+    practical_limit_bicycle,
+    practical_limit_buckets,
+    met,
+    watts,
+    hill_polarity,
+    urban_adjustment,
+    rural_adjustment,
+):
+    """Run one simulation in a worker process and write its results to disk.
+
+    The full zone result is ~2.2M rows (roughly 1 GB in memory). Writing it
+    here and returning only the iteration index keeps that DataFrame out of
+    the parent process. Previously each result was pickled back to the parent
+    and retained by its future object, growing the parent by ~1 GB per
+    completed iteration until the OOM killer terminated it mid-run.
+    """
+    countries_result, district_result, zone_result = mc.run_simulation(
+        crr_adjustment,
+        time_gathering_water,
+        practical_limit_bicycle,
+        practical_limit_buckets,
+        met,
+        watts,
+        hill_polarity,
+        urban_adjustment,
+        rural_adjustment,
+        use_sample_data=False,
+    )
+
+    # Keep only the columns needed for the zone results
+    filtered_zone_result = zone_result[
+        ["fid", "zone_pop_with_water", "zone_pop_without_water"]
+    ]
+
+    district_result.to_parquet(
+        PARQUET_PATH / f"district_simulation_result_{i}.parquet", index=False
+    )
+    countries_result.to_parquet(
+        PARQUET_PATH / f"countries_simulation_result_{i}.parquet", index=False
+    )
+    filtered_zone_result.to_parquet(
+        PARQUET_PATH / f"zone_simulation_result_{i}.parquet", index=False
+    )
+
+    return i
 
 
 if __name__ == "__main__":
@@ -215,7 +275,7 @@ if __name__ == "__main__":
         crr_adjustments = np.random.randint(
             CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
         )
-        time_gatherings = mc.sample_normal(
+        time_gatherings = mc.sample_lognormal(
             TIME_GATHERING_LOWER_ESTIMATE,
             TIME_GATHERING_UPPER_ESTIMATE,
             NUM_ITERATIONS,
@@ -273,10 +333,6 @@ if __name__ == "__main__":
         process_saved_results()
         sys.exit(0)
 
-    # Initialize lists to store results from each output
-    districts_simulation_results = []
-    countries_simulation_results = []
-
     # Record the start time
     start_time = time.time()
     print(f"\n🚀 Starting Monte Carlo simulations...")
@@ -287,15 +343,19 @@ if __name__ == "__main__":
     print(f"🕐 Start time: {time.strftime('%H:%M:%S', time.localtime())}")
     print("\n")
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        # Submit only the remaining simulations
-        futures = {}
-        for idx in iterations_to_run:
-            if shutdown_requested:
-                break
+    # Workers write their own results to disk and return only the iteration
+    # index, so no large DataFrames are transferred to (or retained by) the
+    # parent process. maxtasksperchild=1 replaces each worker after a single
+    # iteration, so memory that pandas/numpy don't return to the OS can't
+    # accumulate across iterations inside long-lived workers.
+    pool = multiprocessing.Pool(processes=MAX_WORKERS, maxtasksperchild=1)
 
-            future = executor.submit(
-                mc.run_simulation,
+    pending = []
+    for idx in iterations_to_run:
+        async_result = pool.apply_async(
+            run_and_save_simulation,
+            (
+                idx,
                 crr_adjustments[idx],
                 time_gatherings[idx],
                 practical_limits_bicycle[idx],
@@ -305,63 +365,47 @@ if __name__ == "__main__":
                 hill_polarities[idx],
                 urban_adjustments[idx],
                 rural_adjustments[idx],
-                use_sample_data=False,
-            )
-            futures[future] = idx
-
-        # Initialize tqdm progress bar
-        futures_progress = tqdm(
-            total=len(iterations_to_run),
-            initial=0,
-            desc="Simulating",
+            ),
         )
+        pending.append((idx, async_result))
+    pool.close()
 
-        for future in concurrent.futures.as_completed(futures):
-            if shutdown_requested:
-                print("\n⚠️  Shutting down gracefully...")
-                executor.shutdown(wait=False)
-                break
+    # Initialize tqdm progress bar
+    futures_progress = tqdm(
+        total=len(iterations_to_run),
+        initial=0,
+        desc="Simulating",
+    )
 
-            i = futures[future]
+    for idx, async_result in pending:
+        if shutdown_requested:
+            print("\n⚠️  Shutting down gracefully...")
+            pool.terminate()
+            break
 
-            try:
-                countries_result, district_result, zone_result = future.result()
+        try:
+            completed_index = async_result.get(timeout=ITERATION_TIMEOUT)
 
-                # Keep results in memory for final processing
-                districts_simulation_results.append(district_result)
-                countries_simulation_results.append(countries_result)
+            # Update completed iterations
+            completed_iterations.append(completed_index)
 
-                # Filter zone results
-                filtered_zone_result = zone_result[
-                    ["fid", "zone_pop_with_water", "zone_pop_without_water"]
-                ]
+            # Save checkpoint periodically (every 10 iterations)
+            if len(completed_iterations) % 10 == 0:
+                save_checkpoint(completed_iterations, parameters)
 
-                # Save all results to Parquet files
-                output_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
-                filtered_zone_result.to_parquet(output_file, index=False)
+            futures_progress.update()
 
-                district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
-                district_result.to_parquet(district_file, index=False)
-
-                countries_file = (
-                    PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
-                )
-                countries_result.to_parquet(countries_file, index=False)
-
-                # Update completed iterations
-                completed_iterations.append(i)
-
-                # Save checkpoint periodically (every 10 iterations)
-                if len(completed_iterations) % 10 == 0:
-                    save_checkpoint(completed_iterations, parameters)
-
-                futures_progress.update()
-
-            except Exception as e:
-                print(f"\n❌ Error in iteration {i}: {e}")
-                continue
+        except multiprocessing.TimeoutError:
+            print(
+                f"\n❌ Iteration {idx}: no result within {ITERATION_TIMEOUT}s "
+                "(worker process may have been killed); continuing"
+            )
+        except Exception as e:
+            print(f"\n❌ Error in iteration {idx}: {e}")
 
     futures_progress.close()
+    pool.terminate()
+    pool.join()
 
     # Save final checkpoint
     if not shutdown_requested:

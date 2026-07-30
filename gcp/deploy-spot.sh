@@ -7,9 +7,9 @@ set -e
 
 # Configuration
 PROJECT_ID="water-access-james-2026"
-ZONE="us-central1-a"
+ZONE="us-east1-b"
 INSTANCE_NAME="water-access-compute-spot"
-MACHINE_TYPE="e2-highcpu-32"
+MACHINE_TYPE="n2-standard-32"
 BUCKET_NAME="water-access-james-data"
 MAX_RUN_DURATION="96h" # 4 days
 BOOT_DISK_SIZE="100GB"
@@ -106,65 +106,73 @@ create_startup_script() {
 #!/bin/bash
 set -e
 
-# Log startup
-echo "Starting water-access simulation setup at $(date)" | tee /startup.log
+INSTALL_ROOT="/root"
+CONDA_DIR="/root/miniforge3"
+WORK_DIR="/root/water-access"
+LOG_FILE="/startup.log"
+
+log() {
+    echo "$1" | tee -a "$LOG_FILE"
+}
+
+log "Starting water-access simulation setup at $(date)"
 
 # Install system dependencies
+export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y wget bzip2 git build-essential
 
-# Install Miniconda
-if [ ! -d "$HOME/miniconda3" ]; then
-    wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-    bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda3
+# Install Miniforge (conda-forge only; avoids Anaconda ToS prompts on headless VMs)
+if [ ! -d "$CONDA_DIR" ]; then
+    log "Installing Miniforge to $CONDA_DIR..."
+    wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/miniforge.sh
+    bash /tmp/miniforge.sh -b -p "$CONDA_DIR"
+    rm -f /tmp/miniforge.sh
 fi
 
-export PATH="$HOME/miniconda3/bin:$PATH"
-source $HOME/miniconda3/bin/activate
-
-# Install mamba for faster conda operations
-conda install -n base -c conda-forge mamba -y
+export PATH="$CONDA_DIR/bin:$PATH"
+source "$CONDA_DIR/etc/profile.d/conda.sh"
 
 # Create work directory
-mkdir -p $HOME/water-access
-cd $HOME/water-access
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
 
 # Download code from GCS
-echo "Downloading code from GCS..." | tee -a /startup.log
+log "Downloading code from GCS..."
 gsutil -m cp -r gs://__BUCKET_NAME__/code/* .
 
 # Download data from GCS
-echo "Downloading data from GCS..." | tee -a /startup.log
+log "Downloading data from GCS..."
 gsutil -m cp -r gs://__BUCKET_NAME__/input/data .
 
 # Setup Python environment
-echo "Setting up Python environment..." | tee -a /startup.log
+log "Setting up Python environment (this can take 30-60 minutes)..."
 mamba env create -f environment.yml -y || mamba env update -f environment.yml
-source activate water-access
+conda activate water-access
 pip install -e .
 
 # Create results directory
 mkdir -p results/parquet_files
 
 # Check for existing checkpoint and results
-echo "Checking for existing checkpoints..." | tee -a /startup.log
+log "Checking for existing checkpoints..."
 gsutil -m cp -r gs://__BUCKET_NAME__/checkpoints/* results/parquet_files/ 2>/dev/null || true
 gsutil -m cp -r gs://__BUCKET_NAME__/results/parquet_files/*.parquet results/parquet_files/ 2>/dev/null || true
 
 # Count existing results
 EXISTING_COUNT=$(ls results/parquet_files/*_simulation_result_*.parquet 2>/dev/null | wc -l)
-echo "Found $EXISTING_COUNT existing simulation results" | tee -a /startup.log
+log "Found $EXISTING_COUNT existing simulation results"
 
 # Setup automatic result sync every 30 minutes
-(crontab -l 2>/dev/null || true; echo "*/30 * * * * cd $HOME/water-access && gsutil -m -q rsync -r results/ gs://__BUCKET_NAME__/results/") | crontab -
+(crontab -l 2>/dev/null || true; echo "*/30 * * * * cd $WORK_DIR && gsutil -m -q rsync -r results/ gs://__BUCKET_NAME__/results/") | crontab -
 
 # Run simulation
-echo "Starting Monte Carlo simulation at $(date)" | tee -a /startup.log
-cd $HOME/water-access
-nohup python scripts/run_monte_carlo_gcp.py > simulation.log 2>&1 &
+log "Starting Monte Carlo simulation at $(date)"
+cd "$WORK_DIR"
+nohup python scripts/run_monte_carlo_gcp.py > /root/simulation.log 2>&1 &
 
-echo "Simulation started. PID: $(pgrep -f run_monte_carlo_gcp.py)" | tee -a /startup.log
-echo "Setup completed at $(date)" | tee -a /startup.log
+log "Simulation started. PID: $(pgrep -f run_monte_carlo_gcp.py)"
+log "Setup completed at $(date)"
 EOF
 
     sed "s/__BUCKET_NAME__/${BUCKET_NAME}/g" /tmp/startup-script.sh > /tmp/startup-script.sh.tmp

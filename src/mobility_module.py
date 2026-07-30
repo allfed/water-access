@@ -543,8 +543,7 @@ class mobility_models:
                         )
                         # V_guess = 12
                     else:
-                        data = (total_load, met, s[0])
-                        # V_guess = 1
+                        data = (total_load, met, s[0] * mo.lhillpo)
 
                     V_r = fsolve(model, V_guess, args=data, full_output=True)
                     if V_r[2] == 1:
@@ -904,14 +903,10 @@ class model_results:
 
         self.model_name = mo.model_name
 
-        # Calculate average speed
-        # ### CAUTION! this currently uses a hardcoded 'average speed' which is
-        # from lit serach, not form the model
-        # # Thismight be appropriate, as the model currentl assumes downhill to
-        # the water, uphill away, so it is conservative.
-        # # average velocity for a round trip
-        self.v_avg_matrix3d = (self.v_load_matrix3d + hpv.v_no_load) / 2
-        self.v_avg_matrix3d = (self.v_load_matrix3d + self.v_unload_matrix3d) / 2
+        # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
+        self.v_avg_matrix3d = 2 / (
+            1 / self.v_load_matrix3d + 1 / self.v_unload_matrix3d
+        )
 
         self.velocitykgs = self.v_avg_matrix3d * self.load_matrix3d
 

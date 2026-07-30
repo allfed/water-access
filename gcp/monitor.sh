@@ -11,6 +11,24 @@ ZONE="us-central1-a"
 INSTANCE_NAME="water-access-compute-spot"
 BUCKET_NAME="water-access-james-data"
 TOTAL_ITERATIONS=1000
+INSTANCE_STATE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.instance-zone"
+
+resolve_instance_zone() {
+    if [[ -f "$INSTANCE_STATE_FILE" ]]; then
+        ZONE="$(cat "$INSTANCE_STATE_FILE")"
+        return 0
+    fi
+
+    local zone
+    for zone in "$ZONE" "us-central1-a" "us-central1-b" "us-central1-c" "us-east1-b" "us-east1-c"; do
+        if gcloud compute instances describe "$INSTANCE_NAME" --zone="$zone" &> /dev/null; then
+            ZONE="$zone"
+            return 0
+        fi
+    done
+
+    return 1
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -41,7 +59,8 @@ print_warning() {
 }
 
 check_instance_status() {
-    STATUS=$(gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --format="value(status)" 2>/dev/null || echo "NOT_FOUND")
+    resolve_instance_zone || true
+    STATUS=$(gcloud compute instances describe "$INSTANCE_NAME" --zone="$ZONE" --format="value(status)" 2>/dev/null || echo "NOT_FOUND")
     
     case $STATUS in
         RUNNING)
@@ -68,16 +87,22 @@ check_instance_status() {
 }
 
 get_instance_details() {
-    if gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE &> /dev/null; then
-        MACHINE_TYPE=$(gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --format="value(machineType.scope(machineTypes))")
-        CREATED=$(gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --format="value(creationTimestamp)")
+    if gcloud compute instances describe "$INSTANCE_NAME" --zone="$ZONE" &> /dev/null; then
+        MACHINE_TYPE=$(gcloud compute instances describe "$INSTANCE_NAME" --zone="$ZONE" --format="value(machineType.scope(machineTypes))")
+        CREATED=$(gcloud compute instances describe "$INSTANCE_NAME" --zone="$ZONE" --format="value(creationTimestamp)")
+        # Uptime and ETA must be measured from the last start, not creation:
+        # a stopped/preempted VM accrues no runtime but does accrue calendar time.
+        # Strip fractional seconds and offset so BSD date can parse it.
+        LAST_START=$(gcloud compute instances describe "$INSTANCE_NAME" --zone="$ZONE" --format="value(lastStartTimestamp)")
+        RUN_SINCE="${LAST_START%.*}"
         
         echo -e "${BLUE}● Machine Type:${NC} $MACHINE_TYPE"
         echo -e "${BLUE}● Created:${NC} $CREATED"
+        echo -e "${BLUE}● Last Started:${NC} $LAST_START"
         
         # Calculate uptime
         if [ "$STATUS" == "RUNNING" ]; then
-            START_EPOCH=$(date -d "$CREATED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$CREATED" +%s)
+            START_EPOCH=$(date -d "$RUN_SINCE" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$RUN_SINCE" +%s)
             NOW_EPOCH=$(date +%s)
             UPTIME_SECONDS=$((NOW_EPOCH - START_EPOCH))
             UPTIME_HOURS=$((UPTIME_SECONDS / 3600))
@@ -135,8 +160,8 @@ check_progress() {
     fi
     
     # Estimate completion time
-    if [ $COMPLETED -gt 10 ] && [ -n "$CREATED" ]; then
-        START_EPOCH=$(date -d "$CREATED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$CREATED" +%s)
+    if [ $COMPLETED -gt 10 ] && [ -n "$RUN_SINCE" ]; then
+        START_EPOCH=$(date -d "$RUN_SINCE" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$RUN_SINCE" +%s)
         NOW_EPOCH=$(date +%s)
         ELAPSED=$((NOW_EPOCH - START_EPOCH))
         
@@ -202,7 +227,7 @@ show_recent_logs() {
     
     if [ "$STATUS" == "RUNNING" ]; then
         # Try to get recent log entries via SSH
-        gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --command="tail -5 ~/simulation.log 2>/dev/null || echo 'Simulation log not available yet'" 2>/dev/null || echo "Unable to fetch logs"
+        gcloud compute ssh "$INSTANCE_NAME" --zone="$ZONE" --command="tail -5 ~/simulation.log 2>/dev/null || echo 'Simulation log not available yet'" 2>/dev/null || echo "Unable to fetch logs"
     else
         echo "Instance not running - cannot fetch logs"
     fi
