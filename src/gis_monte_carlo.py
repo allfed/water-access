@@ -270,49 +270,63 @@ def process_districts_results(districts_simulation_results, output_dir="results"
         None
     """
 
+    # Concatenate once and reuse. Concatenating separately per statistic needs
+    # five simultaneous copies of a ~2.9M-row frame at 1000 iterations, which
+    # exhausts memory before any file is written.
+    combined = pd.concat(districts_simulation_results, ignore_index=True)
+
+    # Group on shapeID, not shapeName: district names are not unique across
+    # countries (e.g. Amazonas exists in BRA, COL, PER and VEN), so grouping by
+    # name merges unrelated districts into one row and loses the rest.
+    # A categorical key avoids grouping on millions of raw strings. Categories
+    # are taken from the data in sorted order, and observed=False is required
+    # because observed=True yields groups in order of appearance rather than
+    # sorted order.
+    unique_ids = combined["shapeID"].dropna().unique()
+    unique_ids.sort()
+    shape_id = pd.Series(
+        pd.Categorical(combined["shapeID"], categories=unique_ids),
+        index=combined.index,
+        name="shapeID",
+    )
+
     # Extract non-numeric columns (assuming 'Entity' and 'region' are the
     # non-numeric columns you mentioned)
     non_numeric_cols = (
-        pd.concat(districts_simulation_results)
-        .groupby("shapeName")
+        combined[["shapeName", "ISOCODE", "Entity", "region", "subregion"]]
+        .groupby(shape_id, observed=False)
         .first()
-        .reset_index()[["shapeName", "ISOCODE", "Entity", "region", "subregion"]]
+        .reset_index()
     )
+
+    numeric = combined.select_dtypes(include="number")
+    del combined
+    grouped = numeric.groupby(shape_id, observed=False)
+    del numeric
 
     # Calculate the mean results for each country for all cols
-    all_means = (
-        pd.concat(districts_simulation_results)
-        .groupby("shapeName")
-        .mean()
-        .reset_index()
-    )
+    all_means = grouped.mean().reset_index()
     # Calculate the median results for each country for all cols
-    all_medians = (
-        pd.concat(districts_simulation_results)
-        .groupby("shapeName")
-        .median()
-        .reset_index()
-    )
+    all_medians = grouped.median().reset_index()
     # Calculate the 95th percentile results for each country for all cols
-    all_percentile_95s = (
-        pd.concat(districts_simulation_results)
-        .groupby("shapeName")
-        .quantile(0.95)
-        .reset_index()
-    )
+    all_percentile_95s = grouped.quantile(0.95).reset_index()
     # Calculate the 5th percentile results for each country for all cols
-    all_percentile_5s = (
-        pd.concat(districts_simulation_results)
-        .groupby("shapeName")
-        .quantile(0.05)
-        .reset_index()
-    )
+    all_percentile_5s = grouped.quantile(0.05).reset_index()
+
+    for frame in (
+        non_numeric_cols,
+        all_means,
+        all_medians,
+        all_percentile_95s,
+        all_percentile_5s,
+    ):
+        frame["shapeID"] = frame["shapeID"].astype(object)
 
     # Merge with non-numeric
-    all_means = pd.merge(all_means, non_numeric_cols, on="shapeName")
-    all_medians = pd.merge(all_medians, non_numeric_cols, on="shapeName")
-    all_percentile_95s = pd.merge(all_percentile_95s, non_numeric_cols, on="shapeName")
-    all_percentile_5s = pd.merge(all_percentile_5s, non_numeric_cols, on="shapeName")
+    all_means = pd.merge(all_means, non_numeric_cols, on="shapeID")
+    all_medians = pd.merge(all_medians, non_numeric_cols, on="shapeID")
+    all_percentile_95s = pd.merge(all_percentile_95s, non_numeric_cols, on="shapeID")
+    all_percentile_5s = pd.merge(all_percentile_5s, non_numeric_cols, on="shapeID")
 
     # Step 2: Save the results to the results folder
     # Ensure the output directory exists

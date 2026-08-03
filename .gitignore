@@ -137,3 +137,6 @@ results/
 .DS_Store
 .DS_Store?
 data/.DS_Store
+
+# GCP deploy state (active zone after fallback create)
+gcp/.instance-zone

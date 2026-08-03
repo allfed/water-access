@@ -37,7 +37,7 @@ script_dir = data_script_dir.parent
 repo_root = script_dir.parent
 
 # Define the data directories relative to the repo root
-parquet_data_dir = repo_root / "results" / "median_parquet"
+parquet_data_dir = repo_root / "results" / "parquet_files"
 results_dir = repo_root / "results"
 csv_data_dir = repo_root / "data" / "GIS"
 

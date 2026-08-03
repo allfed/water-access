@@ -1,9 +1,10 @@
 def format_plotly_graphs(fig):
     fig.update_layout(
-        # font_family="Droid Sans Mono”",
-        # “Arial”, “Balto”, “Courier New”, “Droid Sans”, “Droid Serif”,
-        # “Droid Sans Mono”, “Gravitas One”, “Old Standard TT”, “Open Sans”,
-        # “Overpass”, “PT Sans Narrow”, “Raleway”, “Times New Roman”.
+        # DejaVu Sans matches the matplotlib figures. It must be installed as a
+        # system font for Kaleido's headless Chrome to resolve it; otherwise the
+        # fallback is Verdana, whose heavier stems look darker than the
+        # matplotlib output at the same colour and size.
+        font_family="DejaVu Sans, Verdana, Arial, sans-serif",
         font_color="dimgrey",
         title_font_color="dimgrey",
         title={"font": {"size": 30}},
