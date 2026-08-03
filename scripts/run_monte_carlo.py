@@ -6,13 +6,13 @@ from tqdm import tqdm
 import time
 
 # Resolve project root and update sys.path
-project_root = Path().resolve().parent
-sys.path.append(str(project_root))
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
 import src.gis_monte_carlo as mc  # noqa
 
 
 # Results path
-RESULTS_PATH = project_root / "water-access/results"
+RESULTS_PATH = project_root / "results"
 PARQUET_PATH = RESULTS_PATH / "parquet_files"
 
 # -------------------------------------------------------------------------------

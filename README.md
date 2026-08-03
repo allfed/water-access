@@ -12,60 +12,59 @@ The Water Access model is a tool that simulates global access to freshwater sour
 ![Distributions plot](https://github.com/allfed/water-access/blob/main/results/access_distributions.png)
 
 ## Installation
-To install the Water Access package, we recommend setting up a virtual environment using `mamba` (faster) or `conda`. This will ensure that the package and its dependencies are isolated from other projects on your machine, which can prevent conflicts and make it easier to manage your dependencies. Here are the steps to follow:
+To install the Water Access package, we recommend setting up a virtual environment using [mamba](https://mamba.readthedocs.io/) (faster) or `conda`. This will ensure that the package and its dependencies are isolated from other projects on your machine, which can prevent conflicts and make it easier to manage your dependencies. Here are the steps to follow:
 
 * Create a virtual environment using either conda by running the command `mamba env create -f environment.yml`. This will create an environment called "water-access". A virtual environment is like a separate Python environment, which you can think of as a separate "room" for your project to live in, it's own space which is isolated from the rest of the system, and it will have it's own set of packages and dependencies, that way you can work on different projects with different versions of packages without interfering with each other.
 
-* Activate the environment by running `mamba activate water-access`. This command will make the virtual environment you just created the active one, so that when you run any python command or install any package, it will do it within the environment.
+Input data is stored with [Git LFS](https://git-lfs.com/). Install LFS and run `git lfs pull` after cloning.
 
-* Install the package by running `pip install -e .` in the main folder of the repository. This command will install the package you are currently in as a editable package, so that when you make changes to the package, you don't have to reinstall it again.
 
-* The code is split between python files and Jupytper notebooks. If you want to run the Jupyter notebooks, you'll need to create a kernel for the environment. First, if using Anaconda, install the necessary tools by running `conda install -c anaconda ipykernel`. This command will install the necessary tools to create a kernel for the Jupyter notebook. A kernel is a component of Jupyter notebook that allows you to run your code. It communicates with the notebook web application and the notebook document format to execute code and display the results.
+```bash
+git lfs install
+git lfs pull
+mamba env create -f environment.yml
+mamba activate water-access
+pip install -e .
+```
 
-* Then, create the kernel by running `python -m ipykernel install --user --name=water-access`. This command will create a kernel with the name you specified "water-access" , which you can use to run the example notebook or play around with the model yourself.
+For Jupyter notebooks, register a kernel:
+
+```bash
+python -m ipykernel install --user --name=water-access
+```
+
+If imports fail in the notebook kernel, rerun `pip install -e .` from the repository root.
 
 * Alternatively, you may wish to run the notebook in an IDE such as Visual Studio Code (instructions [here](https://code.visualstudio.com/docs/datascience/jupyter-notebooks))
 
-If you are using the kernel and it fails due an import error for the model package, you might have to rerun: `pip install -e .`.
+## Repository structure
 
-If you encounter any issues, feel free to open an issue in the repository.
+```
+├── data/           Input data (GIS, lookup tables, processed)
+├── docs/           Full reproduction workflow
+├── gcp/            Optional cloud deployment for large Monte Carlo runs
+├── results/        Model outputs (CSVs, parquets, plots)
+├── scripts/        Notebooks and processing scripts
+├── src/            Core model code
+└── tests/          Unit tests
+```
 
-## How this model works in general
+## Quick start
 
-At its most simple, this notebook uses the Lankford walking model and Martin cycling model to simulate water access at different locations all across the globe.
+### Explore existing results
 
-A quick start is provided at the end of this README, along with step-by-step instructions to repeat our analysis in the `docs` folder.
+Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](scripts/distribution_plots.ipynb) to generate key tables and plots from the summary CSVs in `results/`.
 
-## Getting the data
+### Re-run the model with new assumptions
 
-The data is stored using [Git Large File Storage (LFS)](https://git-lfs.com/) as some file sizes are quite large. You will need to set up LFS to be able to download these properly and run the models.
+1. Run [`scripts/run_monte_carlo.py`](scripts/run_monte_carlo.py) — Monte Carlo simulations (resource-intensive; parameter ranges are defined at the top of the script).
+2. Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](scripts/distribution_plots.ipynb) to analyze the new outputs.
 
-## Structure
+For a single deterministic run (no Monte Carlo), use [`src/gis_global_module.py`](src/gis_global_module.py).
 
-├── `data` All input data\
-│   ├── `GIS` Spatial data\
-│   ├── `lookup tables` Parameters read into models\
-│   ├── `original_data` Unmodified source data\
-│   └── `processed` Data used and generated by models\
-│       └── `semi-processed` Partially processed data\
-├── `docs` Step-by-step guidance on re-running analysis\
-├── `results` Tables and plots\
-├── `scripts` Scripts to process data, explore modelling, run models, and generate results\
-│   ├── `Data Manipulation Scripts` Scripts to pre- and post-process data\
-├── `src` Source code\
-└── `tests` Tests
+For large runs on Google Cloud Spot VMs, see [`gcp/gcp-setup.md`](gcp/gcp-setup.md).
 
-## Quick Start
-This section provides a basic way to run some of the model scripts and results, without getting into the more complex aspects of re-generating the processed datasets.
+## Full reproduction
 
+Step-by-step instructions to reproduce the full analysis pipeline (including QGIS map outputs) are in [`docs/README.md`](docs/README.md).
 
-### Global model (use existing results)
-To explore the models with pre-generated results, the following script can be used:
-* `scripts/key_results.ipynb`: Generates key results (data and plots) used in publication.
-
-### Re-run the global model with new assumptions (create new results)
-
-If you want to re-run the model while inputting your own assumptions, the scripts below provide the simplest way to achieve this.
-* `scripts/run_monte_carlo.ipynb`: Performs Monte Carlo simulations of the global model runs. A set of constants at the start of the file are used to define the 90% confidence intervals for the Monte Carlo parameters, and can be changed to the users preferences. Running the model is resource-intensive, and guidance for settings is detailed in the code. 
-* `scripts/key_results.ipynb`: As before, this generates key results (data and plots). The results from the new model run can then be directly compared to those used in publication.
-* `src/gis_global_module.py`: Alternatively, if you would like to run the global model once without Monte Carlo simulations, the main function in this file can be used.
