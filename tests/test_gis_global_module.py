@@ -743,9 +743,10 @@ class TestCalculateMaxDistances:
                 "average_velocity_bicycle": [10, 15, 20],
                 "average_velocity_walk": [5, 7, 10],
                 "max_load_bicycle": [5, 10, 15],
-                "max distance cycling": [30.0, 45.0, 60.0],
-                "max distance walking": [15.0, 21.0, 30.0],
-                "water_ration_kms": [150.0, 450.0, 900.0],
+                # velocities are m/s; convert to one-way km via *3600/2/1000
+                "max distance cycling": [108.0, 162.0, 216.0],
+                "max distance walking": [54.0, 75.6, 108.0],
+                "water_ration_kms": [540.0, 1620.0, 3240.0],
             }
         )
         pd.testing.assert_frame_equal(result, expected_result)
