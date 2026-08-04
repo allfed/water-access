@@ -10,7 +10,6 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 import src.gis_monte_carlo as mc  # noqa
 
-
 # Results path
 RESULTS_PATH = project_root / "results"
 PARQUET_PATH = RESULTS_PATH / "parquet_files"
