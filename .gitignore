@@ -128,8 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# result files
-results/
+# result files (keep README figure tracked)
+results/*
+!results/access_distributions.png
 
 
 # OS generated files #
