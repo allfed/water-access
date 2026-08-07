@@ -847,22 +847,48 @@ def calculate_max_distances(df_zones, time_gathering_water):
     return df_zones
 
 
-def calculate_population_water_access(df_zones):
+def calculate_population_water_access(
+    df_zones,
+    urban_borehole_lose_fraction=0.5,
+    rural_borehole_lose_fraction=0.25,
+):
     """
     Calculates the population with and without access to water for each zone.
 
+    Piped, packaged, delivered, and (a configurable fraction of) borehole users
+    lose their usual supply and must reach an alternative source by walking or
+    cycling. Residual unpiped users (total unpiped minus displaced categories)
+    retain access under the prior assumption.
+
     Args:
         df_zones (pandas.DataFrame): DataFrame containing zone information.
+        urban_borehole_lose_fraction (float): Share of urban borehole users
+            displaced from their usual source.
+        rural_borehole_lose_fraction (float): Share of rural borehole users
+            displaced from their usual source.
 
     Returns:
         pandas.DataFrame: DataFrame with additional columns representing the population
         with and without access to water for each zone.
     """
-    # Set df_zones["zone_pop_piped"] to 0 for all zones to begin with
+    for col in (
+        "URBANPackaged",
+        "RURALPackaged",
+        "URBANDelivered",
+        "RURALDelivered",
+        "URBANBorehole",
+        "RURALBorehole",
+        "URBANOtherUnpiped",
+        "RURALOtherUnpiped",
+    ):
+        if col not in df_zones.columns:
+            df_zones[col] = 0
+        else:
+            df_zones[col] = df_zones[col].fillna(0)
+
     df_zones["zone_pop_piped"] = 0
 
-    # If urban use urban piped and unpiped, if rural use rural piped and unpiped
-    # Use the urban_rural column to do this
+    # If urban use urban shares, if rural use rural shares (urban_rural column)
     df_zones["zone_pop_piped"] = (
         df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANPiped"] / 100
         + df_zones["pop_zone"]
@@ -870,16 +896,77 @@ def calculate_population_water_access(df_zones):
         * df_zones["RURALPiped"]
         / 100
     )
-    df_zones["zone_pop_unpiped"] = (
+    df_zones["zone_pop_packaged"] = (
+        df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANPackaged"] / 100
+        + df_zones["pop_zone"]
+        * (1 - df_zones["urban_rural"])
+        * df_zones["RURALPackaged"]
+        / 100
+    )
+    df_zones["zone_pop_delivered"] = (
+        df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANDelivered"] / 100
+        + df_zones["pop_zone"]
+        * (1 - df_zones["urban_rural"])
+        * df_zones["RURALDelivered"]
+        / 100
+    )
+    df_zones["zone_pop_borehole"] = (
+        df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANBorehole"] / 100
+        + df_zones["pop_zone"]
+        * (1 - df_zones["urban_rural"])
+        * df_zones["RURALBorehole"]
+        / 100
+    )
+    df_zones["zone_pop_borehole_affected"] = (
         df_zones["pop_zone"]
         * df_zones["urban_rural"]
-        * (100 - df_zones["URBANPiped"])
+        * df_zones["URBANBorehole"]
+        * urban_borehole_lose_fraction
         / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
-        * (100 - df_zones["RURALPiped"])
+        * df_zones["RURALBorehole"]
+        * rural_borehole_lose_fraction
         / 100
     )
+    df_zones["zone_pop_other_unpiped"] = (
+        df_zones["pop_zone"]
+        * df_zones["urban_rural"]
+        * df_zones["URBANOtherUnpiped"]
+        / 100
+        + df_zones["pop_zone"]
+        * (1 - df_zones["urban_rural"])
+        * df_zones["RURALOtherUnpiped"]
+        / 100
+    )
+    df_zones["zone_pop_affected"] = (
+        df_zones["zone_pop_piped"]
+        + df_zones["zone_pop_packaged"]
+        + df_zones["zone_pop_delivered"]
+        + df_zones["zone_pop_borehole_affected"]
+    )
+    df_zones["zone_pop_unpiped_resilient"] = (
+        df_zones["pop_zone"]
+        * df_zones["urban_rural"]
+        * (
+            100
+            - df_zones["URBANPiped"]
+            - df_zones["URBANPackaged"]
+            - df_zones["URBANDelivered"]
+            - df_zones["URBANBorehole"] * urban_borehole_lose_fraction
+        )
+        / 100
+        + df_zones["pop_zone"]
+        * (1 - df_zones["urban_rural"])
+        * (
+            100
+            - df_zones["RURALPiped"]
+            - df_zones["RURALPackaged"]
+            - df_zones["RURALDelivered"]
+            - df_zones["RURALBorehole"] * rural_borehole_lose_fraction
+        )
+        / 100
+    ).clip(lower=0)
 
     # Determine if it's possible to reach water with walking/cycling
     df_zones["zone_cycling_okay"] = (
@@ -895,27 +982,31 @@ def calculate_population_water_access(df_zones):
     )
     df_zones["fraction_of_zone_with_walking_access"] = df_zones["zone_walking_okay"] * 1
 
-    # Calculate the population that can access piped water by cycling and walking
-    df_zones["population_piped_with_cycling_access"] = (
-        df_zones["fraction_of_zone_with_cycling_access"] * df_zones["zone_pop_piped"]
+    # Calculate the affected population that can reach water by cycling and walking
+    df_zones["population_affected_with_cycling_access"] = (
+        df_zones["fraction_of_zone_with_cycling_access"] * df_zones["zone_pop_affected"]
     )
-    df_zones["population_piped_with_walking_access"] = (
-        df_zones["fraction_of_zone_with_walking_access"] * df_zones["zone_pop_piped"]
+    df_zones["population_affected_with_walking_access"] = (
+        df_zones["fraction_of_zone_with_walking_access"] * df_zones["zone_pop_affected"]
     )
     # Select the maximum between the two, if walkable, max will always be walking
-    df_zones["population_piped_with_access"] = df_zones[
-        ["population_piped_with_cycling_access", "population_piped_with_walking_access"]
+    df_zones["population_affected_with_access"] = df_zones[
+        [
+            "population_affected_with_cycling_access",
+            "population_affected_with_walking_access",
+        ]
     ].max(axis=1)
 
     # Calculate the population that can access water only by cycling
-    # Equals population_piped_with_cycling_access if zone_walking_okay is 0
-    df_zones["population_piped_with_only_cycling_access"] = df_zones[
-        "population_piped_with_cycling_access"
+    # Equals population_affected_with_cycling_access if zone_walking_okay is 0
+    df_zones["population_affected_with_only_cycling_access"] = df_zones[
+        "population_affected_with_cycling_access"
     ] * (1 - df_zones["zone_walking_okay"])
 
     # Calculate zone population with and without water access
     df_zones["zone_pop_with_water"] = (
-        df_zones["population_piped_with_access"] + df_zones["zone_pop_unpiped"]
+        df_zones["population_affected_with_access"]
+        + df_zones["zone_pop_unpiped_resilient"]
     )
     df_zones["zone_pop_without_water"] = (
         df_zones["pop_zone"] - df_zones["zone_pop_with_water"]
@@ -961,9 +1052,18 @@ def calculate_water_rations(df_zones):
     return df_zones
 
 
-def process_zones_for_water_access(df_zones, time_gathering_water=16):
+def process_zones_for_water_access(
+    df_zones,
+    time_gathering_water=16,
+    urban_borehole_lose_fraction=1,
+    rural_borehole_lose_fraction=1,
+):
     df_zones = calculate_max_distances(df_zones, time_gathering_water)
-    df_zones = calculate_population_water_access(df_zones)
+    df_zones = calculate_population_water_access(
+        df_zones,
+        urban_borehole_lose_fraction=urban_borehole_lose_fraction,
+        rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+    )
     df_zones = calculate_water_rations(df_zones)
     return df_zones
 
@@ -993,10 +1093,10 @@ def aggregate_country_level_data(df_zones):
                 "country_pop_raw": "first",
                 "zone_pop_with_water": "sum",
                 "zone_pop_without_water": "sum",
-                "population_piped_with_access": "sum",
-                "population_piped_with_cycling_access": "sum",
-                "population_piped_with_walking_access": "sum",
-                "population_piped_with_only_cycling_access": "sum",
+                "population_affected_with_access": "sum",
+                "population_affected_with_cycling_access": "sum",
+                "population_affected_with_walking_access": "sum",
+                "population_affected_with_only_cycling_access": "sum",
                 "NATPiped": "first",
                 "region": "first",
                 "subregion": "first",
@@ -1012,10 +1112,10 @@ def aggregate_country_level_data(df_zones):
         "country_pop_raw",
         "zone_pop_with_water",
         "zone_pop_without_water",
-        "population_piped_with_access",
-        "population_piped_with_cycling_access",
-        "population_piped_with_walking_access",
-        "population_piped_with_only_cycling_access",
+        "population_affected_with_access",
+        "population_affected_with_cycling_access",
+        "population_affected_with_walking_access",
+        "population_affected_with_only_cycling_access",
         "NATPiped",
         "region",
         "subregion",
@@ -1091,15 +1191,15 @@ def aggregate_global(df_zones):
         "country_pop_raw": df_zones["pop_zone"].sum(),
         "zone_pop_with_water": df_zones["zone_pop_with_water"].sum(),
         "zone_pop_without_water": df_zones["zone_pop_without_water"].sum(),
-        "population_piped_with_access": df_zones["population_piped_with_access"].sum(),
-        "population_piped_with_cycling_access": df_zones[
-            "population_piped_with_cycling_access"
+        "population_affected_with_access": df_zones["population_affected_with_access"].sum(),
+        "population_affected_with_cycling_access": df_zones[
+            "population_affected_with_cycling_access"
         ].sum(),
-        "population_piped_with_walking_access": df_zones[
-            "population_piped_with_walking_access"
+        "population_affected_with_walking_access": df_zones[
+            "population_affected_with_walking_access"
         ].sum(),
-        "population_piped_with_only_cycling_access": df_zones[
-            "population_piped_with_only_cycling_access"
+        "population_affected_with_only_cycling_access": df_zones[
+            "population_affected_with_only_cycling_access"
         ].sum(),
     }
 
@@ -1247,26 +1347,26 @@ def process_country_data(df_zones):
     )
 
     # add percentage columns for cycling and water access
-    df_countries["percent_piped_with_cycling_access"] = (
-        df_countries["population_piped_with_cycling_access"]
+    df_countries["percent_affected_with_cycling_access"] = (
+        df_countries["population_affected_with_cycling_access"]
         / df_countries["country_pop_raw"]
         * 100
     )
 
-    df_countries["percent_piped_with_walking_access"] = (
-        df_countries["population_piped_with_walking_access"]
+    df_countries["percent_affected_with_walking_access"] = (
+        df_countries["population_affected_with_walking_access"]
         / df_countries["country_pop_raw"]
         * 100
     )
 
-    df_countries["proportion_piped_access_from_cycling"] = (
-        df_countries["population_piped_with_only_cycling_access"]
-        / df_countries["population_piped_with_access"]
+    df_countries["proportion_affected_access_from_cycling"] = (
+        df_countries["population_affected_with_only_cycling_access"]
+        / df_countries["population_affected_with_access"]
         * 100
     )
 
     df_countries["percent_with_only_cycling_access"] = (
-        df_countries["population_piped_with_only_cycling_access"]
+        df_countries["population_affected_with_only_cycling_access"]
         / df_countries["country_pop_raw"]
         * 100
     )
@@ -1318,10 +1418,10 @@ def aggregate_district_level_data(df_zones):
                 "district_pop_raw": "first",
                 "zone_pop_with_water": "sum",
                 "zone_pop_without_water": "sum",
-                "population_piped_with_access": "sum",
-                "population_piped_with_cycling_access": "sum",
-                "population_piped_with_walking_access": "sum",
-                "population_piped_with_only_cycling_access": "sum",
+                "population_affected_with_access": "sum",
+                "population_affected_with_cycling_access": "sum",
+                "population_affected_with_walking_access": "sum",
+                "population_affected_with_only_cycling_access": "sum",
                 "NATPiped": "first",
                 "region": "first",
                 "subregion": "first",
@@ -1338,10 +1438,10 @@ def aggregate_district_level_data(df_zones):
         "district_pop_raw",
         "zone_pop_with_water",
         "zone_pop_without_water",
-        "population_piped_with_access",
-        "population_piped_with_cycling_access",
-        "population_piped_with_walking_access",
-        "population_piped_with_only_cycling_access",
+        "population_affected_with_access",
+        "population_affected_with_cycling_access",
+        "population_affected_with_walking_access",
+        "population_affected_with_only_cycling_access",
         "NATPiped",
         "region",
         "subregion",
@@ -1396,26 +1496,26 @@ def process_district_data(df_zones):
     )
 
     # add percentage columns for cycling and water access
-    df_districts["percent_piped_with_cycling_access"] = (
-        df_districts["population_piped_with_cycling_access"]
+    df_districts["percent_affected_with_cycling_access"] = (
+        df_districts["population_affected_with_cycling_access"]
         / df_districts["district_pop_raw"]
         * 100
     )
 
-    df_districts["percent_piped_with_walking_access"] = (
-        df_districts["population_piped_with_walking_access"]
+    df_districts["percent_affected_with_walking_access"] = (
+        df_districts["population_affected_with_walking_access"]
         / df_districts["district_pop_raw"]
         * 100
     )
 
-    df_districts["proportion_piped_access_from_cycling"] = (
-        df_districts["population_piped_with_only_cycling_access"]
-        / df_districts["population_piped_with_access"]
+    df_districts["proportion_affected_access_from_cycling"] = (
+        df_districts["population_affected_with_only_cycling_access"]
+        / df_districts["population_affected_with_access"]
         * 100
     )
 
     df_districts["percent_with_only_cycling_access"] = (
-        df_districts["population_piped_with_only_cycling_access"]
+        df_districts["population_affected_with_only_cycling_access"]
         / df_districts["district_pop_raw"]
         * 100
     )
@@ -1450,9 +1550,9 @@ def plot_chloropleth(df_countries):
         "country_pop_raw",
         "country_pop_with_water",
         "country_pop_without_water",
-        "population_piped_with_access",
-        "population_piped_with_cycling_access",
-        "population_piped_with_walking_access",
+        "population_affected_with_access",
+        "population_affected_with_cycling_access",
+        "population_affected_with_walking_access",
         "percent_without_water",
         "percent_with_water",
         "NATPiped",

@@ -800,19 +800,25 @@ class TestCalculatePopulationWaterAccess:
                 "max distance walking": [200, 300, 400],
                 "PBO": [80, 90, 100],
                 "zone_pop_piped": [300.0, 1200.0, 2100.0],
-                "zone_pop_unpiped": [700.0, 800.0, 900.0],
+                "zone_pop_packaged": [0.0, 0.0, 0.0],
+                "zone_pop_delivered": [0.0, 0.0, 0.0],
+                "zone_pop_borehole": [0.0, 0.0, 0.0],
+                "zone_pop_borehole_affected": [0.0, 0.0, 0.0],
+                "zone_pop_other_unpiped": [0.0, 0.0, 0.0],
+                "zone_pop_unpiped_resilient": [700.0, 800.0, 900.0],
+                "zone_pop_affected": [300.0, 1200.0, 2100.0],
                 "zone_cycling_okay": [1, 1, 1],
                 "zone_walking_okay": [1, 1, 0],
                 "fraction_of_zone_with_cycling_access": [0.8, 0.9, 1.0],
                 "fraction_of_zone_with_walking_access": [1, 1, 0],
-                "population_piped_with_cycling_access": [
+                "population_affected_with_cycling_access": [
                     240.0,
                     1080.0,
                     2100.0,
                 ],
-                "population_piped_with_walking_access": [300.0, 1200.0, 0.0],
-                "population_piped_with_access": [300.0, 1200.0, 2100.0],
-                "population_piped_with_only_cycling_access": [
+                "population_affected_with_walking_access": [300.0, 1200.0, 0.0],
+                "population_affected_with_access": [300.0, 1200.0, 2100.0],
+                "population_affected_with_only_cycling_access": [
                     0.0,
                     0.0,
                     2100.0,
@@ -822,7 +828,59 @@ class TestCalculatePopulationWaterAccess:
             }
         )
         print(result.columns)
-        pd.testing.assert_frame_equal(result, expected_result)
+        pd.testing.assert_frame_equal(
+            result[expected_result.columns], expected_result, check_like=True
+        )
+
+    def test_packaged_and_delivered_users_lose_access_when_too_far(self):
+        df_zones = pd.DataFrame(
+            {
+                "pop_zone": [1000],
+                "urban_rural": [1],
+                "URBANPiped": [40.0],
+                "RURALPiped": [20.0],
+                "URBANPackaged": [30.0],
+                "RURALPackaged": [10.0],
+                "URBANDelivered": [10.0],
+                "RURALDelivered": [5.0],
+                "URBANBorehole": [5.0],
+                "RURALBorehole": [20.0],
+                "dtw_1": [500],
+                "max distance cycling": [100],
+                "max distance walking": [50],
+                "PBO": [100],
+            }
+        )
+        result = calculate_population_water_access(
+            df_zones,
+            urban_borehole_lose_fraction=1.0,
+            rural_borehole_lose_fraction=0.0,
+        )
+        assert result["zone_pop_with_water"].iloc[0] == pytest.approx(150.0)
+        assert result["zone_pop_without_water"].iloc[0] == pytest.approx(850.0)
+
+    def test_packaged_users_regain_access_when_walking_range_allows(self):
+        df_zones = pd.DataFrame(
+            {
+                "pop_zone": [1000],
+                "urban_rural": [1],
+                "URBANPiped": [0.0],
+                "RURALPiped": [0.0],
+                "URBANPackaged": [100.0],
+                "RURALPackaged": [0.0],
+                "URBANDelivered": [0.0],
+                "RURALDelivered": [0.0],
+                "URBANBorehole": [0.0],
+                "RURALBorehole": [0.0],
+                "dtw_1": [10],
+                "max distance cycling": [100],
+                "max distance walking": [50],
+                "PBO": [100],
+            }
+        )
+        result = calculate_population_water_access(df_zones)
+        assert result["zone_pop_with_water"].iloc[0] == pytest.approx(1000.0)
+        assert result["population_affected_with_access"].iloc[0] == pytest.approx(1000.0)
 
 
 class TestCalculateWaterRations:
@@ -874,10 +932,10 @@ class TestAggregateCountryLevelData:
                 "country_pop_raw": [1000000, 2000000],
                 "zone_pop_with_water": [500000, 1000000],
                 "zone_pop_without_water": [500000, 1000000],
-                "population_piped_with_access": [300000, 400000],
-                "population_piped_with_cycling_access": [200000, 300000],
-                "population_piped_with_walking_access": [100000, 200000],
-                "population_piped_with_only_cycling_access": [150000, 200000],
+                "population_affected_with_access": [300000, 400000],
+                "population_affected_with_cycling_access": [200000, 300000],
+                "population_affected_with_walking_access": [100000, 200000],
+                "population_affected_with_only_cycling_access": [150000, 200000],
                 "NATPiped": ["Yes", "No"],
                 "region": ["North America", "North America"],
                 "subregion": ["Northern America", "Northern America"],
@@ -903,25 +961,25 @@ class TestAggregateCountryLevelData:
                 "country_pop_raw": [1000000, 1000000, 2000000, 2000000],
                 "zone_pop_with_water": [250000, 250000, 500000, 500000],
                 "zone_pop_without_water": [250000, 250000, 500000, 500000],
-                "population_piped_with_access": [
+                "population_affected_with_access": [
                     150000,
                     150000,
                     200000,
                     200000,
                 ],
-                "population_piped_with_cycling_access": [
+                "population_affected_with_cycling_access": [
                     100000,
                     100000,
                     150000,
                     150000,
                 ],
-                "population_piped_with_walking_access": [
+                "population_affected_with_walking_access": [
                     50000,
                     50000,
                     100000,
                     100000,
                 ],
-                "population_piped_with_only_cycling_access": [
+                "population_affected_with_only_cycling_access": [
                     50000,
                     50000,
                     75000,
@@ -952,10 +1010,10 @@ class TestAggregateCountryLevelData:
                 "country_pop_raw": [2000000, 1000000],
                 "zone_pop_with_water": [1000000, 500000],
                 "zone_pop_without_water": [1000000, 500000],
-                "population_piped_with_access": [400000, 300000],
-                "population_piped_with_cycling_access": [300000, 200000],
-                "population_piped_with_walking_access": [200000, 100000],
-                "population_piped_with_only_cycling_access": [150000, 100000],
+                "population_affected_with_access": [400000, 300000],
+                "population_affected_with_cycling_access": [300000, 200000],
+                "population_affected_with_walking_access": [200000, 100000],
+                "population_affected_with_only_cycling_access": [150000, 100000],
                 "NATPiped": ["No", "Yes"],
                 "region": ["North America", "North America"],
                 "subregion": ["Northern America", "Northern America"],
@@ -1014,10 +1072,10 @@ class TestProcessCountryData:
                 "Entity": ["USA", "CAN", "Libya"],
                 "NATPiped": [1000, 2000, 1500],
                 "country_pop_raw": [1000, 2000, 1500],
-                "population_piped_with_access": [1000, 2000, 0],
-                "population_piped_with_cycling_access": [1000, 2000, 0],
-                "population_piped_with_walking_access": [1000, 2000, 0],
-                "population_piped_with_only_cycling_access": [0, 0, 0],
+                "population_affected_with_access": [1000, 2000, 0],
+                "population_affected_with_cycling_access": [1000, 2000, 0],
+                "population_affected_with_walking_access": [1000, 2000, 0],
+                "population_affected_with_only_cycling_access": [0, 0, 0],
                 "region": ["North America", "North America", "Africa"],
                 "subregion": [
                     "Northern America",
@@ -1042,10 +1100,10 @@ class TestProcessCountryData:
                 "Entity": ["USA", "Canada", "Libya"],
                 "NATPiped": [1000, 2000, 1500],
                 "country_pop_raw": [1000, 2000, 1500],
-                "population_piped_with_access": [1000, 2000, 0],
-                "population_piped_with_cycling_access": [1000, 2000, 0],
-                "population_piped_with_walking_access": [1000, 2000, 0],
-                "population_piped_with_only_cycling_access": [0, 0, 0],
+                "population_affected_with_access": [1000, 2000, 0],
+                "population_affected_with_cycling_access": [1000, 2000, 0],
+                "population_affected_with_walking_access": [1000, 2000, 0],
+                "population_affected_with_only_cycling_access": [0, 0, 0],
                 "region": ["North America", "North America", "Africa"],
                 "subregion": [
                     "Northern America",
@@ -1066,10 +1124,10 @@ class TestProcessCountryData:
                 "country_pop_raw": [2000, 1500, 1000, 4500],
                 "country_pop_with_water": [2000, 0, 1000, 3000],
                 "country_pop_without_water": [0, 1500, 0, 1500],
-                "population_piped_with_access": [2000, 0, 1000, 3000],
-                "population_piped_with_cycling_access": [2000, 0, 1000, 3000],
-                "population_piped_with_walking_access": [2000, 0, 1000, 3000],
-                "population_piped_with_only_cycling_access": [0, 0, 0, 0],
+                "population_affected_with_access": [2000, 0, 1000, 3000],
+                "population_affected_with_cycling_access": [2000, 0, 1000, 3000],
+                "population_affected_with_walking_access": [2000, 0, 1000, 3000],
+                "population_affected_with_only_cycling_access": [0, 0, 0, 0],
                 "NATPiped": [2000.0, 1500.0, 1000.0, np.nan],
                 "region": ["North America", "Africa", "North America", None],
                 "subregion": [
@@ -1087,19 +1145,19 @@ class TestProcessCountryData:
                 "weighted_95th_walking": [10, 15, 5, 15],
                 "percent_with_water": [100.0, 0.0, 100.0, (2 / 3) * 100],
                 "percent_without_water": [0.0, 100.0, 0.0, (1 / 3) * 100],
-                "percent_piped_with_cycling_access": [
+                "percent_affected_with_cycling_access": [
                     100.0,
                     0.0,
                     100.0,
                     (2 / 3) * 100,
                 ],
-                "percent_piped_with_walking_access": [
+                "percent_affected_with_walking_access": [
                     100.0,
                     0.0,
                     100.0,
                     (2 / 3) * 100,
                 ],
-                "proportion_piped_access_from_cycling": [
+                "proportion_affected_access_from_cycling": [
                     0.0,
                     np.nan,
                     0.0,
@@ -1133,10 +1191,10 @@ class TestProcessCountryData:
                 "Entity": ["USA", "CAN", "Libya"],
                 "NATPiped": [1000, 2000, 1500],
                 "country_pop_raw": [1000, 2000, 1500],
-                "population_piped_with_access": [1000, 2000, 1500],
-                "population_piped_with_cycling_access": [1000, 2000, 1500],
-                "population_piped_with_walking_access": [1000, 2000, 1500],
-                "population_piped_with_only_cycling_access": [0, 0, 0],
+                "population_affected_with_access": [1000, 2000, 1500],
+                "population_affected_with_cycling_access": [1000, 2000, 1500],
+                "population_affected_with_walking_access": [1000, 2000, 1500],
+                "population_affected_with_only_cycling_access": [0, 0, 0],
                 "region": ["North America", "North America", "Africa"],
                 "subregion": [
                     "Northern America",
@@ -1172,10 +1230,10 @@ class TestProcessCountryData:
                 "Entity": ["USA", "CAN", "Libya"],
                 "NATPiped": [1000, 2000, 1500],
                 "country_pop_raw": [1000, 2000, 1500],
-                "population_piped_with_access": [1000, 2000, 1500],
-                "population_piped_with_cycling_access": [1000, 2000, 1500],
-                "population_piped_with_walking_access": [1000, 2000, 1500],
-                "population_piped_with_only_cycling_access": [0, 0, 0],
+                "population_affected_with_access": [1000, 2000, 1500],
+                "population_affected_with_cycling_access": [1000, 2000, 1500],
+                "population_affected_with_walking_access": [1000, 2000, 1500],
+                "population_affected_with_only_cycling_access": [0, 0, 0],
                 "region": ["North America", "North America", "Africa"],
                 "subregion": [
                     "Northern America",
@@ -1200,10 +1258,10 @@ class TestProcessCountryData:
                 "Entity": ["USA", "CAN", "Libya"],
                 "NATPiped": [1000, 2000, 1500],
                 "country_pop_raw": [1000, 2000, 1500],
-                "population_piped_with_access": [1000, 2000, 1500],
-                "population_piped_with_cycling_access": [1000, 2000, 1500],
-                "population_piped_with_walking_access": [1000, 2000, 1500],
-                "population_piped_with_only_cycling_access": [0, 0, 0],
+                "population_affected_with_access": [1000, 2000, 1500],
+                "population_affected_with_cycling_access": [1000, 2000, 1500],
+                "population_affected_with_walking_access": [1000, 2000, 1500],
+                "population_affected_with_only_cycling_access": [0, 0, 0],
                 "region": ["North America", "North America", "Africa"],
                 "subregion": [
                     "Northern America",
@@ -1229,10 +1287,10 @@ class TestProcessCountryData:
                 "Entity": ["USA", "CAN", "Libya"],
                 "NATPiped": [1000, 2000, 1500],
                 "country_pop_raw": [1000, 2000, 1500],
-                "population_piped_with_access": [1000, 2000, 1500],
-                "population_piped_with_cycling_access": [1000, 2000, 1500],
-                "population_piped_with_walking_access": [1000, 2000, 1500],
-                "population_piped_with_only_cycling_access": [0, 0, 0],
+                "population_affected_with_access": [1000, 2000, 1500],
+                "population_affected_with_cycling_access": [1000, 2000, 1500],
+                "population_affected_with_walking_access": [1000, 2000, 1500],
+                "population_affected_with_only_cycling_access": [0, 0, 0],
                 "region": ["North America", "North America", "Africa"],
                 "subregion": [
                     "Northern America",
@@ -1323,8 +1381,9 @@ class TestAdjustEuclidean:
 # Add test cases for run_global_analysis
 class TestRunGlobalAnalysis:
     def test_run_global_analysis_null_run(self):
-        # If time gathering water is 0, percentage of population without water
-        # access should be equal to percentage piped
+        # If time gathering water is 0, no piped user can reach an alternative
+        # source. Grid-vulnerable unpiped users (packaged, delivered, and a
+        # fraction of borehole) also lose access.
         df_countries, df_districts, df_zones = run_global_analysis(
             crr_adjustment=0,
             time_gathering_water=0,
@@ -1344,23 +1403,9 @@ class TestRunGlobalAnalysis:
         # drop global row
         df_countries = df_countries[df_countries["ISOCODE"] != "GLOBAL"]
 
-        # calculate MAPE between percent_without_water and NATPiped
-        # Extract the true and predicted values
-        y_true = df_countries["NATPiped"]
-        y_pred = df_countries["percent_without_water"]
-        y_true, y_pred = np.array(y_true), np.array(y_pred)
-        mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
-
-        # As we are using national urban and rural piped percentages,
-        # we gain better accuracy for the zonal
-        # results at the expense of the country level results.
-        # Country MAPE should average out at 19% globally
-        # when using *national* piped data
-        assert mape < 20.0
-
         df_countries["pop_unpiped"] = (
             df_countries["country_pop_with_water"]
-            - df_countries["population_piped_with_access"]
+            - df_countries["population_affected_with_access"]
         )
         y_calc = (
             (df_countries["country_pop_raw"] - df_countries["pop_unpiped"])
@@ -1368,6 +1413,7 @@ class TestRunGlobalAnalysis:
             * 100
         )
         y_calc = np.array(y_calc)
+        y_pred = df_countries["percent_without_water"]
         mae_calc = np.mean(np.abs(y_calc - y_pred))
 
         # This should be approx 0 (no areas modelled as piped should get water)

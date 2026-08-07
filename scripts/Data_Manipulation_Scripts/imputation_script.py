@@ -77,6 +77,10 @@ height_file_path = data_dir / "Human Height by Birth Year.csv"
 population_file_path = data_dir / "population.csv"  # OWID
 household_size_file_path = data_dir / "undesa_pd_2022_hh-size-composition.xlsx"
 country_regions_file_path = data_dir / "ISO-3166 Countries.csv"
+jmp_source_breakdown_path = (
+    repo_root / "data" / "processed" / "semi-processed" / "jmp_source_breakdown_latest.csv"
+)
+jmp_country_files_dir = data_dir / "jmp_country_files"
 
 
 # http://download.geonames.org/export/dump/countryInfo.txt
@@ -544,6 +548,53 @@ def process_water_data(df):
     return df
 
 
+def load_jmp_source_breakdown(file_path):
+    """Load parsed JMP source-type percentages, if available."""
+    if not file_path.exists():
+        print(f"JMP source breakdown not found at {file_path}; run extract_jmp_source_breakdown.py")
+        return pd.DataFrame(columns=["alpha3"])
+
+    breakdown = pd.read_csv(file_path)
+    keep_cols = [
+        "alpha3",
+        "URBANPackaged",
+        "RURALPackaged",
+        "URBANDelivered",
+        "RURALDelivered",
+        "URBANBorehole",
+        "RURALBorehole",
+        "URBANOtherUnpiped",
+        "RURALOtherUnpiped",
+    ]
+    existing = [col for col in keep_cols if col in breakdown.columns]
+    return breakdown[existing].drop_duplicates(subset=["alpha3"], keep="first")
+
+
+def prepare_source_breakdown_columns(df):
+    """Fill missing source-type columns; default missing values to zero."""
+    source_cols = [
+        "URBANPackaged",
+        "RURALPackaged",
+        "URBANDelivered",
+        "RURALDelivered",
+        "URBANBorehole",
+        "RURALBorehole",
+        "URBANOtherUnpiped",
+        "RURALOtherUnpiped",
+    ]
+    for col in source_cols:
+        if col not in df.columns:
+            df[col] = pd.NA
+
+    for col in source_cols:
+        df[col] = df[col].fillna(0)
+
+    for col in source_cols:
+        df[col] = df[col].clip(lower=0, upper=100)
+
+    return df
+
+
 def add_back_percentage_urban_data(df, df_water):
     """Adds percentage urban data for countries where it is was dropped in
     process_water_data."""
@@ -978,10 +1029,23 @@ def main(
     # merge weight df with df_cleaned_merge
     df_cleaned_merge = df_cleaned_merge.merge(df_weight, on="alpha3", how="left")
 
+    df_source_breakdown = load_jmp_source_breakdown(jmp_source_breakdown_path)
+    if not df_source_breakdown.empty:
+        df_cleaned_merge = df_cleaned_merge.merge(
+            df_source_breakdown, on="alpha3", how="left"
+        )
+    df_cleaned_merge = prepare_source_breakdown_columns(df_cleaned_merge)
+
     # List of variables to impute
     list_of_vars = [
         "RURALPiped",
         "URBANPiped",
+        "RURALPackaged",
+        "URBANPackaged",
+        "RURALDelivered",
+        "URBANDelivered",
+        "RURALBorehole",
+        "URBANBorehole",
         "PBO",
         "Average Weight",
         "Household_Size",
@@ -1045,6 +1109,7 @@ def main(
 
     # Add back % urban data
     df_output = add_back_percentage_urban_data(df_output, df_water)
+    df_output = prepare_source_breakdown_columns(df_output)
 
     # Save dataframes as CSV
     try:
