@@ -268,6 +268,11 @@ if __name__ == "__main__":
         hill_polarities = np.array(params["hill_polarities"])
         urban_adjustments = np.array(params["urban_adjustments"])
         rural_adjustments = np.array(params["rural_adjustments"])
+        # Keep `parameters` bound so the periodic and final save_checkpoint
+        # calls below still work on a resumed run. Without this it is only
+        # defined in the else-branch, so any resume (i.e. every Spot VM
+        # preemption) raised NameError at the first 10-iteration checkpoint.
+        parameters = params
         print("📂 Parameters restored from checkpoint")
     else:
         # Generate new parameters

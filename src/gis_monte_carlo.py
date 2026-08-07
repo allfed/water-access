@@ -131,8 +131,6 @@ def run_simulation(
     Raises:
     - AssertionError: If any of the input parameters are of incorrect type.
     """
-    # print type of crr_adjustment
-    print(type(crr_adjustment))
     assert isinstance(
         crr_adjustment, (int, np.integer)
     ), "CRR adjustment must be an integer."

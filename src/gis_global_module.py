@@ -577,7 +577,11 @@ def process_and_save_results(
     loaded_velocity_vec, unloaded_velocity_vec, max_load_vec = results.T
 
     # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
-    average_velocity = 2 / (1 / loaded_velocity_vec + 1 / unloaded_velocity_vec)
+    import src.mobility_module as mm
+
+    average_velocity = mm.harmonic_mean_velocity(
+        loaded_velocity_vec, unloaded_velocity_vec
+    )
 
     # Customizing column names based on the type of velocity
     loaded_velocity_col = f"loaded_velocity_{velocity_type}"

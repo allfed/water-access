@@ -16,6 +16,41 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
+def harmonic_mean_velocity(v_loaded, v_unloaded):
+    """Round-trip average velocity as the harmonic mean of the two leg velocities.
+
+    A round trip covers the same distance on each leg, so the time-weighted
+    average speed is the harmonic mean, not the arithmetic mean.
+
+    Zero-safe: an unreachable leg is reported as 0 m/s by the velocity floor in
+    ``single_lankford_run``. The naive ``2 / (1/a + 1/b)`` divides by zero on
+    those rows -- mathematically it still tends to the right answer (0), but it
+    emits a RuntimeWarning per row, which is millions of warnings on a full
+    run. Compute it as ``2ab / (a + b)`` instead, which reaches the same result
+    with no division by zero, and return 0 where either leg is unreachable.
+
+    Parameters:
+    - v_loaded: float or numpy.ndarray. Loaded-leg velocity (m/s).
+    - v_unloaded: float or numpy.ndarray. Unloaded-leg velocity (m/s).
+
+    Returns:
+    - float or numpy.ndarray: round-trip average velocity (m/s), 0 where
+      either leg is 0.
+    """
+    v_loaded = np.asarray(v_loaded, dtype=float)
+    v_unloaded = np.asarray(v_unloaded, dtype=float)
+
+    numerator = 2.0 * v_loaded * v_unloaded
+    denominator = v_loaded + v_unloaded
+
+    return np.divide(
+        numerator,
+        denominator,
+        out=np.zeros_like(numerator),
+        where=denominator > 0,
+    )
+
+
 def linspace_creator(max_value_array, min_value, res):
     """Creates a linspace numpy array from the given inputs.
 
@@ -228,13 +263,24 @@ class mobility_models:
         data_unloaded = (mv.m1, met, s * mo.ulhillpo)
         V_guess = 1  # Initial guess for velocity
         V_un = fsolve(model, V_guess, args=data_unloaded, full_output=True)
-        unloaded_velocity = V_un[0][0] if V_un[2] == 1 else np.nan
+        # Velocity floor: a non-converged or negative solve means the trip
+        # cannot be made, so the reachable velocity is 0 (never NaN/negative).
+        # NaN here used to propagate through the round-trip mean into
+        # "max distance walking", where it silently compares False against
+        # every downstream threshold instead of counting as unreachable.
+        if V_un[2] == 1 and V_un[0][0] >= 0:
+            unloaded_velocity = V_un[0][0]
+        else:
+            unloaded_velocity = 0.0
 
         # Calculate loaded velocity
         total_load = mv.m1 + max_load_HPV
         data_loaded = (total_load, met, s * mo.lhillpo)
         V_load = fsolve(model, V_guess, args=data_loaded, full_output=True)
-        loaded_velocity = V_load[0][0] if V_load[2] == 1 else np.nan
+        if V_load[2] == 1 and V_load[0][0] >= 0:
+            loaded_velocity = V_load[0][0]
+        else:
+            loaded_velocity = 0.0
 
         return loaded_velocity, unloaded_velocity, max_load_HPV
 
@@ -904,8 +950,8 @@ class model_results:
         self.model_name = mo.model_name
 
         # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
-        self.v_avg_matrix3d = 2 / (
-            1 / self.v_load_matrix3d + 1 / self.v_unload_matrix3d
+        self.v_avg_matrix3d = harmonic_mean_velocity(
+            self.v_load_matrix3d, self.v_unload_matrix3d
         )
 
         self.velocitykgs = self.v_avg_matrix3d * self.load_matrix3d
