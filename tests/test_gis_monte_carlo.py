@@ -58,6 +58,30 @@ class TestSampleLognormal:
             sample_lognormal(low, high, n)
 
 
+class TestSamplerMedians:
+    """Sanity checks so a sampler swap does not silently misbehave.
+
+    Both samplers treat [low, high] as a 90% CI, so the median is the geometric
+    mean of the bounds for sample_lognormal and the arithmetic mean for
+    sample_normal. These are properties of the samplers themselves -- the
+    bounds used here are illustrative and do NOT pin the production parameter
+    ranges, which live at the top of the scripts/run_monte_carlo*.py files.
+    """
+
+    def test_lognormal_median_is_geometric_mean_of_bounds(self):
+        # lognormal(2, 5) -> median ~= sqrt(2 * 5) = 3.162
+        np.random.seed(42)
+        samples = sample_lognormal(2, 5, 200000)
+        expected_median = np.sqrt(2 * 5)  # ~3.162
+        assert np.isclose(np.median(samples), expected_median, atol=0.05)
+
+    def test_normal_median_is_arithmetic_mean_of_bounds(self):
+        # normal(3, 5) -> median ~= mean of bounds = 4
+        np.random.seed(42)
+        samples = sample_normal(3, 5, 200000)
+        assert np.isclose(np.median(samples), 4.0, atol=0.02)
+
+
 class TestRunSimulation:
     def test_valid_input_returns_result(self):
         crr_adjustment = 1
