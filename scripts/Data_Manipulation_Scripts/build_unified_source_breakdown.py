@@ -1,0 +1,368 @@
+"""Build a unified drinking-water source breakdown (JMP + researched fills).
+
+Merges the JMP-parsed breakdown (jmp_source_breakdown_latest.csv) with the
+manually curated research dataset (researched_source_breakdown.csv, built from
+national censuses, DHS/EPHS reports, regulator statistics and statistical-
+office publications for the countries whose JMP country files carry no
+source-type data).
+
+Priority: JMP-parsed values always win. Research values only fill rows where
+the JMP extract is entirely blank. Provenance is carried per row.
+
+Research-filled rows are then reconciled against the WHO/JMP piped share using
+the same "unpiped budget" rule the JMP parser applies to survey rows
+(normalize_unpiped_subcategories: if the four categories sum to more than
+100 - piped, scale them down proportionally), with one carve-out agreed on
+2026-08-08: when WHO piped is >= 99.5 (i.e. a rounded ">99") the budget is
+effectively zero and proportional scaling would delete measured regulator or
+census values (e.g. Denmark's 4% private boreholes). In that case the
+categories are kept (capped at a 100 total) and an effective piped share
+(100 - categories) is emitted instead, in URBANPipedEffective /
+RURALPipedEffective. Downstream consumers that adopt the source breakdown
+should also adopt PipedEffective where it is set; otherwise piped + packaged
+users double-count. See researched_source_breakdown_README.md.
+
+Run from repo root:
+  python scripts/Data_Manipulation_Scripts/build_unified_source_breakdown.py
+      [--exclude-low-confidence]
+
+Outputs:
+  data/processed/semi-processed/jmp_source_breakdown_unified.csv
+  data/processed/semi-processed/jmp_source_breakdown_unified_validation.csv
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from jmp_source_parser import (  # noqa: E402
+    DEFAULT_MANUAL_ALPHA3_MAPPING,
+    load_piped_reference_from_water_csv,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SEMI_PROCESSED = REPO_ROOT / "data" / "processed" / "semi-processed"
+JMP_BREAKDOWN_CSV = SEMI_PROCESSED / "jmp_source_breakdown_latest.csv"
+RESEARCH_CSV = REPO_ROOT / "data" / "original_data" / "researched_source_breakdown.csv"
+WATER_CSV = (
+    REPO_ROOT / "data" / "original_data" / "WHO Household Water Data - 2023 Data.csv"
+)
+OUTPUT_CSV = SEMI_PROCESSED / "jmp_source_breakdown_unified.csv"
+VALIDATION_CSV = SEMI_PROCESSED / "jmp_source_breakdown_unified_validation.csv"
+
+VALUE_COLS = [
+    "URBANPackaged",
+    "RURALPackaged",
+    "URBANDelivered",
+    "RURALDelivered",
+    "URBANBorehole",
+    "RURALBorehole",
+    "URBANOtherUnpiped",
+    "RURALOtherUnpiped",
+]
+PROVENANCE_COLS = [
+    "data_origin",
+    "research_tier",
+    "research_confidence",
+    "research_source",
+    "research_url",
+    "research_flags",
+    "research_notes",
+    "research_bounds",
+    "research_verification",
+]
+
+# Sum of piped + our four categories per stratum may exceed 100 by this much
+# before it is reported (rounding and reference-year mismatch tolerance).
+SUM_TOLERANCE = 2.0
+
+# WHO piped shares at or above this are treated as rounded ">99" values whose
+# unpiped budget (100 - piped) is an artifact of rounding, not a measurement.
+ROUNDED_PIPED_THRESHOLD = 99.5
+
+CATEGORIES = ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
+
+
+def reconcile_stratum_with_piped_budget(
+    values: dict[str, float | None], piped: float | None
+) -> tuple[dict[str, float | None], float | None, str | None]:
+    """Reconcile one stratum's four category values with the WHO piped share.
+
+    Implements the call-agreed rule (James Mulhall / Kevin Rassool,
+    2026-08-06 call; carve-out added 2026-08-08):
+
+    - Default (piped < ROUNDED_PIPED_THRESHOLD): James's unpiped-budget rule,
+      identical to normalize_unpiped_subcategories in jmp_source_parser.py —
+      if the categories sum past 100 - piped, scale them all down
+      proportionally to fit. Piped wins because category surveys are often
+      multi-response and overlap sits mostly with piped users, who are
+      already counted as losing access.
+    - Carve-out (piped >= ROUNDED_PIPED_THRESHOLD): the budget is a rounding
+      artifact ("piped >99" -> 100), so scaling would zero out measured
+      regulator/census values. Keep the categories (proportionally capped at
+      a 100 total if they exceed it) and return an effective piped share of
+      100 - sum(categories) for downstream use instead.
+
+    ``values`` maps category name -> value or None (None = unknown, never
+    scaled into a number). Returns (adjusted values, effective piped or None,
+    adjustment note or None).
+    """
+    known = {k: v for k, v in values.items() if v is not None and pd.notna(v)}
+    total = sum(known.values())
+    if not known or piped is None or pd.isna(piped):
+        return dict(values), None, None
+
+    if piped >= ROUNDED_PIPED_THRESHOLD:
+        if total > 100.0:
+            scale = 100.0 / total
+            adjusted = {
+                k: (round(v * scale, 4) if k in known else None)
+                for k, v in values.items()
+            }
+            note = f"piped_capped(scale={round(scale, 4)})"
+            total = 100.0
+        else:
+            adjusted = dict(values)
+            note = "piped_capped"
+        return adjusted, round(100.0 - total, 4), note
+
+    budget = max(0.0, 100.0 - piped)
+    if total <= budget or total == 0:
+        return dict(values), None, None
+
+    scale = budget / total
+    adjusted = {
+        k: (round(v * scale, 4) if k in known else None) for k, v in values.items()
+    }
+    return adjusted, None, f"scaled_to_unpiped_budget(scale={round(scale, 4)})"
+
+
+def load_research(path: Path, exclude_low_confidence: bool) -> pd.DataFrame:
+    research = pd.read_csv(path)
+    for col in VALUE_COLS:
+        research[col] = pd.to_numeric(research[col], errors="coerce")
+
+    has_values = research[VALUE_COLS].notna().any(axis=1)
+    research = research[has_values].copy()
+
+    if exclude_low_confidence:
+        research = research[research["confidence"].str.lower() != "low"].copy()
+
+    dupes = research[research.duplicated(subset=["alpha3"], keep=False)]
+    if not dupes.empty:
+        raise ValueError(
+            f"Duplicate alpha3 rows in research CSV: {sorted(dupes['alpha3'])}"
+        )
+    return research
+
+
+def validate(unified: pd.DataFrame, piped_reference: dict) -> pd.DataFrame:
+    """Range and sum checks; returns a dataframe of warnings (may be empty)."""
+    problems = []
+    for _, row in unified.iterrows():
+        alpha3 = row["alpha3"]
+        for col in VALUE_COLS:
+            value = row[col]
+            if pd.notna(value) and not (0 <= value <= 100):
+                problems.append((alpha3, col, value, "value outside [0, 100]"))
+
+        piped = piped_reference.get(alpha3, {})
+        for stratum in ("URBAN", "RURAL"):
+            piped_value = row.get(f"{stratum}PipedEffective")
+            if pd.isna(piped_value):
+                piped_value = piped.get(f"{stratum}Piped")
+            parts = [
+                row[f"{stratum}{cat}"]
+                for cat in ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
+            ]
+            known = [p for p in parts if pd.notna(p)]
+            if not known:
+                continue
+            unpiped_sum = sum(known)
+            if unpiped_sum > 100 + SUM_TOLERANCE:
+                problems.append(
+                    (
+                        alpha3,
+                        stratum,
+                        round(unpiped_sum, 2),
+                        "unpiped categories sum > 100",
+                    )
+                )
+            elif (
+                piped_value is not None
+                and piped_value + unpiped_sum > 100 + SUM_TOLERANCE
+            ):
+                problems.append(
+                    (
+                        alpha3,
+                        stratum,
+                        round(piped_value + unpiped_sum, 2),
+                        f"piped ({piped_value}) + unpiped categories > 100",
+                    )
+                )
+    return pd.DataFrame(problems, columns=["alpha3", "field", "value", "problem"])
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--exclude-low-confidence",
+        action="store_true",
+        help="Drop research fills whose confidence is 'low'.",
+    )
+    args = parser.parse_args()
+
+    jmp = pd.read_csv(JMP_BREAKDOWN_CSV)
+    research = load_research(RESEARCH_CSV, args.exclude_low_confidence)
+
+    unified = jmp.copy()
+    for col in PROVENANCE_COLS:
+        unified[col] = pd.NA
+
+    jmp_has_data = unified[VALUE_COLS].notna().any(axis=1)
+    unified.loc[jmp_has_data, "data_origin"] = "jmp"
+    unified.loc[~jmp_has_data, "data_origin"] = "none"
+
+    research_by_alpha3 = research.set_index("alpha3")
+    filled = []
+    skipped_jmp_present = []
+    for idx in unified.index[~jmp_has_data]:
+        alpha3 = unified.at[idx, "alpha3"]
+        if alpha3 not in research_by_alpha3.index:
+            continue
+        r = research_by_alpha3.loc[alpha3]
+        for col in VALUE_COLS:
+            unified.at[idx, col] = r[col]
+        unified.at[idx, "survey"] = r.get("survey")
+        unified.at[idx, "survey_year"] = r.get("survey_year")
+        unified.at[idx, "data_origin"] = "research"
+        unified.at[idx, "research_tier"] = r.get("tier")
+        unified.at[idx, "research_confidence"] = r.get("confidence")
+        unified.at[idx, "research_source"] = r.get("source")
+        unified.at[idx, "research_url"] = r.get("url")
+        unified.at[idx, "research_flags"] = r.get("flags")
+        unified.at[idx, "research_notes"] = r.get("mapping_notes")
+        unified.at[idx, "research_bounds"] = r.get("bounds_notes")
+        unified.at[idx, "research_verification"] = r.get("verification")
+        filled.append(alpha3)
+
+    # Research rows for territories absent from the JMP extract entirely.
+    missing = research_by_alpha3.index.difference(unified["alpha3"])
+    for alpha3 in missing:
+        r = research_by_alpha3.loc[alpha3]
+        new_row = {
+            "alpha3": alpha3,
+            "Entity": r.get("Entity"),
+            "data_origin": "research",
+        }
+        for col in VALUE_COLS:
+            new_row[col] = r[col]
+        new_row["survey"] = r.get("survey")
+        new_row["survey_year"] = r.get("survey_year")
+        new_row["research_tier"] = r.get("tier")
+        new_row["research_confidence"] = r.get("confidence")
+        new_row["research_source"] = r.get("source")
+        new_row["research_url"] = r.get("url")
+        new_row["research_flags"] = r.get("flags")
+        new_row["research_notes"] = r.get("mapping_notes")
+        new_row["research_bounds"] = r.get("bounds_notes")
+        new_row["research_verification"] = r.get("verification")
+        unified = pd.concat([unified, pd.DataFrame([new_row])], ignore_index=True)
+        filled.append(alpha3)
+
+    research_available = set(research_by_alpha3.index)
+    skipped_jmp_present = sorted(
+        research_available & set(unified.loc[jmp_has_data, "alpha3"])
+    )
+
+    # Normalize garbled Entity names in the JMP extract (Arabic-script rows for
+    # BHR/KWT/QAT, literal '0' for MAC) using the research dataset's names.
+    def _entity_is_garbled(value) -> bool:
+        if pd.isna(value):
+            return True
+        text = str(value)
+        return text == "0" or not any(c.isascii() and c.isalpha() for c in text)
+
+    research_full = (
+        pd.read_csv(RESEARCH_CSV).drop_duplicates("alpha3").set_index("alpha3")
+    )
+    for idx, row in unified.iterrows():
+        if (
+            _entity_is_garbled(row.get("Entity"))
+            and row["alpha3"] in research_full.index
+        ):
+            unified.at[idx, "Entity"] = research_full.loc[row["alpha3"], "Entity"]
+
+    piped_reference = {}
+    if WATER_CSV.exists():
+        piped_reference = load_piped_reference_from_water_csv(
+            WATER_CSV, manual_alpha3_mapping=DEFAULT_MANUAL_ALPHA3_MAPPING
+        )
+
+    # Reconcile research-origin rows with the WHO piped share. JMP-origin rows
+    # were already fitted to the unpiped budget by the parser
+    # (normalize_unpiped_subcategories), so only research fills are touched.
+    for col in (
+        "URBANPipedEffective",
+        "RURALPipedEffective",
+        "URBAN_budget_adjustment",
+        "RURAL_budget_adjustment",
+    ):
+        unified[col] = pd.NA
+    adjustments = []
+    for idx, row in unified.iterrows():
+        if row["data_origin"] != "research":
+            continue
+        piped = piped_reference.get(row["alpha3"], {})
+        for stratum in ("URBAN", "RURAL"):
+            values = {cat: row[f"{stratum}{cat}"] for cat in CATEGORIES}
+            adjusted, piped_effective, note = reconcile_stratum_with_piped_budget(
+                values, piped.get(f"{stratum}Piped")
+            )
+            for cat, value in adjusted.items():
+                unified.at[idx, f"{stratum}{cat}"] = value
+            if piped_effective is not None:
+                unified.at[idx, f"{stratum}PipedEffective"] = piped_effective
+            if note:
+                unified.at[idx, f"{stratum}_budget_adjustment"] = note
+                adjustments.append((row["alpha3"], stratum, note))
+
+    validation = validate(unified, piped_reference)
+
+    unified = unified.sort_values("alpha3").reset_index(drop=True)
+    unified.to_csv(OUTPUT_CSV, index=False)
+    validation.to_csv(VALIDATION_CSV, index=False)
+
+    origin_counts = unified["data_origin"].value_counts(dropna=False)
+    print("data_origin counts:")
+    for origin, count in origin_counts.items():
+        print(f"  {origin}: {count}")
+    print(f"research fills applied: {len(filled)} -> {sorted(set(filled))}")
+    if skipped_jmp_present:
+        print(
+            "research rows ignored because JMP already has data "
+            f"(JMP wins): {skipped_jmp_present}"
+        )
+    if adjustments:
+        print(f"piped-budget reconciliation applied to {len(adjustments)} strata:")
+        for alpha3, stratum, note in adjustments:
+            print(f"  {alpha3} {stratum}: {note}")
+    if validation.empty:
+        print("validation: no problems found")
+    else:
+        print(f"validation: {len(validation)} problems -> {VALIDATION_CSV}")
+        print(validation.to_string(index=False))
+    print(f"wrote {len(unified)} rows to {OUTPUT_CSV}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
