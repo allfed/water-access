@@ -83,5 +83,5 @@ Default borehole displacement scenarios: 50% urban, 25% rural (JMP does not dist
 
 ## Full reproduction
 
-Step-by-step instructions to reproduce the full analysis pipeline (including QGIS map outputs) are in [`docs/README.md`](docs/README.md).
+Step-by-step instructions to reproduce the full analysis pipeline (including QGIS map outputs) are in [`docs/README.md`](docs/readme.md).
 
