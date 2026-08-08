@@ -91,8 +91,14 @@ resampling needed. This is the ADR-3 alternative population layer.
 (`GMTEDmd`) — i.e. the requested "aggregation = mean, DEM = median" product.
 `slope_1KMmn_GMTEDmn.tif` **does not exist** (404); EarthEnv only publishes
 derived variables off the median DEM, so `GMTEDmd` is the only mean-aggregated
-option. (`slope_1KMmd_GMTEDmd.tif`, the median-aggregated variant, exists at
-693 MB but was not taken.)
+option.
+
+> **Superseded as the pipeline's slope layer.** Phase B established that the
+> legacy CSV's `slope_1` is bit-exact EarthEnv's **median**-aggregated (`md`)
+> product, not this mean-aggregated (`mn`) one — see items 10 and 11 below and
+> `scripts/extraction/README.md` §6. This file stays on disk as the ADR-3
+> configuration and as the automatic fallback if the `md` file is absent, but
+> nothing reads it by default.
 
 > **Extent gotcha:** latitude coverage is **−56° to +84°** (16800 rows), not full
 > globe. Columns align with the master grid but rows do **not** — needs a windowed
@@ -111,7 +117,9 @@ option. (`slope_1KMmd_GMTEDmd.tif`, the median-aggregated variant, exists at
 
 Degree-of-Urbanisation classes: 10/11/12/13 = water & rural grades, 21/22/23 =
 urban cluster grades, 30 = urban centre. `-200` = nodata.
-V2-0 was available, so **no fallback to V1-0 was needed**.
+V2-0 was available, so **no fallback to V1-0 was needed** — though V1-0 was
+later fetched anyway (item 12) to check whether the version the legacy code
+names changes anything. It does not.
 The zip also contained the DUC and UC settlement-boundary shapefiles, kept in
 `ghs_smod/`.
 
@@ -167,16 +175,85 @@ in `grip4/`.
 > lon/lat, but `gdf.crs` is not `EPSG:4326`, so a `set_crs(4326, allow_override=True)`
 > is needed before any CRS-checked spatial join.
 
+## 10. EarthEnv 1 km slope, **median** aggregation — **NEW (Phase B)**
+
+| | |
+|---|---|
+| **Filename** | `slope_1KMmd_GMTEDmd.tif` |
+| **Source** | `https://data.earthenv.org/topography/slope_1KMmd_GMTEDmd.tif` (EarthEnv, https://www.earthenv.org/topography) |
+| **Downloaded** | 2026-08-08 (Phase B) |
+| **Size on disk** | 693 MB |
+| **Licence** | No explicit licence on the EarthEnv page; cite Amatulli et al. 2018, *Scientific Data* 5:180040 (`doi:10.1038/sdata.2018.40`). Treat as CC BY-equivalent with attribution. |
+| **Verification** | `width=43200 height=16800 count=1 dtype=float32 crs=EPSG:4326 nodata=-32768.0 res=(0.00833333, 0.00833333)`, bounds `(-180, -56, 180, 84)` |
+
+**This is the slope layer the 30 arc-second pipeline actually uses** (`slope_1`).
+Variant: aggregated to the 1 km grain by **median** (`md`), off the GMTED
+median-elevation source (`GMTEDmd`).
+
+Why `md` and not the `mn` of item 6: the legacy QGIS CSV's `slope_1` was
+tested against both and is **bit-exact** the `md` product — 100.00% exact match
+on 5,000 random cells and 100.0000% agreement across all 2,190,444 joined cells
+in the full Gate 1 run, whereas `mn` runs ~15% higher globally (mean ratio
+1.155, correlation 0.990). So the median-aggregation product, not the mean one,
+is the true 30as analogue of the layer the published model was built on. This
+is a deliberate documented deviation from SPEC ADR-3; see
+`scripts/extraction/README.md` §6.
+
+> **Extent gotcha:** same as item 6 — latitude coverage is **−56° to +84°**
+> (16800 rows), not full globe, so rows are offset from the master grid and
+> cells outside the GMTED envelope have no slope value.
+
+## 11. EarthEnv 10 km slope, median aggregation (5 arc-minute) — **NEW (Phase B)**
+
+| | |
+|---|---|
+| **Filename** | `slope_10KMmd_GMTEDmd.tif` |
+| **Source** | `https://data.earthenv.org/topography/slope_10KMmd_GMTEDmd.tif` (EarthEnv) |
+| **Downloaded** | 2026-08-08 (Phase B) |
+| **Size on disk** | 6.6 MB |
+| **Licence** | As item 10 — cite Amatulli et al. 2018 (`doi:10.1038/sdata.2018.40`) |
+| **Verification** | `width=4320 height=1680 count=1 dtype=float32 crs=EPSG:4326 nodata=-32768.0 res=(0.08333333, 0.08333333)`, bounds `(-180, -56, 180, 84)` |
+
+EarthEnv's natively 10 km (= 5 arc-minute) median-aggregated product, and the
+`slope_1` source at 5 arc-minute. This is the file the bit-exactness result in
+item 10 was established against: it reproduces the legacy CSV's `slope_1`
+exactly, which is what identified the whole `md` family as the right one.
+
+## 12. GHS-SMOD R2023A 2020, 1 km Mollweide — **V1-0** — **NEW (Phase B)**
+
+| | |
+|---|---|
+| **Filename** | `GHS_SMOD_E2020_GLOBE_R2023A_54009_1000_V1_0.tif` (archive `ghs_smod_v1.zip`, 29 MB, retained) |
+| **Source** | `https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_SMOD_GLOBE_R2023A/GHS_SMOD_E2020_GLOBE_R2023A_54009_1000/V1-0/GHS_SMOD_E2020_GLOBE_R2023A_54009_1000_V1_0.zip` |
+| **Downloaded** | 2026-08-08 (Phase B) |
+| **Size on disk** | 18 MB |
+| **Licence** | European Commission reuse policy — open and free, reuse authorised with source acknowledgement |
+| **Verification** | `width=36082 height=18000 count=1 dtype=int16 crs=ESRI:54009 nodata=-200.0 res=(1000.0, 1000.0)`, bounds `(-18041000, -9000000, 18041000, 9000000)` |
+
+The **older** release of item 7, downloaded because `src/gis_global_module.py:171`
+names V1-0 — i.e. it is the version the legacy pipeline referenced. Fetched to
+settle whether the version difference mattered: cell-level class agreement with
+the legacy CSV is **91.9% (V1-0) vs 91.7% (V2-0)**, i.e. not materially
+different (`scripts/extraction/gate1_exceptions.json`). V2-0 therefore remains
+the default; V1-0 stays on disk and is selectable with `--smod-raster`.
+
+Grid, classes and the Mollweide projection gotcha are identical to item 7.
+
 ---
 
 ## Disk usage
 
 | | |
 |---|---|
-| **Total `data/GIS/source_rasters/`** | **3.1 GB** |
-| New this session (items 5–9) | ~1.7 GB (GPW 407 MB · slope 768 MB · SMOD 75 MB · GRIP4 321 MB · ADM1 138 MB) |
+| **Total `data/GIS/source_rasters/`** | **3.7 GB** (`du -sh`, measured 2026-08-08 after Phase B) |
+| Items 5–9 (first download session) | ~1.7 GB (GPW 407 MB · slope `mn` 768 MB · SMOD V2-0 75 MB · GRIP4 321 MB · ADM1 138 MB) |
+| Items 10–12 (added in Phase B) | ~747 MB (slope `md` 1 km 693 MB · slope `md` 10 km 6.6 MB · SMOD V1-0 18 MB + 29 MB zip) |
 | Pre-existing (items 1–4) | ~1.4 GB |
-| Free space remaining on volume | 16 GB |
+| Free space remaining on volume | 20 GB |
+
+Derived output, not source, and gitignored:
+`data/GIS/extracted/master_30as.parquet` is **3.4 GB** and
+`master_5min.parquet` **36 MB**. Budget ~3.5 GB of free space to rebuild them.
 
 ## Summary of cross-layer alignment
 
@@ -184,7 +261,9 @@ in `grip4/`.
 |---|---|---|
 | Kummu dtw 30as | 43200 × 21600, EPSG:4326 | master |
 | GPW v4.11 density | 43200 × 21600, EPSG:4326 | **yes, exact** |
-| EarthEnv slope | 43200 × 16800, EPSG:4326 | columns yes, rows offset (lat −56…84) |
+| EarthEnv slope 1 km (`md`, **in use**, item 10) | 43200 × 16800, EPSG:4326 | columns yes, rows offset (lat −56…84) |
+| EarthEnv slope 1 km (`mn`, item 6) | 43200 × 16800, EPSG:4326 | as above; not read by default |
+| EarthEnv slope 10 km (`md`, item 11) | 4320 × 1680, EPSG:4326 | matches the 5 arcmin grid in x, rows offset |
 | GHS-POP R2023A | 43202 × 21384, EPSG:4326 | **no** — different width and height |
 | GHS-SMOD R2023A | 36082 × 18000, ESRI:54009 | **no** — Mollweide, needs reprojection |
 | GRIP4 densities | 4320 × 2160, CRS unset | matches the 5 arcmin grid exactly |
