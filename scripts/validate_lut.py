@@ -36,7 +36,7 @@ from src.gis_global_module import (  # noqa: E402
     load_hpv_parameters,
     map_hill_polarity,
 )
-from src.monte_carlo_constants import sample_parameters  # noqa: E402
+from src.monte_carlo_constants import POLARITY_OPTIONS, sample_parameters  # noqa: E402
 
 #: ``sample_parameters`` returns plural keys; map them to the singular names
 #: ``run_global_analysis`` (and this script) use.
@@ -129,8 +129,8 @@ def compare(name, lut_values, reference_values, records):
         {
             "quantity": name,
             "n": int(both_finite.sum()),
-            "max_abs_error": float(delta.max()) if delta.size else 0.0,
-            "max_rel_error_pct": float(relative.max() * 100) if delta.size else 0.0,
+            "max_abs_error": f"{delta.max():.3e}" if delta.size else "0",
+            "max_rel_error_pct": (f"{relative.max() * 100:.5f}" if delta.size else "0"),
             "tolerance_breaches": breaches,
             "nan_mismatches": nan_mismatch,
         }
@@ -242,6 +242,12 @@ def main():
             PARAMETER_ALIASES[name]: values[draw]
             for name, values in parameter_draws.items()
         }
+        # Hill polarity is stratified across draws rather than left to the i.i.d.
+        # sample. It is the one parameter that changes the *shape* of the problem
+        # -- a downhill leg can drive the bike solver into the regime where its
+        # initial-guess ladder stalls -- and an i.i.d. draw of 10 routinely
+        # misses one of the four options entirely.
+        params["hill_polarity"] = POLARITY_OPTIONS[draw % len(POLARITY_OPTIONS)]
         result = run_one_draw(rng, params, slope_pool, mass_pool, samples_per_draw)
         for model in ("bike", "walk"):
             collected[model][0].append(result[model][0])

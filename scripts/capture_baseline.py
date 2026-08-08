@@ -14,9 +14,10 @@ country- and district-level frames. The committed copy under
 
 import argparse
 import json
+import resource
+import sys
 import time
 from pathlib import Path
-import sys
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
@@ -75,11 +76,18 @@ def main():
     df_districts.to_csv(out_dir / "districts.csv", index=False)
 
     # AC-7 measures the run excluding the initial data load, so record both.
+    # Peak RSS is recorded too: it is the 5-arcmin datum Phase D extrapolates
+    # from for the AC-6 30-arcsecond budget.
+    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform != "darwin":  # Linux reports kilobytes, macOS reports bytes
+        peak_rss *= 1024
     timing = {
         "input": str(gis.URB_DATA_FILE),
         "total_seconds": round(total_seconds, 3),
         "load_seconds": round(load_seconds, 3),
         "seconds_excluding_load": round(total_seconds - load_seconds, 3),
+        "peak_rss_gb": round(peak_rss / 1e9, 3),
+        "modelled_cells": int(len(_df_zones)) if len(_df_zones.columns) else None,
     }
     (out_dir / "timing.json").write_text(json.dumps(timing, indent=2) + "\n")
 

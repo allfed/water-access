@@ -242,6 +242,23 @@ def main():
             "took ~4 minutes)",
             "",
         ]
+        if timing.get("peak_rss_gb") is not None:
+            cells = timing.get("modelled_cells")
+            lines += [
+                "## Memory (ADR-5 datum for Phase D)",
+                "",
+                f"- Peak RSS of the single fixed-parameter run: "
+                f"**{timing['peak_rss_gb']:.2f} GB**",
+                (
+                    f"- Modelled cells: {cells:,}"
+                    if cells
+                    else "- Modelled cells: not recorded"
+                ),
+                "",
+                "This is the 5-arcmin datum; AC-6's 24 GB budget is measured at "
+                "30 arc-seconds by Phase D.",
+                "",
+            ]
     else:
         lines += ["- No `timing.json` found next to the new results.", ""]
 
