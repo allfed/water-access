@@ -46,7 +46,39 @@ this table is the download recipe.
 Optional / cross-check only (not read by the pipeline):
 `ghs_pop_2020_30ss.tif` (GHS-POP, alternative population layer),
 `geoBoundariesCGAZ_ADM0.gpkg`, `GHS_SMOD_..._V1_0.tif`,
-`slope_1KMmn_GMTEDmd.tif` (mean-aggregated slope; see §6).
+`slope_1KMmn_GMTEDmd.tif` (mean-aggregated slope; see §6), and
+`gpw_v4_density_adjusted_2020_30sec.tif` (the **UN WPP-adjusted** GPW sibling —
+a documented alternate selectable with `--pop-raster`; see §6 for why it is not
+the default).
+
+**GPW UN WPP-adjusted variant (alternate).** SEDAC's own host is dead; the
+product now lives on NASA Earthdata and **requires a (free) Earthdata login**,
+so it cannot be `curl`ed unauthenticated. Collection `C3540929692-ESDIS`,
+`doi:10.7927/H4F47M65`, CC BY 4.0 (CIESIN/SEDAC). Download the `_asc` bundle
+(8 ESRI-ASCII tiles, 182 MB zipped / 6.1 GB unpacked) from
+
+```
+https://data.earthdata.nasa.gov/nasa-earth/human-dimensions/sedac-root/downloads/data/gpw-v4/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11_2020_30_sec_asc.zip
+```
+
+(the sibling `..._tif.zip` also exists) into `data/GIS/`, then mosaic the tiles
+into one master-lattice GeoTIFF:
+
+```bash
+.venv/bin/python scripts/extraction/convert_gpw_asc.py \
+    --zip data/GIS/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11_2020_30_sec_asc.zip \
+    --out data/GIS/source_rasters/gpw_v4_density_adjusted_2020_30sec.tif
+```
+
+`--zip` unpacks to a scratch directory and deletes each `.asc` as soon as it has
+been written, so it needs ~6.1 GB of transient free space. The script verifies
+every tile header against the reference lattice rather than assuming the 4×2
+layout, refuses to stamp the reference transform if any tile is more than
+`--max-origin-drift` (1e-6°) off it, re-reads every written block to prove the
+DEFLATE round-trip is bit-exact, and finishes with a country-ratio sanity check
+against the published UN WPP adjustment factors. Runtime ~45 s after
+extraction; output 146 MB, tiled 432×432, DEFLATE, float32, nodata −9999,
+43200×21600 on exactly the reference GPW transform.
 
 ```bash
 cd data/GIS/source_rasters
@@ -286,17 +318,57 @@ which is what the pipeline uses. `slope_1KMmn_GMTEDmd.tif` remains on disk and
 is still selectable (`--slope-raster`, and it is the automatic fallback if the
 `md` file is absent), so the ADR-3 configuration still runs.
 
-**Population — unadjusted GPW, not UN WPP-adjusted.** The legacy `pop_density`
-is GPW v4.11 **UN WPP-adjusted** density: per-country ratios reproduce the
-published adjustment factors (NPL 0.966, GBR 1.014, NGA 0.995) and the extremes
-are the classic high-migration cases (LBN −26%, QAT +24%). The adjusted product
-sits behind an Earthdata login and was not obtained, so the pipeline uses the
-unadjusted 30as raster named in ADR-3. This is immaterial downstream:
+**Population — GPW adjusted vs unadjusted (hypothesis tested and refuted,
+2026-08-09).** The pipeline uses the **unadjusted** GPW v4.11 30as raster named
+in ADR-3, and Gate 1 carries a wildcard `pop_total_pct` exception for it.
+
+Phase A hypothesised that the residual existed because the legacy manual-QGIS
+artefact had used the **UN WPP-adjusted** GPW variant while the pipeline used
+the unadjusted one. The adjusted product has since been obtained (see §2) and
+the hypothesis is **refuted** — the legacy layer is the *unadjusted* product:
+
+| evidence (from `validate_extraction.py`, 5 arcmin, 160 gated countries) | unadjusted (default) | adjusted |
+|---|---|---|
+| cell-level `pop_density` agreement, `--pop-agg average` | **61.12%** | 27.22% |
+| cell-level agreement, `--pop-agg nearest` | **73.24%** | 28.47% |
+| countries within AC-3's 1% on `pop_total_pct` | **45 / 160** | 15 / 160 |
+| median \|`pop_total_pct`\| | **1.94%** | 6.22% |
+| worst \|`pop_total_pct`\| | **26.29% (LBN)** | 56.74% (LBN) |
+| uncovered Gate 1 failures | **0** | 14 |
+
+Three quarters of the legacy cells are *bit-equal* to the unadjusted raster and
+therefore cannot be the adjusted one; swapping triples the median per-country
+error and breaks the gate. The three ratios previously cited as "published
+adjustment factors" (NPL 0.966, GBR 1.014, NGA 0.995) were simply the observed
+legacy/unadjusted ratios — the true GPW adjustment factors for those countries
+are 0.739, 0.987 and 0.954, which do not match.
+
+What the residual actually is: the undocumented QGIS resampling of a highly
+skewed density field onto the coarse 5-arcmin lattice, where each output cell
+covers 100 30-arcsec source cells. Measured median / worst \|`pop_total_pct`\|
+by resampling: `average` 1.94% / 26.29%, `bilinear` 2.02% / 29.03%, `nearest`
+3.15% / 94.73%. `average` is the closest reconstruction and is the default.
+
+Either way the choice is **downstream-neutral**: the two products differ by a
+per-country scalar only (verified — the ratio is constant to 4 dp across a
+country's cells, e.g. 189,032 of Nepal's ~190k cells share one value), and
 `merge_and_adjust_population` (`src/gis_global_module.py:323-327`) renormalises
-`pop_density` to a within-country share and multiplies by an external country
-population, which cancels any uniform per-country scale factor exactly. Global
-population-weighted difference is −0.26%. If the adjusted product is ever
-obtained, point `layers.GPW_DENSITY` at it — nothing else needs to change.
+`pop_density` to a within-country share before multiplying by an external
+country population, cancelling any such scalar exactly. Global
+population-weighted difference is −0.26%.
+
+The adjusted raster is kept on disk as a documented alternate. To use it:
+
+```bash
+.venv/bin/python scripts/extraction/extract_grid.py --resolution 5min \
+    --pop-raster data/GIS/source_rasters/gpw_v4_density_adjusted_2020_30sec.tif \
+    --out data/GIS/extracted/master_5min.parquet
+```
+
+or flip `layers.GPW_DENSITY` from `GPW_DENSITY_UNADJUSTED` to
+`GPW_DENSITY_ADJUSTED`. **Doing so currently fails Gate 1** (14 uncovered
+failures), so it needs a deliberate decision and a new exception list, not a
+silent switch.
 
 ## 7. Files
 

@@ -72,8 +72,40 @@ Exactly the 30as lattice ÷ 10. Used as the validation/regression grid.
 | **Licence** | CC BY 4.0 (CIESIN, Columbia University / NASA SEDAC) |
 | **Verification** | `width=43200 height=21600 count=1 dtype=float32 crs=EPSG:4326 nodata=-9999.0 res=(0.00833333, 0.00833333)`, bounds `(-180, -90, 180, 90)` |
 
-Units: persons per km². **Grid-identical to the Kummu 30as master grid** — no
-resampling needed. This is the ADR-3 alternative population layer.
+Units: persons per km². 43200 × 21600 at exactly 1/120°, i.e. the same *shape*
+as the Kummu 30as master grid but on the clean `(-180, +90)` origin rather than
+Kummu's `(-179.999999007, +90.002416350)` — offset by ~0.1% of a cell, so
+`layers.py` reads it through `WarpedReader`, not as a native array. This is the
+ADR-3 alternative population layer and **the pipeline default**.
+
+### 5b. GPW v4.11 population density 2020, 30 arc-second, **UN WPP-adjusted** — **NEW (2026-08-09)**
+
+| | |
+|---|---|
+| **Filename** | `gpw_v4_density_adjusted_2020_30sec.tif` (converted) — from `../gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11_2020_30_sec_asc.zip` (kept) |
+| **Source** | NASA Earthdata (**free login required**; the old SEDAC host is dead), collection `C3540929692-ESDIS`, `doi:10.7927/H4F47M65`. `https://data.earthdata.nasa.gov/nasa-earth/human-dimensions/sedac-root/downloads/data/gpw-v4/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11/gpw-v4-population-density-adjusted-to-2015-unwpp-country-totals-rev11_2020_30_sec_asc.zip` |
+| **Downloaded** | 2026-08-09 |
+| **Size on disk** | zip 182 MB (retained, in `data/GIS/`) · converted tif 146 MB · 6.1 GB transient during conversion |
+| **Licence** | CC BY 4.0 (CIESIN, Columbia University / NASA SEDAC) |
+| **Conversion** | `.venv/bin/python scripts/extraction/convert_gpw_asc.py --zip data/GIS/gpw-v4-...-rev11_2020_30_sec_asc.zip --out data/GIS/source_rasters/gpw_v4_density_adjusted_2020_30sec.tif` (~45 s) |
+| **Verification** | `width=43200 height=21600 count=1 dtype=float32 crs=EPSG:4326 nodata=-9999.0 tiled 432×432 DEFLATE`; transform **bit-identical to item 5** (asserted, ≤1e-12°); every written block re-read and proven bit-exact against its `.asc` tile; 222,670,055 data cells (item 5 has 222,670,054) |
+
+The zip holds 8 ESRI-ASCII tiles of 10800 × 10800 in a 4 × 2 layout. Their
+headers carry the clean corners with ~1e-11° of float noise (`xllcorner
+-89.999999999994` etc.), i.e. the same lattice as item 5 to about one millionth
+of a cell, so the converter *stamps* item 5's transform rather than resampling;
+it refuses (and exits non-zero) if any tile is more than 1e-6° off.
+
+**This is an alternate, not the default.** It differs from item 5 by a single
+per-country scalar (the UN WPP adjustment factor — measured constant across
+≥99% of each country's populated cells), and its country totals reproduce UN
+WPP 2015-revision 2020 (ROU 19.21M vs UN 19.24M; NPL 30.17M vs 30.29M) where
+item 5's do not (ROU 34.46M, NPL 40.82M). It was obtained specifically to test
+the Phase A hypothesis that the legacy QGIS artefact had used the adjusted
+variant; **that hypothesis was refuted** — 73.2% of legacy cells are bit-equal
+to the *unadjusted* raster versus 27.2% for this one, and switching produces 14
+uncovered Gate 1 failures. Selectable with `--pop-raster`. See
+`scripts/extraction/README.md` §6.
 
 ## 6. EarthEnv 1 km slope (GMTED) — **NEW**
 
@@ -233,7 +265,8 @@ exactly, which is what identified the whole `md` family as the right one.
 The **older** release of item 7, downloaded because `src/gis_global_module.py:171`
 names V1-0 — i.e. it is the version the legacy pipeline referenced. Fetched to
 settle whether the version difference mattered: cell-level class agreement with
-the legacy CSV is **91.9% (V1-0) vs 91.7% (V2-0)**, i.e. not materially
+the legacy CSV — as measured by `validate_extraction.py`'s ungated layer table —
+is **94.96% (V1-0) vs 94.82% (V2-0)**, i.e. not materially
 different (`scripts/extraction/gate1_exceptions.json`). V2-0 therefore remains
 the default; V1-0 stays on disk and is selectable with `--smod-raster`.
 
@@ -245,11 +278,12 @@ Grid, classes and the Mollweide projection gotcha are identical to item 7.
 
 | | |
 |---|---|
-| **Total `data/GIS/source_rasters/`** | **3.7 GB** (`du -sh`, measured 2026-08-08 after Phase B) |
+| **Total `data/GIS/source_rasters/`** | **3.9 GB** (`du -sh`, measured 2026-08-09 after the GPW-adjusted addition) |
 | Items 5–9 (first download session) | ~1.7 GB (GPW 407 MB · slope `mn` 768 MB · SMOD V2-0 75 MB · GRIP4 321 MB · ADM1 138 MB) |
 | Items 10–12 (added in Phase B) | ~747 MB (slope `md` 1 km 693 MB · slope `md` 10 km 6.6 MB · SMOD V1-0 18 MB + 29 MB zip) |
+| Item 5b (added 2026-08-09) | 146 MB converted tif, plus a retained 182 MB zip in `data/GIS/` and 6.1 GB transient during conversion |
 | Pre-existing (items 1–4) | ~1.4 GB |
-| Free space remaining on volume | 20 GB |
+| Free space remaining on volume | 25 GB |
 
 Derived output, not source, and gitignored:
 `data/GIS/extracted/master_30as.parquet` is **3.4 GB** and
@@ -260,7 +294,7 @@ Derived output, not source, and gitignored:
 | Layer | Grid | Aligns with Kummu 30as master? |
 |---|---|---|
 | Kummu dtw 30as | 43200 × 21600, EPSG:4326 | master |
-| GPW v4.11 density | 43200 × 21600, EPSG:4326 | **yes, exact** |
+| GPW v4.11 density (items 5 and 5b) | 43200 × 21600, EPSG:4326 | same shape, origin `(-180, +90)` vs Kummu's `(-179.999999007, +90.002416350)` — ~0.1% of a cell off, so warped, not native. Items 5 and 5b are bit-identical to each other. |
 | EarthEnv slope 1 km (`md`, **in use**, item 10) | 43200 × 16800, EPSG:4326 | columns yes, rows offset (lat −56…84) |
 | EarthEnv slope 1 km (`mn`, item 6) | 43200 × 16800, EPSG:4326 | as above; not read by default |
 | EarthEnv slope 10 km (`md`, item 11) | 4320 × 1680, EPSG:4326 | matches the 5 arcmin grid in x, rows offset |
