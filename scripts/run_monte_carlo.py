@@ -1,5 +1,4 @@
 import concurrent.futures
-import numpy as np
 from pathlib import Path
 import sys
 from tqdm import tqdm
@@ -9,6 +8,7 @@ import time
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 import src.gis_monte_carlo as mc  # noqa
+from src.monte_carlo_constants import sample_parameters  # noqa
 
 # Results path
 RESULTS_PATH = project_root / "results"
@@ -29,102 +29,25 @@ MAX_WORKERS = 15
 
 # -------------------------------------------------------------------------------
 
-
-# -------------------------------------------------------------------------------
-# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
-# -------------------------------------------------------------------------------
-
-# CRR adjustments.
-# 1 means one road type better, -1 means one road type worse
-CRR_LOWER_ESTIMATE = -1
-CRR_UPPER_ESTIMATE = 1
-
-# Time gathering water in hours
-TIME_GATHERING_LOWER_ESTIMATE = 4
-TIME_GATHERING_UPPER_ESTIMATE = 7
-
-# Practical load limits for cycling in kg
-PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
-PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
-
-# Practical load limits for walking with buckets in kg
-PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
-PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
-
-# Average METS available for walking with buckets to and from water source
-METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 6
-
-# Average watts available for cycling to and from water source
-WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 80
-
-# Polarity options (randomly chosen from list each simulation run)
-# The first word defines the trip to the water source
-# The second word defines the trip from the water source
-# Options to include: "uphill_downhill", "downhill_uphill", "uphill_flat",
-# "flat_uphill", "downhill_flat", "flat_downhill", "flat_flat"
-
-POLARITY_OPTIONS = [
-    "uphill_downhill",
-    "uphill_flat",
-    "flat_uphill",
-    "downhill_uphill",
-]
-
-# Adjustments for euclidean distance to account for paths taken to water
-# not being straight lines
-URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
-URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-
-# Set the parameters for the GPD distribution for rural adjustments.
-# Shape, scale, and loc
-# These values were obtained from the scripts/create_pareto_distribution.py
-RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
-RURAL_PDR_PARETO_SCALE = 0.19953125000000005
-RURAL_PDR_PARETO_LOC = 1.0
+# The walking and cycling sampling parameters live in
+# src/monte_carlo_constants.py so that this script, run_monte_carlo_gcp.py and
+# run_monte_carlo_test.py can never disagree about them again (ADR-7).
 
 # -------------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
-    # Monte Carlo parameters
-    crr_adjustments = np.random.randint(
-        CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
-    )
-    time_gatherings = mc.sample_normal(
-        TIME_GATHERING_LOWER_ESTIMATE,
-        TIME_GATHERING_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    practical_limits_bicycle = mc.sample_normal(
-        PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-        PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    practical_limits_buckets = mc.sample_normal(
-        PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-        PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    mets = mc.sample_normal(METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS)
-    watts_values = mc.sample_normal(
-        WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
-    )
-
-    hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
-
-    urban_adjustments = mc.sample_normal(
-        URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-        URBAN_ADJUSTMENT_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    rural_adjustments = mc.sample_gpd(
-        RURAL_PDR_PARETO_SHAPE,
-        RURAL_PDR_PARETO_SCALE,
-        RURAL_PDR_PARETO_LOC,
-        NUM_ITERATIONS,
-    )
+    # Monte Carlo parameters (canonical distributions, see ADR-7)
+    parameters = sample_parameters(NUM_ITERATIONS)
+    crr_adjustments = parameters["crr_adjustments"]
+    time_gatherings = parameters["time_gatherings"]
+    practical_limits_bicycle = parameters["practical_limits_bicycle"]
+    practical_limits_buckets = parameters["practical_limits_buckets"]
+    mets = parameters["mets"]
+    watts_values = parameters["watts_values"]
+    hill_polarities = parameters["hill_polarities"]
+    urban_adjustments = parameters["urban_adjustments"]
+    rural_adjustments = parameters["rural_adjustments"]
 
     print(crr_adjustments)
     print(time_gatherings)
