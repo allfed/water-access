@@ -1,0 +1,8 @@
+{
+  "input": "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/data/GIS/updated_GIS_output_cleaned.csv",
+  "total_seconds": 29.927,
+  "load_seconds": 1.766,
+  "seconds_excluding_load": 28.161,
+  "peak_rss_gb": 3.144,
+  "modelled_cells": 1403388
+}
