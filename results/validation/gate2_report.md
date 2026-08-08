@@ -21,23 +21,21 @@ Both runs use the AC-2 fixed parameters: `crr_adjustment=0, time_gathering_water
 | country population_piped_with_walking_access      | max 0.00004% (BHS)                               | <= 0.1%            | PASS |
 | country population_piped_with_only_cycling_access | max 0.02502% (TZA)                               | <= 0.1%            | PASS |
 | district percent_with_water (>100,000 people)     | max 0.04872 pp (36957248B69769580879919, n=2483) | <= 0.25 pp         | PASS |
-| AC-7 run time excluding data load                 | 112.9 s                                          | <= 90 s            | FAIL |
+| AC-7 run time excluding data load                 | 24.9 s                                           | <= 90 s            | PASS |
 
 ## AC-7 timing
 
 - Input: `/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/data/GIS/updated_GIS_output_cleaned.csv`
-- Total wall clock: **121.3 s**
-- Initial data load: 8.4 s
-- **Excluding data load: 112.9 s** (bar: <= 90 s; the pre-refactor solver alone took ~4 minutes)
+- Total wall clock: **26.3 s**
+- Initial data load: 1.4 s
+- **Excluding data load: 24.9 s** (bar: <= 90 s; the pre-refactor solver alone took ~4 minutes)
 
 ## Memory (ADR-5 datum for Phase D)
 
-- Peak RSS of the single fixed-parameter run: **2.15 GB**
+- Peak RSS of the single fixed-parameter run: **2.88 GB**
 - Modelled cells: 1,403,388
 
 This is the 5-arcmin datum; AC-6's 24 GB budget is measured at 30 arc-seconds by Phase D.
-
-> **AC-7 measurement caveat — re-measure on a quiet machine.** This run was taken while an unrelated GPU/CPU-heavy application (a game) held ~47% CPU, which on Apple silicon pushes the model onto efficiency cores and inflates *both* wall-clock and user CPU time by roughly 4x. A bare `pandas.read_csv` of the same input went 1.5 s -> 8.3 s over the same interval with no code involved. An A/B under identical load shows no regression from the chunking work: pre-C2 commit `1475b11` took **112.6 s** excluding load, the C2 tree **111.7 s**. On the quiet machine the same command measured **26-28 s** against the 90 s bar. The independent verifier should simply re-time it.
 
 ## Per-column population detail
 
@@ -53,4 +51,4 @@ This is the 5-arcmin datum; AC-6's 24 GB budget is measured at 30 arc-seconds by
 
 ## Verdict
 
-**FAIL**
+**PASS**
