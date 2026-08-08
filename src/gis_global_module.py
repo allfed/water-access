@@ -439,6 +439,33 @@ def merge_and_adjust_population(df_zones_input, df_input):
     return df_zones
 
 
+def decategorise(df):
+    """Turn a frame's categorical columns back into plain object columns.
+
+    Categoricals are a *per-cell* memory optimisation (ADR-5). The ~200-row
+    country and ~3000-row district aggregates gain nothing from them and lose
+    something important: a categorical keeps its full category list after rows
+    are filtered out, so a later ``groupby`` on it (as the Monte Carlo result
+    processors do) resurrects the dropped countries as empty groups. Handing the
+    aggregates back with the dtypes they have always had keeps every downstream
+    consumer -- groupbys, pickles, notebooks -- working unchanged.
+
+    Args:
+        df (DataFrame): an aggregate frame.
+
+    Returns:
+        DataFrame: the frame with no categorical columns.
+    """
+    categorical = [
+        column
+        for column in df.columns
+        if isinstance(df[column].dtype, pd.CategoricalDtype)
+    ]
+    if not categorical:
+        return df
+    return df.astype({column: object for column in categorical})
+
+
 def compact_zone_frame(df_zones):
     """Shrink a merged zone frame in place (ADR-5).
 
@@ -1801,10 +1828,12 @@ def run_global_analysis(
         plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
         use_sample_data (bool, optional): Whether to use sample data or not (only for testing). Defaults to False.
         zone_columns (list, optional): if given, only these columns of the
-            per-cell zone frame are returned. Defaults to None (every column, the
-            historical behaviour). ADR-5: at 30 arc-seconds the full zone frame
-            is tens of GB and callers keep three columns of it, so handing back
-            the whole thing is what actually blows the memory budget.
+            per-cell zone frame are returned; an empty list returns an empty
+            frame (no rows), meaning "I do not need the per-cell output".
+            Defaults to None (every column, the historical behaviour). ADR-5: at
+            30 arc-seconds the full zone frame is tens of GB and callers keep
+            three columns of it, so handing back the whole thing is what
+            actually blows the memory budget.
 
     Returns:
         pandas.DataFrame: The processed data for each country.
@@ -1852,11 +1881,20 @@ def run_global_analysis(
     # drop countries in df_distciricts if they don't appear in df_copuntries
     df_districts = df_districts[df_districts["ISOCODE"].isin(df_countries["ISOCODE"])]
 
+    # ADR-5: the aggregates leave with their historical dtypes; only the
+    # per-cell frame keeps the categorical/float32 treatment.
+    df_countries = decategorise(df_countries)
+    df_districts = decategorise(df_districts)
+
     if plot:
         plot_chloropleth(df_countries)
 
     if zone_columns is not None:
-        df_zones = df_zones[list(zone_columns)]
+        zone_columns = list(zone_columns)
+        # An explicitly empty selection means "I do not need the per-cell frame
+        # at all" -- return the schema with no rows, so a 140M-row index does
+        # not get pickled back to the parent process for nothing (ADR-5).
+        df_zones = df_zones.iloc[:0] if not zone_columns else df_zones[zone_columns]
 
     # print("\n\n 5 \n\n")
     # print(len(df_districts["ISOCODE"].unique()))

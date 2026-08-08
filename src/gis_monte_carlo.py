@@ -105,6 +105,7 @@ def run_simulation(
     rural_adjustment,
     calculate_distance=True,
     use_sample_data=False,
+    zone_columns=None,
 ):
     """Run a simulation to analyze global water access from walking or cycling
     based on sensitivity parameters.
@@ -124,6 +125,12 @@ def run_simulation(
     - use_sample_data (bool, optional): Whether to use sample data. Defaults
                                         to False, must be False to run a true
                                         simulation with the given parameters.
+    - zone_columns (list, optional): restrict the returned per-cell zone frame
+                                     to these columns. Defaults to None, i.e.
+                                     every column, the historical behaviour.
+                                     ADR-5: at 30 arc-seconds the full frame is
+                                     tens of GB and the callers keep three
+                                     columns of it.
 
     Returns:
     - result: The result of the global analysis.
@@ -168,11 +175,14 @@ def run_simulation(
         calculate_distance=calculate_distance,
         plot=False,
         use_sample_data=use_sample_data,
+        zone_columns=zone_columns,
     )
     return df_countries, df_districts, df_zones
 
 
-def process_mc_results(countries_simulation_results, plot=True, output_dir="results"):
+def process_mc_results(
+    countries_simulation_results, plot=True, output_dir="results", write_pickle=True
+):
     """Process the Monte Carlo simulation results. Calculate the median, 95th
     percentile, 5th percentile, max, and min values and plot the results.
 
@@ -264,9 +274,15 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
         os.path.join(output_dir, "country_5th_percentile_results.csv")
     )
 
-    # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "countries_simulation_results.pkl"), "wb") as f:
-        pickle.dump(countries_simulation_results, f)
+    # Step 4: pickle the simulation results. Only two notebooks read these; at
+    # 30 arc-seconds they are enormous, so the 30as driver turns them off.
+    if write_pickle:
+        with open(
+            os.path.join(output_dir, "countries_simulation_results.pkl"), "wb"
+        ) as f:
+            pickle.dump(countries_simulation_results, f)
+    else:
+        print("Skipping countries_simulation_results.pkl (write_pickle=False).")
 
     print(
         "Country simulation results have been processed and saved to the "
@@ -274,7 +290,9 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
     )
 
 
-def process_districts_results(districts_simulation_results, output_dir="results"):
+def process_districts_results(
+    districts_simulation_results, output_dir="results", write_pickle=True
+):
     """Process the Monte Carlo simulation results. Calculate the median, 95th
     percentile, 5th percentile, max, and min values and plot the results.
 
@@ -302,7 +320,9 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     # are taken from the data in sorted order, and observed=False is required
     # because observed=True yields groups in order of appearance rather than
     # sorted order.
-    unique_ids = combined["shapeID"].dropna().unique()
+    # np.asarray, not the raw .unique(): on a categorical column .unique()
+    # returns a Categorical, which has no .sort().
+    unique_ids = np.asarray(combined["shapeID"].dropna().unique())
     unique_ids.sort()
     shape_id = pd.Series(
         pd.Categorical(combined["shapeID"], categories=unique_ids),
@@ -364,9 +384,14 @@ def process_districts_results(districts_simulation_results, output_dir="results"
         os.path.join(output_dir, "districts_5th_percentile_results.csv")
     )
 
-    # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "districts_simulation_results.pkl"), "wb") as f:
-        pickle.dump(districts_simulation_results, f)
+    # Step 4: pickle the simulation results. See process_mc_results.
+    if write_pickle:
+        with open(
+            os.path.join(output_dir, "districts_simulation_results.pkl"), "wb"
+        ) as f:
+            pickle.dump(districts_simulation_results, f)
+    else:
+        print("Skipping districts_simulation_results.pkl (write_pickle=False).")
 
     print(
         "Districts simulation results have been processed and saved to the "
