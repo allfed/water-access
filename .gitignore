@@ -143,3 +143,6 @@ data/.DS_Store
 gcp/.instance-zone
 data/GIS/source_rasters/
 .venv-phase0/
+
+# scripted extraction outputs (large parquet/csv, never committed)
+data/GIS/extracted/
