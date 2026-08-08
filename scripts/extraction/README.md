@@ -185,32 +185,38 @@ Peak RSS scales with `--block-rows`, not with grid size — the full
 | Gate 1 | `validate_extraction.py` **5.5 s**, **4.88 GB** peak (loads both tables) |
 | self-checks | `check_consistency.py` ~25 s, <2 GB |
 
-### 30 arc-second (partial measurement — 18 of 45 blocks)
-
-Extrapolate rather than guess: the smoke below covered latitudes +90° → +18°,
-which holds most of the world's land.
+### 30 arc-second (measured, full run — Phase D, 2026-08-08)
 
 | | |
 |---|---|
-| command | `extract_grid.py --resolution 30as --block-rows 480 --limit-blocks 18` |
-| blocks run | 18 of 45 |
-| wall clock | 70.4 s |
-| peak RSS | **5.49 GB** |
-| rows written | 153,975,909 |
-| output size | 2.35 GB Parquet (~16 bytes/row on disk, ~87 bytes/row in pandas) |
-| projected full run | ~3 min wall clock, ~5.5 GB peak RSS, ~250–300M rows, ~4–5 GB Parquet |
+| command | `extract_grid.py --resolution 30as --out data/GIS/extracted/master_30as.parquet` |
+| block rows | 480 (default) → 45 blocks |
+| wall clock | **399.7 s** (6 min 40 s) |
+| peak RSS | **2.31 GB** (`maximum resident set size` = 2,485,321,728 B; `peak memory footprint` 6.24 GB) |
+| rows written | **218,986,194** |
+| output size | **3.36 GB** Parquet (3,521,298,754 B — 16.1 bytes/row on disk, ~87 bytes/row in pandas) |
+| free disk | 17 GB before → 13 GB after |
+| self-checks | `check_consistency.py` **11.4 s**, 2.34 GB peak — **8/8 passed** |
 
-<!-- Phase D fills: 30as actuals -->
-<!--
-Replace the block above with the measured full-run numbers once
-`extract_grid.py --resolution 30as --out data/GIS/extracted/master_30as.parquet`
-has been run end to end:
-  wall clock | peak RSS | rows written | output size | free disk before/after
--->
+Row accounting for the full run: 933,120,000 cells scanned, 627,610,021 dropped
+for falling in no ADM1 polygon, 86,523,785 dropped for nodata in any of
+`dtw_1` / `pop_density` / `GHS_SMOD` / `slope_1` (per-layer nodata counts:
+dtw_1 25,460,475 · pop_density 86,121,286 · GHS_SMOD 4,778,564 · slope_1
+85,760,167 — they overlap heavily), leaving 218,986,194 written. These are raw
+land cells; the ADR-8 population filter is applied downstream by the model, not
+here.
 
-**Disk warning for the full 30as run:** the working volume had 14 GB free when
-this was written. The 30as Parquet is expected to take ~5 GB. Check `df -h`
-first.
+Both projections made from the earlier 18-of-45-block smoke were conservative:
+it extrapolated ~3 min / ~5.5 GB / 250–300M rows / 4–5 GB Parquet, against
+actuals of 6 min 40 s / **2.31 GB** / 219M rows / 3.36 GB. The row count came in
+under because the smoke covered latitudes +90° → +18°, the land-densest band, so
+per-block row counts fell off in the remaining 27 blocks. The peak-RSS gap
+(5.49 GB smoke vs 2.31 GB full run, same accounting, same `--block-rows`) is
+**not explained** — it is favourable and was not chased further; treat 5.5 GB as
+the safe planning number rather than 2.3 GB.
+
+**Disk:** budget ~3.5 GB free for the 30as Parquet, and check `df -h` first.
+The volume this was measured on had 17 GB free and finished with 13 GB.
 
 **Reading the 30as table without blowing the memory budget:** the file is
 written with bounded row groups (`--row-group-rows`, default 2,000,000), so it
@@ -223,8 +229,10 @@ for g in range(pf.num_row_groups):
     chunk = pf.read_row_group(g, columns=["fid", "ISOCODE", "dtw_1", "slope_1"]).to_pandas()
 ```
 
-At ~87 bytes/row a full `pd.read_parquet` of the 30as table is ~24 GB — use a
-column subset or row groups.
+At ~87 bytes/row a full `pd.read_parquet` of the 30as table's 218,986,194 rows
+is ~19 GB — use a column subset or row groups. The model itself never does this:
+`src/chunked_analysis.py` runs a draw one group of whole countries at a time, so
+its peak follows the chunk budget rather than the grid size (ADR-5).
 
 ## 6. Deviations from SPEC ADR-3, and why
 
