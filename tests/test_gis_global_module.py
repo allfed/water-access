@@ -1107,7 +1107,9 @@ class TestProcessCountryData:
                 ],
                 "percent_with_only_cycling_access": [0.0, 0.0, 0.0, 0.0],
             },
-            index=pd.Int64Index([0, 1, 2, 3], dtype="int64"),
+            # pd.Int64Index was removed in pandas 2.0; pd.Index(..., dtype="int64")
+            # is the drop-in replacement and compares equal to the pandas 1.x index.
+            index=pd.Index([0, 1, 2, 3], dtype="int64"),
         )
         # find all differences between result and expected result
         diff = result.compare(expected_result)

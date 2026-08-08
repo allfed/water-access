@@ -203,17 +203,37 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
         .reset_index()[["ISOCODE", "Entity", "region", "subregion"]]
     )  # noqa
 
+    # NOTE: numeric_only=True is required on pandas >= 2.0. Pandas 1.x silently
+    # dropped the non-numeric ("nuisance") columns here; pandas 2.x raises on them
+    # instead. Passing numeric_only=True restores the pandas 1.x result exactly --
+    # the non-numeric columns are merged back in below from `non_numeric_cols`.
     # Calculate the mean results for each country for all cols
-    all_means = pd.concat(ordered_results).groupby("ISOCODE").mean().reset_index()
+    all_means = (
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .mean(numeric_only=True)
+        .reset_index()
+    )
     # Calculate the median results for each country for all cols
-    all_medians = pd.concat(ordered_results).groupby("ISOCODE").median().reset_index()
+    all_medians = (
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .median(numeric_only=True)
+        .reset_index()
+    )
     # Calculate the 95th percentile results for each country for all cols
     all_percentile_95s = (
-        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.95).reset_index()
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .quantile(0.95, numeric_only=True)
+        .reset_index()
     )
     # Calculate the 5th percentile results for each country for all cols
     all_percentile_5s = (
-        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .quantile(0.05, numeric_only=True)
+        .reset_index()
     )
 
     # Merge with non-numeric

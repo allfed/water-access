@@ -242,9 +242,13 @@ def merge_and_adjust_population(df_zones_input, df_input):
 
     # convert population density to percent of national population on a per country basis, grouped by ISO_CC
     # Prevent division by zero when country population sum is zero
-    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE")["pop_density"].apply(
-        lambda x: x / x.sum() if x.sum() > 0 else x * 0
-    )
+    # NOTE: group_keys=False is required on pandas >= 2.0. Pandas 1.x returned the
+    # original (flat) index here; pandas 2.x prepends the group keys, producing a
+    # MultiIndex that cannot be assigned back onto df_zones. group_keys=False
+    # restores the pandas 1.x result exactly -- values are unchanged.
+    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE", group_keys=False)[
+        "pop_density"
+    ].apply(lambda x: x / x.sum() if x.sum() > 0 else x * 0)
     # multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
 
