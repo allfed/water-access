@@ -336,6 +336,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="resampling for GPW density when the master grid is coarser than "
         "30 arc-second (ignored at 30as, where the grids coincide)",
     )
+    p.add_argument(
+        "--pop-raster",
+        default=None,
+        help="override the GPW density GeoTIFF (default: the UN WPP-adjusted "
+        "product; pass data/GIS/source_rasters/gpw_v4_density_2020_30sec.tif "
+        "for the unadjusted fallback)",
+    )
     p.add_argument("--slope-raster", default=None, help="override the slope GeoTIFF")
     p.add_argument("--smod-raster", default=None, help="override the GHS-SMOD GeoTIFF")
     p.add_argument("--adm1", default=DEFAULT_ADM1)
@@ -367,6 +374,8 @@ def main(argv=None) -> int:
     # Resolve user paths against the *invocation* cwd before pinning the
     # process to the repo root, so relative --out works from anywhere.
     args.out = os.path.abspath(args.out)
+    if args.pop_raster:
+        args.pop_raster = os.path.abspath(args.pop_raster)
     if args.slope_raster:
         args.slope_raster = os.path.abspath(args.slope_raster)
     if args.smod_raster:

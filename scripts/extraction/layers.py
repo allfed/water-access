@@ -35,12 +35,44 @@ from grid import RASTER_DIR, MasterGrid
 # --------------------------------------------------------------------------
 # Source paths
 # --------------------------------------------------------------------------
-GPW_DENSITY = os.path.join(RASTER_DIR, "gpw_v4_density_2020_30sec.tif")
+#: GPW v4.11 2020 population density, 30 arc-second.  Both variants of the same
+#: product are on disk.  They share one lattice and one nodata footprint and
+#: differ *only* by a per-country scalar -- the UN WPP country-total adjustment
+#: factor -- which ``convert_gpw_asc.py``'s sanity check measures directly.
+#:
+#: * ``gpw_v4_density_2020_30sec.tif`` -- **unadjusted**, and the default.
+#: * ``gpw_v4_density_adjusted_2020_30sec.tif`` -- **UN WPP-adjusted**, built
+#:   from the SEDAC ``_asc`` tiles by ``scripts/extraction/convert_gpw_asc.py``.
+#:   Selectable with ``--pop-raster``.
+#:
+#: The unadjusted product is the default because the legacy manual-QGIS artefact
+#: that Gate 1 validates against was *measured* to be the unadjusted one:
+#: 73.2% of legacy cells are bit-equal to it (nearest) and 61.1% under
+#: ``--pop-agg average``, versus 27.2% for the adjusted product, and swapping to
+#: the adjusted product triples the median per-country population error
+#: (|pop_total_pct| median 1.94% -> 6.22%, worst 26.3% -> 56.7%).  This refutes
+#: the hypothesis previously recorded in ``gate1_exceptions.json``; see
+#: scripts/extraction/README.md, "GPW adjusted vs unadjusted".
+#:
+#: Note the choice is downstream-neutral either way: the adjustment is a
+#: per-country scalar and ``merge_and_adjust_population``
+#: (``src/gis_global_module.py:323-327``) renormalises ``pop_density`` to a
+#: within-country share before multiplying by an external country total, which
+#: cancels any such scalar exactly.
+#:
+#: Both rasters sit on the clean ``(-180, +90)`` / ``1/120 deg`` lattice -- *not*
+#: the Kummu master lattice -- so either one is read through ``WarpedReader``.
+GPW_DENSITY_UNADJUSTED = os.path.join(RASTER_DIR, "gpw_v4_density_2020_30sec.tif")
+GPW_DENSITY_ADJUSTED = os.path.join(
+    RASTER_DIR, "gpw_v4_density_adjusted_2020_30sec.tif"
+)
+GPW_DENSITY = GPW_DENSITY_UNADJUSTED
 #: GHS-SMOD R2023A 1 km Mollweide.  V2-0 is the default (newest, and the file
 #: recorded in data/GIS/source_rasters/MANIFEST.md).  V1-0 -- the version named
 #: in ``src/gis_global_module.py:171`` -- is also on disk and selectable with
-#: ``--smod-raster``; it was measured at 91.9% vs 91.7% cell-level class
-#: agreement with the legacy CSV, i.e. not materially different.
+#: ``--smod-raster``.  Cell-level class agreement with the legacy CSV, as
+#: measured by ``validate_extraction.py``'s ungated layer table, is 94.82%
+#: (V2-0) vs 94.96% (V1-0) -- i.e. not materially different.
 GHS_SMOD = os.path.join(RASTER_DIR, "GHS_SMOD_E2020_GLOBE_R2023A_54009_1000_V2_0.tif")
 GRIP_DIR = os.path.join(RASTER_DIR, "grip4")
 
@@ -304,7 +336,9 @@ def open_readers(grid: MasterGrid, args) -> dict:
     readers = {
         "dtw_1": NativeReader(GRID_DEFINING_RASTER[grid.resolution], "Kummu dtw"),
         "pop_density": WarpedReader(
-            GPW_DENSITY, "GPW v4.11 density", resampling=pop_resampling
+            getattr(args, "pop_raster", None) or GPW_DENSITY,
+            "GPW v4.11 density",
+            resampling=pop_resampling,
         ),
         "slope_1": WarpedReader(
             resolve_slope_path(grid.resolution, args.slope_raster),
