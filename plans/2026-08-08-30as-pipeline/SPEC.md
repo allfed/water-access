@@ -58,7 +58,7 @@ Output: partitioned Parquet (float32 for rasters, category for ISOCODE/shapeID/s
 | dtw_1 | Kummu `distance2water_30arcsec.tif` (already at `data/GIS/source_rasters/`) | native |
 | pop_density | **GPW v4.11 population density 2020, 30as — CONFIRMED available, no login**: `https://data.ghg.center/sedac-popdensity-yeargrid5yr-v4.11/gpw_v4_population_density_rev11_2020_30_sec_2020.tif` (426 MB; verified HTTP 200 on 2026-08-08; downloaded to `data/GIS/source_rasters/gpw_v4_density_2020_30sec.tif`). GHS-POP E2020 30ss remains on disk as a cross-check layer only | Gate 1's pop criteria (AC-3, 1% totals) apply in full — same product as the manuscript. See `data/GIS/source_rasters/MANIFEST.md` for all source provenance (feeds AC-9) |
 | GHS_SMOD | GHS-SMOD R2023A 1 km (Mollweide) via `rasterio.vrt.WarpedVRT` nearest → master grid | categorical; nearest only |
-| slope_1 | EarthEnv 1 km slope, **GMTED-based variant** (mn aggregation) | SRTM variant holes >60°N (FEASIBILITY §1a) |
+| slope_1 | EarthEnv 1 km slope, **GMTED-based, md (median) aggregation** (`slope_1KMmd_GMTEDmd.tif`) — **amended 2026-08-09 (Kevin sign-off)**: originally specified `mn` (mean) as a planning-time guess; Gate 1 proved the legacy CSV's slope is bit-exact to the `md` product (`slope_10KMmd_GMTEDmd.tif` at 5 arcmin, 100.0000% over 2.19M cells), and the mean variant reads ~15% steeper globally. `mn` remains selectable via `--slope-raster` for sensitivity checks | SRTM variant holes >60°N (FEASIBILITY §1a) |
 | grip_*_1 | GRIP4 5-arcmin density rasters (tp11–tp51 ASCII grids) broadcast 10×10 onto the 30as grid | information floor is 5 arcmin; document |
 | shapeID/shapeName/ISOCODE | geoBoundaries CGAZ **ADM1** + ADM0 gpkg rasterised to int32 on the master grid (Phase 0 did ADM0 in 13 s) | cells with no polygon → dropped, count reported |
 
@@ -131,7 +131,7 @@ Phases B and C are genuinely independent (disjoint files) and MAY run as paralle
 
 **Verifier notes:** every AC has a report artefact under `results/validation/`; the verifier re-runs AC-1, AC-3, AC-4, AC-5, AC-7 commands cold and spot-checks AC-6's logged RSS. Data downloads (~3–6 GB) are the only network dependency; all sources are public except the optional GPW/EarthData step.
 
-**All source data is already on disk and verified** (2026-08-08): see `plans/2026-08-08-30as-pipeline/DATA_MANIFEST.md` (tracked copy; original sits gitignored beside the rasters). Phase B needs **no downloads** — skip straight to extraction. Slope file is `slope_1KMmn_GMTEDmd.tif` (mean aggregation of the GMTED median-DEM layer; the `GMTEDmn` variant does not exist).
+**All source data is already on disk and verified** (2026-08-08): see `plans/2026-08-08-30as-pipeline/DATA_MANIFEST.md` (tracked copy; original sits gitignored beside the rasters). Phase B needs **no downloads** — skip straight to extraction. Slope file: `slope_1KMmd_GMTEDmd.tif` (median aggregation — see the amended ADR-3 slope row; the initially-downloaded `slope_1KMmn_GMTEDmd.tif` mean variant is retained on disk as the `--slope-raster` fallback).
 
 **Measured alignment facts (from the download verification — do not rediscover these):**
 - **GPW v4.11 density is grid-identical to the Kummu 30as master grid** (43200×21600, EPSG:4326, nodata −9999) — read directly, zero resampling.
