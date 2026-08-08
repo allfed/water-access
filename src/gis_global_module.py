@@ -216,6 +216,80 @@ def manage_slope(df_zones_input):
     return df_zones_input
 
 
+# -----------------------------------------------------------------------------
+# ADR-8: the "does this cell hold anybody?" filter is a DENSITY threshold, not a
+# headcount.
+#
+# The model has always dropped cells holding <= 10 people. At 5 arc-minutes a
+# cell is roughly 85 km^2 at the equator, so 10 people is about 0.1 person/km^2
+# -- an "effectively uninhabited" bar. Carried over verbatim to a 30 arc-second
+# grid, where cells are 100x smaller in area, the same 10 people would mean
+# ~10 people/km^2 and would silently delete most of the rural tail, which is
+# precisely the population this model exists to describe.
+#
+# So the threshold scales with cell area: 10 people at 5 arc-minutes (i.e. the
+# historical behaviour, bit-for-bit), 0.1 people at 30 arc-seconds.
+# -----------------------------------------------------------------------------
+
+# Cell edge length of the reference (5 arc-minute) grid, in degrees.
+FIVE_ARCMIN_DEGREES = 300 / 3600
+
+# People per cell below which a 5-arc-minute cell is treated as uninhabited.
+MIN_POP_PER_CELL_5_ARCMIN = 10
+
+
+def infer_cell_size_degrees(df_zones_input, default=FIVE_ARCMIN_DEGREES):
+    """Infer the grid cell edge length, in degrees, from a zone DataFrame.
+
+    Uses the ``left``/``right`` cell-bound columns that the GIS extract carries.
+    The measured width is snapped to whole arc-seconds, both because every grid
+    this model consumes is defined in whole arc-seconds and because snapping
+    makes the 5-arc-minute case land on exactly ``FIVE_ARCMIN_DEGREES`` -- which
+    is what keeps :func:`minimum_population_per_cell` bit-identical to the old
+    hard-coded threshold despite the CSV's truncated coordinate text.
+
+    Args:
+        df_zones_input (DataFrame): zone frame, ideally with ``left``/``right``.
+        default (float): value to return when the bounds are unavailable or
+            degenerate (e.g. the minimal frames used in unit tests).
+
+    Returns:
+        float: cell edge length in degrees.
+    """
+    if not {"left", "right"}.issubset(df_zones_input.columns):
+        return default
+
+    widths = (df_zones_input["right"] - df_zones_input["left"]).abs()
+    widths = widths[widths > 0]
+    if widths.empty:
+        return default
+
+    arcseconds = round(float(widths.median()) * 3600)
+    if arcseconds <= 0:
+        return default
+
+    return arcseconds / 3600
+
+
+def minimum_population_per_cell(cell_size_degrees):
+    """People-per-cell threshold below which a cell counts as uninhabited.
+
+    Scales the historical 5-arc-minute threshold by the cell AREA ratio, so the
+    implied population density is the same at every resolution (ADR-8). At
+    ``cell_size_degrees == FIVE_ARCMIN_DEGREES`` the ratio is exactly 1.0 and
+    the result is exactly ``MIN_POP_PER_CELL_5_ARCMIN``.
+
+    Args:
+        cell_size_degrees (float): cell edge length in degrees.
+
+    Returns:
+        float: threshold in people per cell. 10 at 5 arc-minutes, 0.1 at
+        30 arc-seconds.
+    """
+    area_ratio = (cell_size_degrees / FIVE_ARCMIN_DEGREES) ** 2
+    return MIN_POP_PER_CELL_5_ARCMIN * area_ratio
+
+
 # Function for merging dataframes and adjusting populations
 def merge_and_adjust_population(df_zones_input, df_input):
     """
@@ -257,8 +331,15 @@ def merge_and_adjust_population(df_zones_input, df_input):
         "sum"
     )
 
-    # trim the dataframe to only include rows where there is a population
-    df_zones["any_pop"] = df_zones["pop_zone"].apply(lambda x: 1 if x > 10 else 0)
+    # trim the dataframe to only include rows where there is a population.
+    # The threshold is resolution-aware (ADR-8): exactly 10 people per cell at
+    # 5 arc-minutes, 0.1 at 30 arc-seconds -- the same ~0.1 person/km^2 bar.
+    min_pop_per_cell = minimum_population_per_cell(
+        infer_cell_size_degrees(df_zones_input)
+    )
+    df_zones["any_pop"] = df_zones["pop_zone"].apply(
+        lambda x: 1 if x > min_pop_per_cell else 0
+    )
     df_zones = df_zones[df_zones["any_pop"] == 1]
 
     return df_zones
