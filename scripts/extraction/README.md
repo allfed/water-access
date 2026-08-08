@@ -234,6 +234,42 @@ is ~19 GB — use a column subset or row groups. The model itself never does thi
 `src/chunked_analysis.py` runs a draw one group of whole countries at a time, so
 its peak follows the chunk budget rather than the grid size (ADR-5).
 
+### Monte Carlo runs off these tables (measured, Phase D)
+
+Ten-iteration smoke runs, same machine, same `--seed 20260808`, `--workers 1` on
+both sides. These are the AC-6 numbers; the full comparison is
+`results/validation/smoke_comparison.md`.
+
+| | 30 arc-second | 5 arc-minute |
+|---|---|---|
+| command | `run_monte_carlo.py --resolution 30as --iterations 10 --input …/master_30as.parquet` | same with `--resolution 5min --input …/master_5min.parquet` |
+| modelled cells | 137,930,520 | 1,419,773 |
+| chunk plan | 12 chunks, 12,000,000-cell budget, RUS split by district | not chunked |
+| chunk planning | 19.4 min (one-off per run, streams 3 columns of the whole table) | n/a |
+| simulating | **80.7 min** for 10 draws (~5-8 min/draw, 12 chunks at ~20-43 s each) | 3.0 min |
+| total wall clock | **100.1 min** | 3.0 min |
+| peak RSS | **16.43 GB** (`maximum resident set size` 17,639,522,304 B) | 3.19 GB |
+
+Peak RSS was independently corroborated by sampling the summed RSS of the whole
+Python process tree every 15 s during the run (16.19 GB peak,
+`results/validation/smoke30_rss_samples.csv`) — worth doing because
+`/usr/bin/time -l` reports `getrusage`'s max-over-children, not parent+worker.
+Note that the same `/usr/bin/time -l` output reports a `peak memory footprint` of
+42.3 GB; that counter accumulates across the run rather than reporting a
+simultaneous high-water mark, and it is contradicted by both the RSS figure and
+the sampler on a 32 GB machine that never swapped. **`maximum resident set size`
+is the figure AC-6 asks for and the one to trust.**
+
+Against the ADR-5 memory model (peak GB ≈ 1.0 + 1.2 × millions of cells in the
+largest chunk), a 12M-cell budget projected ~15 GB and measured 16.4 GB — the
+model is good to ~10% and the 24 GB budget held with room to spare. Lower
+`--chunk-rows` if a machine has less headroom; raising it buys little, since the
+solver LUT is cached across chunks.
+
+A 10-iteration run at 30 arc-second is therefore a ~1.7 h job, not the 4-7 h
+originally projected, so the 1000-iteration production run extrapolates to
+roughly 5-6 days single-threaded — which is what the GCP driver is for.
+
 ## 6. Deviations from SPEC ADR-3, and why
 
 Two source choices differ from the letter of ADR-3. Both are evidence-driven
