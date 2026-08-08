@@ -1,0 +1,46 @@
+# water-access runtime + dev dependencies (ADR-6).
+#
+# Target interpreter: Python 3.11 or newer. Python 3.9 (the old conda pin) is EOL
+# and blocks the rasterio/geopandas versions the 30 arc-second extraction needs.
+#
+# Install with either:
+#     python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/pip install -e .
+#     uv venv --python 3.11 && uv pip install -r requirements.txt && uv pip install -e .
+#
+# pandas is capped below 3.0: the model has only been validated on the pandas 2.x
+# semantics (109/109 tests green). Lift the cap only after re-running the suite
+# and the AC-5 regression gate against results/regression_baseline/.
+
+# --- core numerics ---
+numpy>=1.26
+pandas>=2.1,<3.0
+scipy>=1.11
+
+# --- IO ---
+pyarrow>=14.0          # Parquet (per-draw aggregates, extracted master grids)
+openpyxl>=3.1          # .xlsx sources under data/
+
+# --- GIS / raster extraction ---
+rasterio>=1.3
+geopandas>=0.14
+shapely>=2.0
+pyproj>=3.6
+
+# --- analysis / plotting ---
+matplotlib>=3.8
+plotly>=5.18
+kaleido>=0.2.1         # plotly static image export
+seaborn>=0.13
+scikit-learn>=1.3
+pycountry>=23.12
+tqdm>=4.66
+
+# --- notebooks (scripts/*.ipynb) ---
+ipykernel>=6.29
+ipywidgets>=8.1
+notebook>=7.0
+
+# --- dev / test ---
+pytest>=8.0
+pytest-mock>=3.12
+black>=24.0
