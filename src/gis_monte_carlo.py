@@ -106,6 +106,8 @@ def run_simulation(
     calculate_distance=True,
     use_sample_data=False,
     zone_columns=None,
+    chunk_rows=None,
+    chunk_plan=None,
 ):
     """Run a simulation to analyze global water access from walking or cycling
     based on sensitivity parameters.
@@ -131,6 +133,14 @@ def run_simulation(
                                      ADR-5: at 30 arc-seconds the full frame is
                                      tens of GB and the callers keep three
                                      columns of it.
+    - chunk_rows (int, optional): run the analysis one group of whole countries
+                                  at a time, at most this many modelled cells
+                                  per group (ADR-5). Defaults to None, i.e. the
+                                  monolithic path. The returned per-cell frame
+                                  is empty in this mode.
+    - chunk_plan (optional): a ``src.chunked_analysis.ChunkPlan`` to reuse. Build
+                             it once in the parent process rather than once per
+                             draw -- it depends only on the input file.
 
     Returns:
     - result: The result of the global analysis.
@@ -176,6 +186,8 @@ def run_simulation(
         plot=False,
         use_sample_data=use_sample_data,
         zone_columns=zone_columns,
+        chunk_rows=chunk_rows,
+        chunk_plan=chunk_plan,
     )
     return df_countries, df_districts, df_zones
 

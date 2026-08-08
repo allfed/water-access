@@ -51,6 +51,12 @@ MAX_WORKERS = 15
 # at a time unless the operator says otherwise.
 MAX_WORKERS_30AS = 1
 
+# Country-group chunk budget at 30 arc-seconds (ADR-5). ~20M modelled cells is a
+# ~8 GB working frame at the measured ~406 bytes/row, which leaves comfortable
+# headroom inside the 24 GB budget for the accumulated global-summary columns
+# and the interpolation scratch.
+CHUNK_ROWS_30AS = 20_000_000
+
 # The only per-cell columns anything downstream reads. Everything else is
 # dropped inside the worker so it never crosses a process boundary.
 ZONE_RESULT_COLUMNS = ["fid", "zone_pop_with_water", "zone_pop_without_water"]
@@ -62,6 +68,21 @@ ZONE_RESULT_COLUMNS = ["fid", "zone_pop_with_water", "zone_pop_without_water"]
 # run_monte_carlo_test.py can never disagree about them again (ADR-7).
 
 # -------------------------------------------------------------------------------
+
+
+def _init_worker(zone_file):
+    """Point a freshly spawned worker at the right zone frame.
+
+    ``--input`` rebinds a module-level constant, and on macOS (and any Python
+    3.14+ default) ProcessPoolExecutor *spawns* workers, so they re-import the
+    module and get the packaged default rather than the parent's override.
+    Without this the parent plans against one file and every worker silently
+    analyses another.
+    """
+    if zone_file is not None:
+        import src.gis_global_module as worker_gis
+
+        worker_gis.URB_DATA_FILE = zone_file
 
 
 def parse_args(argv=None):
@@ -123,6 +144,17 @@ def parse_args(argv=None):
         help="force them off (default: off at 30as, where they would be terabytes)",
     )
     parser.add_argument(
+        "--chunk-rows",
+        type=int,
+        default=None,
+        help=(
+            "run each draw one group of whole countries at a time, at most this "
+            "many modelled cells per group (ADR-5). Peak memory then follows this "
+            f"number, not the grid size. Default: {CHUNK_ROWS_30AS:,} at 30as, "
+            "off at 5min. 0 disables it."
+        ),
+    )
+    parser.add_argument(
         "--plot",
         dest="plot",
         action="store_true",
@@ -159,6 +191,33 @@ def main(argv=None):
         gis.URB_DATA_FILE = args.input
     print(f"Resolution: {args.resolution}")
     print(f"Zone frame: {gis.URB_DATA_FILE}")
+
+    chunk_rows = (
+        args.chunk_rows
+        if args.chunk_rows is not None
+        else (CHUNK_ROWS_30AS if is_30as else 0)
+    )
+    chunk_plan = None
+    if chunk_rows:
+        # Plan once, here, and hand the same plan to every draw: it depends only
+        # on the input file, and building it re-reads three columns of the whole
+        # grid (ADR-5).
+        import src.chunked_analysis as chunked
+
+        print(f"Planning country chunks (budget {chunk_rows:,} cells) ...", flush=True)
+        chunk_plan = chunked.plan_chunks(
+            gis.URB_DATA_FILE, max_rows_per_chunk=chunk_rows
+        )
+        print(f"  {chunk_plan.describe()}", flush=True)
+        largest_district = chunk_plan.notes.get("largest_district_rows", 0)
+        if largest_district > chunk_rows:
+            print(
+                f"  WARNING: one district holds {largest_district:,} cells, more "
+                f"than the {chunk_rows:,} budget. A district is the smallest work "
+                "unit this scheme can make, so that chunk will overrun.",
+                flush=True,
+            )
+
     if is_30as:
         print(
             "30as profile: persisting per-draw country/district aggregates only "
@@ -205,7 +264,11 @@ def main(argv=None):
     print("Start time:", time.strftime("%H:%M:%S", time.localtime()))
     print("\n\n")
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=workers,
+        initializer=_init_worker,
+        initargs=(gis.URB_DATA_FILE,),
+    ) as executor:
         # Submit all simulations to the executor
         futures = [
             executor.submit(
@@ -223,6 +286,8 @@ def main(argv=None):
                 # ADR-5: trim the per-cell frame inside the worker, so a
                 # multi-GB zone frame is never pickled back to the parent.
                 zone_columns=ZONE_RESULT_COLUMNS if save_zone_parquet else [],
+                chunk_rows=chunk_rows or None,
+                chunk_plan=chunk_plan,
             )
             for (
                 crr_adjustment,

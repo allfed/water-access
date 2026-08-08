@@ -42,7 +42,122 @@ to well inside the AC-4 tolerance):
 ground truth; ``scripts/validate_lut.py`` (AC-4) checks this layer against them.
 """
 
+import contextlib
+
 import numpy as np
+
+#: When set, :func:`build_slope_grid` / :func:`build_mass_grid` span these
+#: ranges instead of the range of the values they are handed. Managed by
+#: :func:`pinned_grid_ranges`.
+_PINNED_RANGES = {"slope": None, "mass": None}
+
+
+@contextlib.contextmanager
+def pinned_grid_ranges(slope_range=None, mass_range=None):
+    """Pin the LUT axes to a fixed span for the duration of the block.
+
+    The chunked driver processes one group of countries at a time. Left to
+    itself each chunk would build its grid over *its own* observed slope and
+    mass range, so the same cell would be interpolated on a different grid
+    depending on which chunk it landed in, and the chunked and monolithic runs
+    would disagree in the last few decimal places. Pinning both axes to the
+    globally observed ranges (measured once, in the planning pre-pass) makes the
+    LUT a pure function of the draw -- identical in every chunk, and identical
+    to the one a whole-world run builds.
+
+    Args:
+        slope_range (tuple, optional): ``(min, max)`` slope in degrees.
+        mass_range (tuple, optional): ``(min, max)`` body mass in kg.
+    """
+    previous = dict(_PINNED_RANGES)
+    if slope_range is not None:
+        _PINNED_RANGES["slope"] = (float(slope_range[0]), float(slope_range[1]))
+    if mass_range is not None:
+        _PINNED_RANGES["mass"] = (float(mass_range[0]), float(mass_range[1]))
+    try:
+        yield
+    finally:
+        _PINNED_RANGES.update(previous)
+
+
+#: When true, :func:`should_use_lut` ignores its row-count floor.
+_FORCE_LUT = [False]
+
+
+@contextlib.contextmanager
+def force_lut():
+    """Take the LUT path regardless of row count, for the duration of the block.
+
+    :func:`should_use_lut` normally sends small frames down the original
+    per-cell solver loop, which is *more* accurate than the LUT. That is the
+    right default, but it would make a chunked run disagree with a monolithic
+    one whenever a chunk happened to fall under the threshold. Chunked runs pin
+    the choice so every cell is solved the same way wherever it lands.
+    """
+    previous = _FORCE_LUT[0]
+    _FORCE_LUT[0] = True
+    try:
+        yield
+    finally:
+        _FORCE_LUT[0] = previous
+
+
+#: Active memo for built LUTs, or None when caching is off.
+_LUT_CACHE = [None]
+
+
+@contextlib.contextmanager
+def lut_cache():
+    """Memoise built lookup tables for the duration of the block.
+
+    A chunked run solves the same draw over and over, once per country group,
+    and with the axes pinned the table it builds is *bit-identical* every time.
+    Caching turns an O(chunks) solver cost back into O(1) -- measured at 5
+    arc-minutes with seven chunks, it takes the chunked run from 145 s to 45 s.
+
+    Off by default, because a cached table is a few MB that would otherwise
+    live for the whole process, and the monolithic path builds each table
+    exactly once anyway.
+    """
+    previous = _LUT_CACHE[0]
+    _LUT_CACHE[0] = {}
+    try:
+        yield
+    finally:
+        _LUT_CACHE[0] = previous
+
+
+def _cached(key, build):
+    """Return ``build()``, memoised under ``key`` when caching is enabled."""
+    cache = _LUT_CACHE[0]
+    if cache is None:
+        return build()
+    if key not in cache:
+        cache[key] = build()
+    return cache[key]
+
+
+def _grid_key(*grids):
+    """A hashable identity for a set of grids: their exact bytes."""
+    return tuple(np.asarray(grid, dtype=float).tobytes() for grid in grids)
+
+
+def _scalar(value):
+    """Collapse a possibly-array model attribute to a plain float."""
+    return float(np.asarray(value).flatten()[0])
+
+
+def _span(values, axis):
+    """The (lo, hi) span an axis should cover: pinned if set, else observed."""
+    pinned = _PINNED_RANGES[axis]
+    if pinned is not None:
+        return pinned
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return None
+    return float(finite.min()), float(finite.max())
+
 
 # ---------------------------------------------------------------------------
 # Grid sizing (ADR-4 defaults)
@@ -128,13 +243,11 @@ def build_slope_grid(slope_values, n_slope=DEFAULT_N_SLOPE):
     Returns:
         numpy.ndarray: sorted, strictly increasing slope nodes (degrees).
     """
-    slopes = np.asarray(slope_values, dtype=float)
-    finite = slopes[np.isfinite(slopes)]
-    if finite.size == 0:
+    span = _span(slope_values, "slope")
+    if span is None:
         return np.array([0.0, 1.0])
 
-    lo = float(finite.min())
-    hi = float(finite.max())
+    lo, hi = span
     if hi <= lo:
         # Degenerate (single slope): a two-node grid still interpolates exactly.
         return np.array([lo, lo + 1.0])
@@ -163,13 +276,11 @@ def build_mass_grid(mass_values, n_mass=DEFAULT_N_MASS):
     Returns:
         numpy.ndarray: sorted, strictly increasing mass nodes (kg).
     """
-    masses = np.asarray(mass_values, dtype=float)
-    finite = masses[np.isfinite(masses)]
-    if finite.size == 0:
+    span = _span(mass_values, "mass")
+    if span is None:
         return np.array([62.0, 63.0])
 
-    lo = float(finite.min())
-    hi = float(finite.max())
+    lo, hi = span
     if hi <= lo:
         return np.array([lo, lo + 1.0])
 
@@ -545,8 +656,22 @@ def bicycle_results_via_lut(
     slope_grid = build_slope_grid(slope, n_slope=n_slope)
     mass_grid = build_mass_grid(mass, n_mass=n_mass)
 
-    lut = build_bicycle_lut(
-        mm, mv, mo, hpv, crr_grid, slope_grid, mass_grid, load_attempt
+    # Everything the table's contents depend on. If two calls agree on all of
+    # this, they would solve the identical grid of identical equations.
+    key = (
+        "bicycle",
+        _grid_key(crr_grid, slope_grid, mass_grid),
+        (mv.ro, mv.C_d, mv.A, mv.eta, mv.P_t, mv.g, mv.F_max),
+        (mo.ulhillpo, mo.lhillpo),
+        float(load_attempt),
+        _scalar(hpv.m_HPV_only),
+        _scalar(hpv.load_capacity),
+    )
+    lut = _cached(
+        key,
+        lambda: build_bicycle_lut(
+            mm, mv, mo, hpv, crr_grid, slope_grid, mass_grid, load_attempt
+        ),
     )
     loaded, unloaded = evaluate_bicycle_lut(lut, slope, crr, mass)
     max_load = bike_max_load(mm, mv, hpv, slope, load_attempt)
@@ -674,7 +799,22 @@ def walking_results_via_lut(
     slope_grid = build_slope_grid(slope, n_slope=n_slope)
     mass_grid = build_mass_grid(mass, n_mass=n_mass)
 
-    lut = build_walking_lut(mm, mv, mo, met, hpv, slope_grid, mass_grid, load_attempt)
+    # The Lankford path reads only these: the grids, the MET budget, the hill
+    # polarities, the attempted load and the bucket capacity.
+    key = (
+        "walking",
+        _grid_key(slope_grid, mass_grid),
+        float(met),
+        (mo.ulhillpo, mo.lhillpo),
+        float(load_attempt),
+        _scalar(hpv.load_capacity),
+    )
+    lut = _cached(
+        key,
+        lambda: build_walking_lut(
+            mm, mv, mo, met, hpv, slope_grid, mass_grid, load_attempt
+        ),
+    )
     loaded, unloaded = evaluate_walking_lut(lut, slope, mass)
 
     results = np.empty((len(slope), 3), dtype=float)
@@ -696,7 +836,7 @@ def should_use_lut(n_rows, crr=None, min_rows=LUT_MIN_ROWS):
     than it saves, and the unit tests that monkeypatch the single-run solvers
     depend on that loop being used.
     """
-    if n_rows < min_rows:
+    if n_rows < min_rows and not _FORCE_LUT[0]:
         return False
     if crr is not None:
         distinct = np.unique(np.asarray(crr, dtype=float))
