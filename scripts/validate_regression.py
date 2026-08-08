@@ -104,6 +104,14 @@ def main():
         type=Path,
         default=PROJECT_ROOT / "results" / "validation" / "gate2_report.md",
     )
+    parser.add_argument(
+        "--timing-note",
+        default=None,
+        help=(
+            "free text appended to the AC-7 section, for recording measurement "
+            "conditions (e.g. a loaded machine)."
+        ),
+    )
     args = parser.parse_args()
 
     baseline_countries = pd.read_csv(args.baseline / "countries.csv")
@@ -261,6 +269,9 @@ def main():
             ]
     else:
         lines += ["- No `timing.json` found next to the new results.", ""]
+
+    if args.timing_note:
+        lines += [args.timing_note, ""]
 
     lines += [
         "## Per-column population detail",
