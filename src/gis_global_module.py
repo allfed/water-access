@@ -9,7 +9,10 @@ import sys
 from pathlib import Path
 import pdb
 import os
+import time
 import warnings
+
+import src.solver_lut as solver_lut
 
 # ## Import Data from CSVs.
 # CSVs created in previous script, which did the cycling mobility on a per country basis
@@ -123,30 +126,60 @@ def run_weighted_median_on_grouped_df(df, groupby_column, value_column, weight_c
     return pd.DataFrame(d)
 
 
+#: Wall-clock seconds the most recent :func:`load_data` call spent reading the
+#: zone frame off disk. AC-7 measures solver/refactor time *excluding* the
+#: initial data load, and the load happens several frames down inside
+#: ``run_global_analysis``, so it is recorded here rather than plumbed through
+#: every signature.
+LAST_LOAD_SECONDS = 0.0
+
+#: File extensions that :func:`load_data` reads as Parquet (ADR-2). Anything
+#: else is read as CSV, byte-for-byte as before.
+PARQUET_SUFFIXES = (".parquet", ".parq", ".pq")
+
+
+def _read_zone_frame(path):
+    """Read a zone frame from Parquet or CSV, dispatching on the file extension.
+
+    ADR-2: the 30 arc-second extract is Parquet (a CSV would be ~40 GB) but
+    carries the identical column contract, so everything downstream is unchanged.
+    A directory is treated as a partitioned Parquet dataset.
+    """
+    candidate = Path(path)
+    if candidate.is_dir() or candidate.suffix.lower() in PARQUET_SUFFIXES:
+        return pd.read_parquet(path)
+    return pd.read_csv(path)
+
+
 def load_data(urb_data_file, country_data_file):
     """
-    Load data from CSV files.
+    Load data from CSV (or Parquet) files.
 
     Parameters:
-    - urb_data_file (str): The file path of the urban data CSV file.
+    - urb_data_file (str): The file path of the urban data file. CSV by default;
+      a ``.parquet``/``.parq``/``.pq`` file, or a directory holding a partitioned
+      Parquet dataset, is read as Parquet instead (ADR-2).
     - country_data_file (str): The file path of the country data CSV file.
 
     Returns:
     - df_zones_input (pandas.DataFrame): The loaded urban data as a DataFrame.
     - df_input (pandas.DataFrame): The loaded country data as a DataFrame.
     """
+    global LAST_LOAD_SECONDS
+    started = time.perf_counter()
     try:
-        df_zones_input = pd.read_csv(urb_data_file)
+        df_zones_input = _read_zone_frame(urb_data_file)
         df_input = pd.read_csv(country_data_file)
     except (FileNotFoundError, pd.errors.EmptyDataError) as e:
         # Try relative path as fallback
         try:
-            df_zones_input = pd.read_csv(Path(".") / urb_data_file)
+            df_zones_input = _read_zone_frame(Path(".") / urb_data_file)
             df_input = pd.read_csv(Path(".") / country_data_file)
         except Exception as fallback_e:
             raise FileNotFoundError(
                 f"Could not load data files: {e}, fallback error: {fallback_e}"
             )
+    LAST_LOAD_SECONDS = time.perf_counter() - started
 
     return df_zones_input, df_input
 
@@ -616,6 +649,23 @@ def run_bicycle_model(
     import src.mobility_module as mm
 
     n_runs = len(slope_zones)
+
+    # ADR-4: for anything bigger than a toy frame, solve the model once on a
+    # (Crr x slope x mass) grid and interpolate, instead of once per cell. The
+    # per-cell loop below stays as the ground truth and is still used for small
+    # inputs.
+    if solver_lut.should_use_lut(n_runs, Crr_values):
+        return solver_lut.bicycle_results_via_lut(
+            mm,
+            mv,
+            mo,
+            hpv,
+            np.asarray(slope_zones, dtype=float),
+            np.asarray(Crr_values, dtype=float),
+            np.asarray(country_average_weights, dtype=float),
+            load_attempt,
+        )
+
     results = np.zeros((n_runs, 3))
     # TODO update test to include country_average_weight
     for i, (slope, crr, country_average_weight) in enumerate(
@@ -817,6 +867,21 @@ def run_walking_model(
     import src.mobility_module as mm
 
     n_runs = len(slope_zones)
+
+    # ADR-4: see run_bicycle_model. The walking table has no Crr axis -- buckets
+    # are carried, not rolled -- so it is a (slope x mass) grid.
+    if solver_lut.should_use_lut(n_runs):
+        return solver_lut.walking_results_via_lut(
+            mm,
+            mv,
+            mo,
+            met,
+            hpv,
+            np.asarray(slope_zones, dtype=float),
+            np.asarray(country_average_weights, dtype=float),
+            load_attempt,
+        )
+
     results = np.zeros((n_runs, 3))
 
     # Run model for each zone with country-specific weights

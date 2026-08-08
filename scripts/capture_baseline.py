@@ -13,11 +13,14 @@ country- and district-level frames. The committed copy under
 """
 
 import argparse
+import json
+import time
 from pathlib import Path
 import sys
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
+import src.gis_global_module as gis  # noqa: E402
 from src.gis_global_module import run_global_analysis  # noqa: E402
 
 # Fixed parameters, verbatim from AC-2. Changing any of these invalidates the
@@ -45,18 +48,48 @@ def main():
         default=project_root / "results" / "regression_baseline",
         help="directory to write countries.csv and districts.csv into",
     )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=None,
+        help=(
+            "override the zone frame (CSV or Parquet). Defaults to the full "
+            "5 arc-minute CSV the committed baseline was captured from."
+        ),
+    )
     args = parser.parse_args()
 
     out_dir = args.out if args.out.is_absolute() else Path.cwd() / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.input is not None:
+        gis.URB_DATA_FILE = args.input
+
     print(f"Running run_global_analysis with {BASELINE_PARAMETERS}")
+    started = time.perf_counter()
     df_countries, df_districts, _df_zones = run_global_analysis(**BASELINE_PARAMETERS)
+    total_seconds = time.perf_counter() - started
+    load_seconds = gis.LAST_LOAD_SECONDS
 
     df_countries.to_csv(out_dir / "countries.csv", index=False)
     df_districts.to_csv(out_dir / "districts.csv", index=False)
+
+    # AC-7 measures the run excluding the initial data load, so record both.
+    timing = {
+        "input": str(gis.URB_DATA_FILE),
+        "total_seconds": round(total_seconds, 3),
+        "load_seconds": round(load_seconds, 3),
+        "seconds_excluding_load": round(total_seconds - load_seconds, 3),
+    }
+    (out_dir / "timing.json").write_text(json.dumps(timing, indent=2) + "\n")
+
     print(f"Wrote {len(df_countries)} countries to {out_dir / 'countries.csv'}")
     print(f"Wrote {len(df_districts)} districts to {out_dir / 'districts.csv'}")
+    print(
+        f"Total {total_seconds:.1f} s "
+        f"(data load {load_seconds:.1f} s, "
+        f"excluding load {total_seconds - load_seconds:.1f} s)"
+    )
 
 
 if __name__ == "__main__":
