@@ -138,6 +138,67 @@ LAST_LOAD_SECONDS = 0.0
 PARQUET_SUFFIXES = (".parquet", ".parq", ".pq")
 
 
+#: Zone columns stored as float32 rather than float64 (ADR-5). These are raster
+#: samples with at most ~4 significant digits of real information, so float32 is
+#: lossless in any meaningful sense and halves the frame. Population *counts*,
+#: which get summed over millions of cells, stay float64.
+FLOAT32_ZONE_COLUMNS = (
+    "left",
+    "top",
+    "right",
+    "bottom",
+    "GHS_SMOD",
+    "pop_density",
+    "dtw_1",
+    "grip_1_1",
+    "grip_2_1",
+    "grip_3_1",
+    "grip_4_1",
+    "grip_5_1",
+    "slope_1",
+)
+
+#: Zone columns stored as categoricals (ADR-5). At 30 arc-seconds these are
+#: ~140M repetitions of a few thousand short strings; as objects they alone cost
+#: more than the whole numeric frame.
+CATEGORICAL_ZONE_COLUMNS = ("shapeName", "shapeID", "ISOCODE")
+
+
+def optimise_zone_dtypes(df_zones_input):
+    """Shrink a freshly loaded zone frame in place (ADR-5).
+
+    float64 rasters become float32, repeated identifier strings become
+    categoricals, and the NaN-indicator flags become ``int8``. At 5 arc-minutes
+    this is a convenience; at 30 arc-seconds (~140M rows) it is the difference
+    between fitting in 32 GB and not.
+
+    Args:
+        df_zones_input (DataFrame): the zone frame as read off disk.
+
+    Returns:
+        DataFrame: the same frame, with narrowed dtypes.
+    """
+    for column in FLOAT32_ZONE_COLUMNS:
+        if (
+            column in df_zones_input.columns
+            and df_zones_input[column].dtype == "float64"
+        ):
+            df_zones_input[column] = df_zones_input[column].astype("float32")
+
+    for column in CATEGORICAL_ZONE_COLUMNS:
+        if column in df_zones_input.columns and not isinstance(
+            df_zones_input[column].dtype, pd.CategoricalDtype
+        ):
+            df_zones_input[column] = df_zones_input[column].astype("category")
+
+    for column in df_zones_input.columns:
+        if str(column).endswith("_nan") or column == "any_nan":
+            if pd.api.types.is_numeric_dtype(df_zones_input[column]):
+                df_zones_input[column] = df_zones_input[column].astype("int8")
+
+    return df_zones_input
+
+
 def _read_zone_frame(path):
     """Read a zone frame from Parquet or CSV, dispatching on the file extension.
 
@@ -147,8 +208,8 @@ def _read_zone_frame(path):
     """
     candidate = Path(path)
     if candidate.is_dir() or candidate.suffix.lower() in PARQUET_SUFFIXES:
-        return pd.read_parquet(path)
-    return pd.read_csv(path)
+        return optimise_zone_dtypes(pd.read_parquet(path))
+    return optimise_zone_dtypes(pd.read_csv(path))
 
 
 def load_data(urb_data_file, country_data_file):
@@ -353,16 +414,16 @@ def merge_and_adjust_population(df_zones_input, df_input):
     # original (flat) index here; pandas 2.x prepends the group keys, producing a
     # MultiIndex that cannot be assigned back onto df_zones. group_keys=False
     # restores the pandas 1.x result exactly -- values are unchanged.
-    df_zones["pop_density_perc"] = df_zones.groupby("ISOCODE", group_keys=False)[
-        "pop_density"
-    ].apply(lambda x: x / x.sum() if x.sum() > 0 else x * 0)
+    df_zones["pop_density_perc"] = df_zones.groupby(
+        "ISOCODE", group_keys=False, observed=True
+    )["pop_density"].apply(lambda x: x / x.sum() if x.sum() > 0 else x * 0)
     # multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
 
     # sum the population in each zone
-    df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")["pop_zone"].transform(
-        "sum"
-    )
+    df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE", observed=True)[
+        "pop_zone"
+    ].transform("sum")
 
     # trim the dataframe to only include rows where there is a population.
     # The threshold is resolution-aware (ADR-8): exactly 10 people per cell at
@@ -375,6 +436,37 @@ def merge_and_adjust_population(df_zones_input, df_input):
     )
     df_zones = df_zones[df_zones["any_pop"] == 1]
 
+    return df_zones
+
+
+def compact_zone_frame(df_zones):
+    """Shrink a merged zone frame in place (ADR-5).
+
+    Two jobs:
+
+    1. The country merge broadcasts the country table's text columns (Entity,
+       region, subregion, Continent, the alpha codes...) onto every single cell,
+       and de-categorises ISOCODE on the way through. Measured at 5 arc-minutes
+       those object columns are ~60% of the whole frame; at 30 arc-seconds they
+       would be tens of GB of pointers to a couple of hundred distinct strings.
+    2. pandas groups a categorical over *every* category by default, including
+       ones the merge and the population filter just deleted -- which would
+       inject empty groups into every downstream groupby. Pruning the category
+       lists makes a categorical group exactly like the object column it
+       replaced.
+
+    Args:
+        df_zones (DataFrame): the merged, filtered zone frame.
+
+    Returns:
+        DataFrame: the same frame, with text columns categorised and category
+        lists pruned to what is actually present.
+    """
+    for column in df_zones.columns:
+        if df_zones[column].dtype == object:
+            df_zones[column] = df_zones[column].astype("category")
+        elif isinstance(df_zones[column].dtype, pd.CategoricalDtype):
+            df_zones[column] = df_zones[column].cat.remove_unused_categories()
     return df_zones
 
 
@@ -581,6 +673,10 @@ def preprocess_data(
     df_zones = merge_and_adjust_population(df_zones_input, df_input)
     df_zones = road_analysis(df_zones, crr_adjustment=crr_adjustment)
     df_zones = calculate_nat_piped(df_zones)
+    # ADR-5. Done here, at the end of the pipeline, rather than inside
+    # merge_and_adjust_population / road_analysis, so that those functions'
+    # returned dtypes -- and the unit tests pinning them -- are untouched.
+    df_zones = compact_zone_frame(df_zones)
     return df_zones
 
 
@@ -1136,7 +1232,7 @@ def aggregate_country_level_data(df_zones):
         df_countries (DataFrame): The aggregated DataFrame with country-level summaries.
     """
     df_countries = (
-        df_zones.groupby("ISOCODE")
+        df_zones.groupby("ISOCODE", observed=True)
         .agg(
             {
                 "Entity": "first",
@@ -1193,8 +1289,19 @@ def calculate_weighted_results(df_zones):
     if df_zones.empty:
         raise ValueError("Input DataFrame is empty")
 
+    # Only the four columns the lambda reads are passed to it. That keeps the
+    # per-group frames small at 30 arc-seconds (ADR-5) and, incidentally,
+    # silences the pandas 2.x FutureWarning about `apply` operating on the
+    # grouping column -- the grouping column is no longer in the selection.
     df_median_group = (
-        df_zones.groupby("ISOCODE")
+        df_zones.groupby("ISOCODE", observed=True)[
+            [
+                "dtw_1",
+                "pop_zone",
+                "max distance cycling",
+                "max distance walking",
+            ]
+        ]
         .apply(
             lambda x: pd.Series(
                 {
@@ -1443,6 +1550,27 @@ def process_country_data(df_zones):
 ##############################################################################################################################
 
 
+#: The only zone columns :func:`process_district_data` reads. ``run_global_analysis``
+#: hands it a copy of exactly these rather than of the whole frame (ADR-5).
+DISTRICT_ZONE_COLUMNS = (
+    "shapeID",
+    "Entity",
+    "ISOCODE",
+    "shapeName",
+    "pop_zone",
+    "dtw_1",
+    "zone_pop_with_water",
+    "zone_pop_without_water",
+    "population_piped_with_access",
+    "population_piped_with_cycling_access",
+    "population_piped_with_walking_access",
+    "population_piped_with_only_cycling_access",
+    "NATPiped",
+    "region",
+    "subregion",
+)
+
+
 def aggregate_district_level_data(df_zones):
     """
     Aggregate zone data into district level summaries.
@@ -1454,12 +1582,12 @@ def aggregate_district_level_data(df_zones):
         df_countries (DataFrame): The aggregated DataFrame with district-level summaries.
     """
 
-    df_zones["district_pop_raw"] = df_zones.groupby("shapeID")["pop_zone"].transform(
-        "sum"
-    )
+    df_zones["district_pop_raw"] = df_zones.groupby("shapeID", observed=True)[
+        "pop_zone"
+    ].transform("sum")
 
     df_districts = (
-        df_zones.groupby("shapeID")
+        df_zones.groupby("shapeID", observed=True)
         .agg(
             {
                 "Entity": "first",
@@ -1516,7 +1644,11 @@ def process_district_data(df_zones):
 
     # use groupby to create weighted median, needs to be speerate from the above groupby as it uses apply, which can't be used in the same groupby
     # needs to use apply because the function required two columns as input
-    df_median_group = df_zones.groupby(["shapeID"]).apply(
+    # Selecting the two columns the lambda reads keeps the per-group frames
+    # small (ADR-5) and silences the pandas 2.x grouping-column FutureWarning.
+    df_median_group = df_zones.groupby(["shapeID"], observed=True)[
+        ["dtw_1", "pop_zone"]
+    ].apply(
         lambda x: pd.Series({"weighted_med": weighted_median(x, "dtw_1", "pop_zone")})
     )
 
@@ -1652,6 +1784,7 @@ def run_global_analysis(
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
     use_sample_data=False,  # only change to test functionality
+    zone_columns=None,  # ADR-5: trim the returned per-cell frame
 ):
     """
     Runs one run of the global analysis for water access.
@@ -1667,6 +1800,11 @@ def run_global_analysis(
         human_mass (float): The mass of an average human carrying water in kilograms.
         plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
         use_sample_data (bool, optional): Whether to use sample data or not (only for testing). Defaults to False.
+        zone_columns (list, optional): if given, only these columns of the
+            per-cell zone frame are returned. Defaults to None (every column, the
+            historical behaviour). ADR-5: at 30 arc-seconds the full zone frame
+            is tens of GB and callers keep three columns of it, so handing back
+            the whole thing is what actually blows the memory budget.
 
     Returns:
         pandas.DataFrame: The processed data for each country.
@@ -1702,9 +1840,13 @@ def run_global_analysis(
     # print("\n\n 1 \n\n")
     # print(len(df_zones["ISOCODE"].unique()))
 
-    # add df_districts
-    df_zones_districts = df_zones.copy()
+    # add df_districts.
+    # ADR-5: this used to copy the whole ~60-column zone frame purely because
+    # process_district_data adds a column to what it is given. Copying just the
+    # columns it reads is behaviourally identical and ~4x smaller.
+    df_zones_districts = df_zones[list(DISTRICT_ZONE_COLUMNS)].copy()
     df_districts = process_district_data(df_zones_districts)
+    del df_zones_districts
     df_countries = process_country_data(df_zones)
 
     # drop countries in df_distciricts if they don't appear in df_copuntries
@@ -1712,6 +1854,9 @@ def run_global_analysis(
 
     if plot:
         plot_chloropleth(df_countries)
+
+    if zone_columns is not None:
+        df_zones = df_zones[list(zone_columns)]
 
     # print("\n\n 5 \n\n")
     # print(len(df_districts["ISOCODE"].unique()))
