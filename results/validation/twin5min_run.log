@@ -1,0 +1,106 @@
+=== 5 arcmin TWIN run (AC-8), Sat Aug  8 21:14:38 AEST 2026 ===
+seed: 20260808 ; input: data/GIS/extracted/master_5min.parquet (scripted extraction, same provenance as the 30as table)
+--- load before:
+Processes: 803 total, 3 running, 800 sleeping, 4689 threads 
+2026/08/08 21:14:40
+Load Avg: 2.65, 2.83, 2.75 
+CPU usage: 10.27% user, 14.12% sys, 75.60% idle 
+SharedLibs: 649M resident, 116M data, 105M linkedit.
+MemRegions: 372082 total, 4656M resident, 224M private, 2188M shared.
+PhysMem: 21G used (3638M wired, 7894M compressor), 2644M unused.
+VM: 347T vsize, 6144M framework vsize, 5280202(0) swapins, 7596037(0) swapouts.
+
+Resolution: 5min
+Zone frame: data/GIS/extracted/master_5min.parquet
+Parameter seed: 20260808
+PARAM_DRAW 000 crr_adjustments=0 time_gatherings=2.36720627872 practical_limits_bicycle=40.8133567635 practical_limits_buckets=23.431186915 mets=3.4420202703 watts_values=50.0787936764 hill_polarities=flat_uphill urban_adjustments=1.34651385137 rural_adjustments=1.6667592195
+PARAM_DRAW 001 crr_adjustments=1 time_gatherings=2.30864590037 practical_limits_bicycle=39.4385891779 practical_limits_buckets=17.9129754977 mets=3.73604933456 watts_values=44.5457460892 hill_polarities=uphill_flat urban_adjustments=1.32296662614 rural_adjustments=1.01621167572
+PARAM_DRAW 002 crr_adjustments=-1 time_gatherings=2.83925208221 practical_limits_bicycle=37.2678777411 practical_limits_buckets=19.3376766138 mets=4.55274691097 watts_values=36.1070565361 hill_polarities=flat_uphill urban_adjustments=1.15092270682 rural_adjustments=1.78429660281
+PARAM_DRAW 003 crr_adjustments=1 time_gatherings=2.61258126018 practical_limits_bicycle=44.6018482072 practical_limits_buckets=15.5888452685 mets=3.65166175257 watts_values=48.3575103355 hill_polarities=downhill_uphill urban_adjustments=1.37955218218 rural_adjustments=1.09590603022
+PARAM_DRAW 004 crr_adjustments=-1 time_gatherings=2.88144407418 practical_limits_bicycle=33.1156708891 practical_limits_buckets=20.8673625317 mets=4.52014664556 watts_values=60.2061234938 hill_polarities=flat_uphill urban_adjustments=1.31451619217 rural_adjustments=1.71944652652
+PARAM_DRAW 005 crr_adjustments=-1 time_gatherings=2.8619876891 practical_limits_bicycle=40.6695648915 practical_limits_buckets=21.7488748936 mets=3.99210217988 watts_values=33.4615063102 hill_polarities=flat_uphill urban_adjustments=1.42023876124 rural_adjustments=1.11060739068
+PARAM_DRAW 006 crr_adjustments=1 time_gatherings=3.33872815912 practical_limits_bicycle=38.7058056209 practical_limits_buckets=19.3669464734 mets=4.34156430056 watts_values=35.6222295397 hill_polarities=uphill_flat urban_adjustments=1.41020441377 rural_adjustments=1.26856680768
+PARAM_DRAW 007 crr_adjustments=0 time_gatherings=3.28268115722 practical_limits_bicycle=30.9834132002 practical_limits_buckets=22.2779691144 mets=4.07369847609 watts_values=43.0687156916 hill_polarities=flat_uphill urban_adjustments=1.24529141124 rural_adjustments=1.24551736371
+PARAM_DRAW 008 crr_adjustments=1 time_gatherings=2.41993562858 practical_limits_bicycle=37.3352232577 practical_limits_buckets=21.0593728629 mets=4.29802823152 watts_values=46.9335404231 hill_polarities=uphill_downhill urban_adjustments=1.50893969481 rural_adjustments=1.00810491904
+PARAM_DRAW 009 crr_adjustments=0 time_gatherings=3.26260642934 practical_limits_bicycle=35.179573158 practical_limits_buckets=20.2031014061 mets=4.14194030852 watts_values=39.5765203313 hill_polarities=flat_uphill urban_adjustments=1.40334186485 rural_adjustments=1.07612185643
+Starting Monte Carlo simulations...
+Running 10 simulations...
+Running 15 simulations concurrently...
+Start time: 21:14:43
+
+
+
+Simulating:   0%|          | 0/10 [00:00<?, ?it/s]/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+Simulating:  10%|█         | 1/10 [03:11<28:40, 191.11s/it]Simulating:  30%|███       | 3/10 [03:16<06:01, 51.58s/it] Simulating:  40%|████      | 4/10 [03:16<03:23, 33.86s/it]/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+Simulating:  50%|█████     | 5/10 [03:22<02:02, 24.41s/it]Simulating:  60%|██████    | 6/10 [03:28<01:14, 18.57s/it]Simulating:  70%|███████   | 7/10 [03:28<00:38, 12.79s/it]Simulating:  80%|████████  | 8/10 [03:29<00:18,  9.24s/it]Simulating:  90%|█████████ | 9/10 [03:37<00:08,  8.78s/it]Simulating: 100%|██████████| 10/10 [03:38<00:00,  6.44s/it]<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Bahrain', 'Comoros', 'Cabo Verde', 'Micronesia, Federated States of', 'Qatar']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Comoros', 'Cabo Verde', 'Micronesia, Federated States of']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Bahrain', 'Comoros', 'Cabo Verde', 'Micronesia, Federated States of']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Comoros', 'Cabo Verde', 'Micronesia, Federated States of']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Bahrain', 'Comoros', 'Cabo Verde', 'Micronesia, Federated States of', 'Qatar']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Bahrain', 'Comoros', 'Cabo Verde', 'Micronesia, Federated States of', 'Qatar']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Comoros', 'Cabo Verde', 'Micronesia, Federated States of']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Comoros', 'Cabo Verde', 'Micronesia, Federated States of']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Bahrain', 'Comoros', 'Cabo Verde', 'Micronesia, Federated States of']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+<class 'numpy.int64'>
+Countries removed from analysis due to being further than Libya's median: ['Bahrain', 'Comoros', 'Cabo Verde', 'Micronesia, Federated States of', 'Qatar']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+Simulating: 100%|██████████| 10/10 [03:40<00:00, 22.02s/it]
+Country simulation results have been processed and saved to the results folder.
+Districts simulation results have been processed and saved to the results folder.
+Time taken: 3.68 minutes
+Time taken: 0.06 hours
+      224.97 real       814.13 user       101.82 sys
+          1986510848  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            14587388  page reclaims
+                3558  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                7452  voluntary context switches
+             3168997  involuntary context switches
+         15830982701  instructions retired
+          7632453913  cycles elapsed
+           202883840  peak memory footprint
+EXIT=0

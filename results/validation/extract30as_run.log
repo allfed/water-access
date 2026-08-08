@@ -1,0 +1,120 @@
+=== 30as extraction, Sat Aug  8 21:07:07 AEST 2026 ===
+--- df before:
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s5   460Gi   420Gi    17Gi    97%    4.4M  175M    2%   /System/Volumes/Data
+--- load before:
+Processes: 803 total, 4 running, 799 sleeping, 4671 threads 
+2026/08/08 21:07:08
+Load Avg: 2.55, 2.44, 2.61 
+CPU usage: 10.93% user, 14.74% sys, 74.31% idle 
+SharedLibs: 667M resident, 122M data, 112M linkedit.
+MemRegions: 371896 total, 5707M resident, 279M private, 2592M shared.
+PhysMem: 23G used (3544M wired, 6836M compressor), 821M unused.
+VM: 347T vsize, 6144M framework vsize, 5280190(0) swapins, 7596037(0) swapouts.
+master grid [30as] 43200x21600 cell=0.00833333333 origin=(-179.999999007, 90.002416350) crs=EPSG:4326
+sources: slope=slope_1KMmd_GMTEDmd.tif pop=gpw_v4_density_2020_30sec.tif (resampling=nearest) adm1=geoBoundariesCGAZ_ADM1.gpkg (3224 polygons)
+  block 2/45 rows 480-960 -> 645,318 rows total (4.3s, peak RSS 1.88 GB)
+  block 3/45 rows 960-1440 -> 4,848,108 rows total (7.8s, peak RSS 1.91 GB)
+  block 4/45 rows 1440-1920 -> 9,497,996 rows total (8.3s, peak RSS 1.91 GB)
+  block 5/45 rows 1920-2400 -> 17,170,693 rows total (12.5s, peak RSS 1.91 GB)
+  block 6/45 rows 2400-2880 -> 31,569,431 rows total (19.6s, peak RSS 1.91 GB)
+  block 7/45 rows 2880-3360 -> 46,847,942 rows total (21.4s, peak RSS 1.91 GB)
+  block 8/45 rows 3360-3840 -> 59,355,225 rows total (18.5s, peak RSS 1.91 GB)
+  block 9/45 rows 3840-4320 -> 70,663,412 rows total (17.0s, peak RSS 1.91 GB)
+  block 10/45 rows 4320-4800 -> 83,060,557 rows total (19.1s, peak RSS 1.91 GB)
+  block 11/45 rows 4800-5280 -> 94,593,480 rows total (18.4s, peak RSS 1.91 GB)
+  block 12/45 rows 5280-5760 -> 104,593,336 rows total (15.9s, peak RSS 1.91 GB)
+  block 13/45 rows 5760-6240 -> 113,811,725 rows total (13.9s, peak RSS 1.91 GB)
+  block 14/45 rows 6240-6720 -> 122,508,901 rows total (13.1s, peak RSS 1.91 GB)
+  block 15/45 rows 6720-7200 -> 131,328,791 rows total (13.3s, peak RSS 1.91 GB)
+  block 16/45 rows 7200-7680 -> 139,798,198 rows total (13.0s, peak RSS 1.91 GB)
+  block 17/45 rows 7680-8160 -> 147,349,675 rows total (11.8s, peak RSS 1.91 GB)
+  block 18/45 rows 8160-8640 -> 153,975,909 rows total (10.7s, peak RSS 1.91 GB)
+  block 19/45 rows 8640-9120 -> 159,585,884 rows total (10.1s, peak RSS 1.91 GB)
+  block 20/45 rows 9120-9600 -> 164,344,996 rows total (8.9s, peak RSS 1.91 GB)
+  block 21/45 rows 9600-10080 -> 169,403,703 rows total (9.2s, peak RSS 1.91 GB)
+  block 22/45 rows 10080-10560 -> 173,724,737 rows total (8.3s, peak RSS 1.91 GB)
+  block 23/45 rows 10560-11040 -> 178,366,915 rows total (8.5s, peak RSS 1.91 GB)
+  block 24/45 rows 11040-11520 -> 183,310,066 rows total (8.7s, peak RSS 1.91 GB)
+  block 25/45 rows 11520-12000 -> 188,013,793 rows total (8.3s, peak RSS 1.91 GB)
+  block 26/45 rows 12000-12480 -> 192,142,735 rows total (7.9s, peak RSS 1.91 GB)
+  block 27/45 rows 12480-12960 -> 196,972,484 rows total (8.7s, peak RSS 1.91 GB)
+  block 28/45 rows 12960-13440 -> 201,935,026 rows total (8.9s, peak RSS 1.91 GB)
+  block 29/45 rows 13440-13920 -> 206,887,289 rows total (8.8s, peak RSS 1.91 GB)
+  block 30/45 rows 13920-14400 -> 211,345,318 rows total (8.4s, peak RSS 1.91 GB)
+  block 31/45 rows 14400-14880 -> 214,924,746 rows total (7.6s, peak RSS 1.91 GB)
+  block 32/45 rows 14880-15360 -> 216,629,586 rows total (5.1s, peak RSS 1.91 GB)
+  block 33/45 rows 15360-15840 -> 217,524,838 rows total (4.4s, peak RSS 2.14 GB)
+  block 34/45 rows 15840-16320 -> 218,184,514 rows total (4.5s, peak RSS 2.14 GB)
+  block 35/45 rows 16320-16800 -> 218,644,733 rows total (4.1s, peak RSS 2.14 GB)
+  block 36/45 rows 16800-17280 -> 218,922,062 rows total (3.9s, peak RSS 2.23 GB)
+  block 37/45 rows 17280-17760 -> 218,986,194 rows total (3.4s, peak RSS 2.23 GB)
+
+resolution        : 30as
+cells scanned     : 933,120,000
+cells w/o ADM1    : 627,610,021
+cells dropped nan : 86,523,785
+  nan per layer   : dtw_1=25,460,475, pop_density=86,121,286, GHS_SMOD=4,778,564, slope_1=85,760,167
+rows written      : 218,986,194
+output            : /Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/data/GIS/extracted/master_30as.parquet (3358.2 MB)
+wall clock        : 399.7 s
+peak RSS          : 2.31 GB
+      400.51 real       384.91 user        42.62 sys
+          2485321728  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             7859457  page reclaims
+               18178  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                6556  voluntary context switches
+              301941  involuntary context switches
+       1931804087487  instructions retired
+        657124232523  cycles elapsed
+          6706960024  peak memory footprint
+EXIT=0
+--- df after:
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s5   460Gi   423Gi    13Gi    97%    4.4M  141M    3%   /System/Volumes/Data
+--- output:
+total 6954584
+drwxr-xr-x@  4 kevin  staff         128 Aug  8 21:07 .
+drwxr-xr-x@ 12 kevin  staff         384 Aug  8 17:56 ..
+-rw-r--r--@  1 kevin  staff  3521298754 Aug  8 21:13 master_30as.parquet
+-rw-r--r--@  1 kevin  staff    37504659 Aug  8 17:56 master_5min.parquet
+
+=== check_consistency.py, Sat Aug  8 21:14:11 AEST 2026 ===
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/data/GIS/extracted/master_30as.parquet: sampled 200,000 rows
+  [PASS] fid == col * nrows + row + 1 
+  [PASS] cell indices in range 
+  [PASS] right-left == top-bottom == cell size (max dev 4.15e-16)
+  [PASS] dtw_1 == Kummu raster value (on 20,002 sampled cells)
+  [PASS] grip_*_1 == GRIP4 tp value of the containing 5-arcmin cell (broadcast factor 10) 
+  [PASS] *_nan indicators agree with the data 
+  [PASS] any_nan == OR of the four indicators 
+  [PASS] ISOCODE / shapeID / shapeName all populated 
+
+8/8 checks passed
+       11.40 real        10.42 user         2.51 sys
+          2512748544  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              536659  page reclaims
+                 950  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                2393  voluntary context switches
+               16693  involuntary context switches
+         52033719157  instructions retired
+         20852570528  cycles elapsed
+          5069738928  peak memory footprint
