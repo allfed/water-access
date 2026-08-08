@@ -72,14 +72,17 @@ def peak_rss_gb():
 GLOBAL_ROW_RTOL = 1e-12
 
 GLOBAL_ROW_NOTE = (
-    "The `GLOBAL` summary row is the single value in the output that chunking "
-    "cannot reproduce bit for bit, and the reason is arithmetic rather than "
-    "structural: its population columns are whole-column sums over every cell "
-    "on Earth, and floating-point addition is not associative, so summing "
-    "chunk-by-chunk lands within an ULP of summing in one pass but not exactly "
-    "on it. Every *country* row and every *district* row is required to be "
-    "bit-identical, because those are per-group sums whose row membership and "
-    "order chunking does not change."
+    "Two kinds of row cannot be reproduced bit for bit, and in both cases the "
+    "reason is arithmetic rather than structural: their population columns are "
+    "sums over cells that chunking splits up, and floating-point addition is "
+    "not associative, so adding the parts lands within an ULP of adding the "
+    "whole but not exactly on it. Those rows are (a) the `GLOBAL` summary, "
+    "which sums every cell on Earth, and (b) any country so large it had to be "
+    "spread over several chunks. Both are held to a relative tolerance instead. "
+    "**Every other country row, and every district row without exception, must "
+    "be bit-identical** -- including the districts of a split country, because "
+    "splitting is done on district boundaries precisely so that no district is "
+    "ever divided."
 )
 
 
@@ -172,7 +175,7 @@ def compare(label, left, right, key, checks, exempt_keys=(), rtol=GLOBAL_ROW_RTO
         checks.append(
             {
                 "check": (
-                    f"{label}: {'/'.join(exempt_keys)} row within "
+                    f"{label}: {'/'.join(exempt_keys)} row(s) within "
                     f"{GLOBAL_ROW_RTOL:g} relative"
                 ),
                 "observed": f"{worst_exempt_rel:.3e} ({worst_exempt_column})",
@@ -234,7 +237,7 @@ def main():
         chunk_countries,
         "ISOCODE",
         checks,
-        exempt_keys=("GLOBAL",),
+        exempt_keys=("GLOBAL", *plan.split_countries),
     )
     compare("districts", mono_districts, chunk_districts, "shapeID", checks)
     checks.append(

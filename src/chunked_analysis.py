@@ -56,11 +56,20 @@ import pandas as pd
 import src.gis_global_module as gis
 import src.solver_lut as solver_lut
 
-#: Default chunk budget, in *post-filter* rows. At the measured ~406 bytes per
-#: row the working frame for a chunk this size is ~8 GB, which leaves room for
-#: the accumulated global-statistics columns and the interpolation scratch
-#: inside the 24 GB budget (AC-6).
-DEFAULT_CHUNK_ROWS = 20_000_000
+#: Default chunk budget, in *post-filter* (modelled) rows.
+#:
+#: Calibrated, not guessed. Peak RSS was measured against chunk size on the
+#: 5-arcmin grid and fits
+#:
+#:     peak GB ~= 1.0 + 1.2 * (millions of modelled cells in the largest chunk)
+#:
+#: The 1.2 GB/M coefficient is ~3x the steady-state frame (~406 bytes/row)
+#: because pandas' merge and per-column dtype conversions hold transient copies;
+#: peak lives inside preprocessing, not in the model itself. 12M cells therefore
+#: projects to ~15 GB, comfortably inside AC-6's 24 GB with room for the
+#: finalisation pass. Raising it buys little: the LUT is cached across chunks,
+#: so extra chunks cost I/O and vectorised arithmetic, not solver time.
+DEFAULT_CHUNK_ROWS = 12_000_000
 
 #: Columns the planning pre-pass reads. Deliberately tiny: at 30 arc-seconds
 #: this is ~1.7 GB against ~40 GB for the full frame. ``shapeID`` is here so an
@@ -277,10 +286,15 @@ def plan_chunks(
         )
     populations = df_input.set_index("alpha3")["Population"]
     weights = df_input.set_index("alpha3")["Average Weight"]
-    iso = frame["ISOCODE"].astype(object)
-    keep = iso.isin(populations.index).to_numpy()
+    # Everything here stays categorical. Calling .astype(object) on ISOCODE
+    # would materialise one Python string pointer per raw grid cell -- 2+ GB at
+    # 30 arc-seconds, in the one pass that is supposed to be cheap.
+    keep = frame["ISOCODE"].isin(populations.index).to_numpy()
     frame = frame[keep].reset_index(drop=True)
-    iso = iso[keep].reset_index(drop=True)
+    for column in ("ISOCODE", "shapeID"):
+        if isinstance(frame[column].dtype, pd.CategoricalDtype):
+            frame[column] = frame[column].cat.remove_unused_categories()
+    iso = frame["ISOCODE"]
 
     # Capture the per-country divisor as well as using it. A chunk holding only
     # part of a country has to be handed this, or it would normalise against its
@@ -300,26 +314,34 @@ def plan_chunks(
     density_share = frame.groupby(iso, group_keys=False, observed=True)[
         "pop_density"
     ].apply(_share)
-    pop_zone = density_share * iso.map(populations)
+    # Look the national population up through the categorical codes rather than
+    # Series.map, which on a categorical returns another categorical and cannot
+    # then be multiplied. This also keeps the int64 dtype the merge would give,
+    # so the float32 * int64 -> float64 promotion matches.
+    population_by_category = populations.reindex(iso.cat.categories).to_numpy()
+    pop_values = pd.Series(
+        population_by_category[iso.cat.codes.to_numpy()], index=iso.index
+    )
+    pop_zone = density_share * pop_values
 
     survivors = (pop_zone > minimum_pop).to_numpy()
     surviving_iso = iso[survivors]
     surviving_slope = frame["slope_1"].to_numpy(dtype=float)[survivors]
 
-    surviving_shape = frame["shapeID"].astype(object)[survivors]
+    surviving_shape = frame["shapeID"][survivors]
     counts = surviving_iso.value_counts()
     counts = counts[counts > 0].sort_values(ascending=False)
     if counts.empty:
         raise ValueError("No cells survive the population filter; nothing to chunk.")
 
     slope_range = (float(np.nanmin(surviving_slope)), float(np.nanmax(surviving_slope)))
-    surviving_weights = weights.reindex(counts.index).dropna()
+    surviving_weights = weights.reindex(list(counts.index)).dropna()
     mass_range = (float(surviving_weights.min()), float(surviving_weights.max()))
 
     # Greedy first-fit-decreasing bin packing. Countries are few (~200) and the
     # sizes are wildly uneven, so anything cleverer buys nothing.
     budget = max(int(max_rows_per_chunk), 1)
-    oversized = [str(iso) for iso, rows in counts.items() if int(rows) > budget]
+    oversized = [str(code) for code, rows in counts.items() if int(rows) > budget]
 
     chunks, chunk_rows = [], []
     for isocode, rows in counts.items():
@@ -346,7 +368,12 @@ def plan_chunks(
     district_counts = {}
     for isocode in oversized:
         mask = (surviving_iso == isocode).to_numpy()
-        sizes = surviving_shape[mask].value_counts().sort_values(ascending=False)
+        # value_counts on a categorical reports *every* category, so the zero
+        # rows here are other countries' districts. Dropping them matters: a
+        # foreign shapeID left in this country's bin would be pulled into the
+        # chunk by the shapeID filter and counted twice.
+        sizes = surviving_shape[mask].value_counts()
+        sizes = sizes[sizes > 0].sort_values(ascending=False)
         district_counts[isocode] = {str(k): int(v) for k, v in sizes.items()}
         bins, bin_rows = [], []
         for shape_id, rows in sizes.items():

@@ -51,11 +51,11 @@ MAX_WORKERS = 15
 # at a time unless the operator says otherwise.
 MAX_WORKERS_30AS = 1
 
-# Country-group chunk budget at 30 arc-seconds (ADR-5). ~20M modelled cells is a
-# ~8 GB working frame at the measured ~406 bytes/row, which leaves comfortable
-# headroom inside the 24 GB budget for the accumulated global-summary columns
-# and the interpolation scratch.
-CHUNK_ROWS_30AS = 20_000_000
+# Country-group chunk budget at 30 arc-seconds (ADR-5). See
+# src/chunked_analysis.DEFAULT_CHUNK_ROWS for the calibration behind the number:
+# peak RSS ~= 1.0 + 1.2 GB per million modelled cells in the largest chunk, so
+# 12M projects to ~15 GB against AC-6's 24 GB budget.
+CHUNK_ROWS_30AS = 12_000_000
 
 # The only per-cell columns anything downstream reads. Everything else is
 # dropped inside the worker so it never crosses a process boundary.
