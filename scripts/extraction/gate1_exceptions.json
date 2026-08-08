@@ -1,0 +1,52 @@
+{
+  "version": "2026-08-08",
+  "gate": "AC-3 / Gate 1 — scripted extraction vs legacy manual-QGIS output at 5 arc-minute",
+  "policy": [
+    "Every entry is an explicitly approved, cause-attributed deviation (SPEC ADR-9).",
+    "'max_magnitude' is a hard cap in the metric's own units: a failure larger than",
+    "the cap is NOT covered and the gate fails. Caps are set just above the magnitude",
+    "measured on 2026-08-08, so any regression that widens a residual will re-open the",
+    "gate rather than be silently absorbed.",
+    "'country': \"*\" is only used for the two causes that are demonstrably systematic",
+    "(a source-product substitution and an unreproducible categorical resampling",
+    "tie-break); every other exception names its country."
+  ],
+  "exceptions": [
+    {
+      "country": "*",
+      "metric": "pop_total_pct",
+      "max_magnitude": 27.0,
+      "n_countries_2026_08_08": 115,
+      "worst_2026_08_08": "LBN -26.29%",
+      "cause": "Legacy used GPW v4.11 **UN WPP-adjusted** population density; the pipeline uses the unadjusted 30as product (the adjusted one is behind an Earthdata login and was not obtained). Evidence: per-country ratios reproduce published GPW-to-UNWPP adjustment factors (NPL 0.966, GBR 1.014, NGA 0.995) and the extremes are the classic high-migration adjustments (LBN -26%, QAT +24%). Immaterial downstream: `merge_and_adjust_population` (src/gis_global_module.py:323-327) renormalises pop_density to a within-country share and multiplies by an external country Population, cancelling any uniform per-country scale factor exactly. Global population-weighted difference is -0.26%."
+    },
+    {
+      "country": "*",
+      "metric": "smod_urban_pp",
+      "max_magnitude": 31.5,
+      "n_countries_2026_08_08": 46,
+      "worst_2026_08_08": "GMB +30.78 pp",
+      "cause": "GHS-SMOD is a 1 km categorical layer in Mollweide; on the 5-arcmin validation lattice each output cell covers ~85 source cells and nearest-neighbour picks exactly one of them, so the class assigned is a tie-break the undocumented QGIS warp made differently. Cell-level class agreement is 91.7% (V2-0) / 91.9% (V1-0 — tested, not materially better), global population-weighted urban-share difference is -0.42 pp, and the largest failing country is COL at 64M. This artefact is specific to the coarse validation grid: at the 30 arc-second production resolution GHS-SMOD is effectively native and the tie-break disappears."
+    },
+    {
+      "country": "118",
+      "metric": "smod_mode_match",
+      "max_magnitude": 1.0,
+      "cause": "geoBoundaries CGAZ disputed-territory pseudo-code '118', 6 cells total. The modal SMOD class flips on a 6-cell sample for the same nearest-neighbour tie-break reason as the entry above."
+    },
+    {
+      "country": "RWA",
+      "metric": "cell_count_pct",
+      "max_magnitude": 4.5,
+      "observed_2026_08_08": "+4.27% (281 -> 293 cells)",
+      "cause": "geoBoundaries CGAZ ADM1 release drift — the legacy join used an older CGAZ snapshot, and Rwanda's boundary polygon moved by well under one 5-arcmin cell along its borders. On a 281-cell country a 12-cell shift is 4.3%."
+    },
+    {
+      "country": "NZL",
+      "metric": "cell_count_pct",
+      "max_magnitude": 4.5,
+      "observed_2026_08_08": "+4.15% (3,757 -> 3,913 cells)",
+      "cause": "geoBoundaries CGAZ ADM1 release drift — the current CGAZ ADM1 layer covers offshore/outlying New Zealand polygons that the legacy snapshot's join did not reach."
+    }
+  ]
+}
