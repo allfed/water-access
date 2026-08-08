@@ -22,12 +22,14 @@ import sys
 from tqdm import tqdm
 import time
 
+import numpy as np
+
 # Resolve project root and update sys.path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 import src.gis_global_module as gis  # noqa
 import src.gis_monte_carlo as mc  # noqa
-from src.monte_carlo_constants import sample_parameters  # noqa
+from src.monte_carlo_constants import PARAMETER_NAMES, sample_parameters  # noqa
 
 # Results path
 RESULTS_PATH = project_root / "results"
@@ -167,7 +169,42 @@ def parse_args(argv=None):
         action="store_false",
         help="suppress them (default at 30as, and what you want on a headless box)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help=(
+            "seed the Monte Carlo parameter draws, so that two runs consume "
+            "IDENTICAL parameter tuples -- what AC-8's 30as/5min twin comparison "
+            "needs. Default: unseeded, exactly as before."
+        ),
+    )
     return parser.parse_args(argv)
+
+
+def format_parameter_draws(parameters, num_iterations):
+    """Render one ``PARAM_DRAW`` line per draw, for log-to-log diffing.
+
+    AC-8 compares a 30 arc-second run against a 5 arc-minute twin and needs
+    evidence that the only difference between them was the resolution. Both run
+    logs carry these lines, so ``diff <(grep PARAM_DRAW a.log) <(grep PARAM_DRAW
+    b.log)`` is the proof.
+    """
+    lines = []
+    columns = [parameters[name] for name in PARAMETER_NAMES]
+    for i in range(num_iterations):
+        cells = []
+        for name, column in zip(PARAMETER_NAMES, columns):
+            value = column[i]
+            # ``hill_polarities`` is a string; everything else is numeric and
+            # printed at enough precision to round-trip a comparison.
+            cells.append(
+                f"{name}={value}"
+                if isinstance(value, str)
+                else f"{name}={float(value):.12g}"
+            )
+        lines.append(f"PARAM_DRAW {i:03d} " + " ".join(cells))
+    return lines
 
 
 def main(argv=None):
@@ -232,6 +269,15 @@ def main(argv=None):
     parquet_path.mkdir(parents=True, exist_ok=True)
 
     # Monte Carlo parameters (canonical distributions, see ADR-7)
+    if args.seed is not None:
+        # sample_parameters draws through the legacy global RNG (numpy's, which
+        # is also what scipy's ``.rvs`` uses by default), so seeding it here
+        # fixes every one of the nine parameters. Same trick as
+        # scripts/validate_lut.py.
+        np.random.seed(args.seed)
+        print(f"Parameter seed: {args.seed}")
+    else:
+        print("Parameter seed: none (unseeded draws)")
     parameters = sample_parameters(args.iterations)
     crr_adjustments = parameters["crr_adjustments"]
     time_gatherings = parameters["time_gatherings"]
@@ -243,14 +289,11 @@ def main(argv=None):
     urban_adjustments = parameters["urban_adjustments"]
     rural_adjustments = parameters["rural_adjustments"]
 
-    print(crr_adjustments)
-    print(time_gatherings)
-    print(practical_limits_bicycle)
-    print(mets)
-    print(watts_values)
-    print(hill_polarities)
-    print(urban_adjustments)
-    print(rural_adjustments)
+    # One line per draw, all nine parameters, so two run logs can be diffed
+    # directly (AC-8). This replaces eight raw array dumps that both truncated
+    # at large iteration counts and silently omitted practical_limits_buckets.
+    for line in format_parameter_draws(parameters, args.iterations):
+        print(line)
 
     # Initialize lists to store results from each output
     districts_simulation_results = []
