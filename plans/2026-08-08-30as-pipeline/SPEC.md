@@ -86,6 +86,10 @@ The pinned conda env (py3.9, pandas 1.4.3 — `environment.yml`) doesn't exist o
 ### ADR-9: Gate 1 pass bar is statistical, not cell-exact (Kevin sign-off)
 The QGIS provenance is undocumented (resampling method, tie-breaking, an extra unexplained transformation between `pre_process_GIS_data.py` outputs and the cleaned CSV). Chasing cell-exactness would burn build loops on artefacts of the old manual process. Bar defined in AC-3. Residual per-country exceptions get a documented list with a one-line cause hypothesis each.
 
+### ADR-10 (added 2026-08-09, Kevin sign-off): cos-latitude area weighting in the population split, default ON
+Within-country population shares are `pop_density × cos(lat)`, not `pop_density` alone — on the lat/long grid, people per cell = density × area and cell area ∝ cos(latitude). The unweighted split (the legacy/published behaviour, and this spec's original implicit assumption) over-weights poleward cells; measured effect at fixed parameters: global −0.078 pp, worst country NOR +1.33 pp, resolution-stable (`results/validation/cos_lat_diff.md`). Adopted as the DEFAULT the same day it was measured — an off-by-default correction is a trap for the next reader. Legacy split reachable via `area_weighted_population=False` / `--no-area-weighted*`; regression baseline re-frozen against the corrected model (pre-correction baseline remains at commit `640dceb`).
+**Rejected:** keeping it opt-in until the production run (risks publishing known-biased per-country figures by accident).
+
 ---
 
 ## 3. Acceptance criteria
