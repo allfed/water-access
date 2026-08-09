@@ -75,9 +75,21 @@ python scripts/Data_Manipulation_Scripts/download_jmp_country_files.py
 # 2. Parse source-type percentages for all countries
 python scripts/Data_Manipulation_Scripts/extract_jmp_source_breakdown.py
 
-# 3. Rebuild merged_data.csv (adds URBAN/RURAL Packaged, Delivered, Borehole, OtherUnpiped columns)
+# 3. Merge in researched fills for the 76 countries whose JMP files are blank
+#    (data/original_data/researched_source_breakdown.csv; see its README)
+python scripts/Data_Manipulation_Scripts/build_unified_source_breakdown.py
+
+# 4. Rebuild merged_data.csv (adds URBAN/RURAL Packaged, Delivered, Borehole, OtherUnpiped columns)
 python scripts/Data_Manipulation_Scripts/imputation_script.py
 ```
+
+The 76 countries with blank JMP source breakdowns (mostly high-income and
+small-island territories) are filled from national censuses, DHS/EPHS reports
+and regulator statistics, with per-row provenance, confidence, and
+verification status. Sources, the mapping rubric, and the piped-share
+reconciliation rule (unpiped-budget scaling with a rounded-piped carve-out)
+are documented in
+[`data/original_data/researched_source_breakdown_README.md`](data/original_data/researched_source_breakdown_README.md).
 
 Default borehole displacement scenarios: 50% urban, 25% rural (JMP does not distinguish handpump vs motorized). Displaced users — piped, packaged, delivered, and the displaced borehole share — all regain access only if walking or cycling range allows. Resilient unpiped users are the residual share after subtracting those displaced categories from total unpiped (`100% − piped`). Parsed `OtherUnpiped` columns are used only when scaling survey breakdowns to the unpiped budget. Override via `urban_borehole_lose_fraction` and `rural_borehole_lose_fraction` in `calculate_population_water_access()`.
 

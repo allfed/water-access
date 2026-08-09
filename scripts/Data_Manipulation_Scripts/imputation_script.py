@@ -77,8 +77,15 @@ height_file_path = data_dir / "Human Height by Birth Year.csv"
 population_file_path = data_dir / "population.csv"  # OWID
 household_size_file_path = data_dir / "undesa_pd_2022_hh-size-composition.xlsx"
 country_regions_file_path = data_dir / "ISO-3166 Countries.csv"
+# Unified breakdown = JMP-parsed values plus researched fills for the 76
+# countries whose JMP files are blank (see researched_source_breakdown_README).
+# Built by build_unified_source_breakdown.py; JMP values always win.
 jmp_source_breakdown_path = (
-    repo_root / "data" / "processed" / "semi-processed" / "jmp_source_breakdown_latest.csv"
+    repo_root
+    / "data"
+    / "processed"
+    / "semi-processed"
+    / "jmp_source_breakdown_unified.csv"
 )
 jmp_country_files_dir = data_dir / "jmp_country_files"
 
@@ -551,7 +558,9 @@ def process_water_data(df):
 def load_jmp_source_breakdown(file_path):
     """Load parsed JMP source-type percentages, if available."""
     if not file_path.exists():
-        print(f"JMP source breakdown not found at {file_path}; run extract_jmp_source_breakdown.py")
+        print(
+            f"JMP source breakdown not found at {file_path}; run extract_jmp_source_breakdown.py"
+        )
         return pd.DataFrame(columns=["alpha3"])
 
     breakdown = pd.read_csv(file_path)
@@ -565,9 +574,96 @@ def load_jmp_source_breakdown(file_path):
         "RURALBorehole",
         "URBANOtherUnpiped",
         "RURALOtherUnpiped",
+        "data_origin",
     ]
     existing = [col for col in keep_cols if col in breakdown.columns]
     return breakdown[existing].drop_duplicates(subset=["alpha3"], keep="first")
+
+
+def reconcile_research_breakdown_with_piped(df):
+    """Reconcile research-filled source breakdowns against the piped shares
+    this script actually uses.
+
+    The unified CSV is reconciled against the raw WHO reference at build
+    time, but process_water_data fills piped values the reference lacks
+    (older years, 100%-urban handling), so research rows are re-reconciled
+    here against the final piped values. Applies the same rule as the build
+    (reconcile_stratum_with_piped_budget): categories are scaled down to the
+    unpiped budget (100 - piped), EXCEPT when piped >= 99.5 (a rounded
+    ">99"), where the measured categories win and piped becomes
+    100 - sum(categories). Without this, piped + packaged/borehole users sum
+    past 100% and the model double-counts the affected population.
+
+    JMP-origin rows are left untouched: the parser already fitted them to
+    its own piped reference (normalize_unpiped_subcategories).
+    """
+    from build_unified_source_breakdown import reconcile_stratum_with_piped_budget
+
+    if "data_origin" not in df.columns:
+        return df
+    categories = ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
+    for idx in df.index[df["data_origin"] == "research"]:
+        for stratum in ("URBAN", "RURAL"):
+            piped = df.at[idx, f"{stratum}Piped"]
+            values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
+            adjusted, piped_effective, _ = reconcile_stratum_with_piped_budget(
+                values, piped if pd.notna(piped) else None
+            )
+            for cat, value in adjusted.items():
+                df.at[idx, f"{stratum}{cat}"] = value
+            if piped_effective is not None:
+                df.at[idx, f"{stratum}Piped"] = piped_effective
+    return df
+
+
+def reconcile_research_rows_with_final_piped(df, spatial_track):
+    """Final consistency pass on the output frame, after piped imputation.
+
+    Countries absent from the WHO piped data (AUT, SVN, HRV) or lacking
+    urban/rural splits (FSM, GRD) only get piped values from spatial/GDP
+    imputation, which runs AFTER the first reconciliation, so their
+    research-filled categories can conflict with the imputed piped share.
+
+    Rule here depends on which datum is weaker:
+    - piped was IMPUTED (per the spatial tracking frame): the researched
+      categories are the stronger datum, so piped is lowered to
+      100 - sum(categories) when they conflict (e.g. FSM: imputed piped
+      82 vs census categories 69 -> piped 31, which matches the census's
+      own utility+community share).
+    - piped was measured: same rule as the build script
+      (reconcile_stratum_with_piped_budget); a no-op for rows the earlier
+      pass already fitted.
+    """
+    from build_unified_source_breakdown import reconcile_stratum_with_piped_budget
+
+    if "data_origin" not in df.columns:
+        return df
+    categories = ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
+    track = spatial_track.drop_duplicates("alpha3").set_index("alpha3")
+    for idx in df.index[df["data_origin"] == "research"]:
+        alpha3 = df.at[idx, "alpha3"]
+        for stratum in ("URBAN", "RURAL"):
+            piped_col = f"{stratum}Piped"
+            piped = df.at[idx, piped_col]
+            if pd.isna(piped):
+                continue
+            values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
+            total = sum(v for v in values.values() if pd.notna(v))
+            piped_was_imputed = alpha3 in track.index and pd.notna(
+                track.at[alpha3, piped_col]
+            )
+            if piped_was_imputed:
+                if piped + total > 100.0:
+                    df.at[idx, piped_col] = round(max(0.0, 100.0 - total), 4)
+            else:
+                adjusted, piped_effective, _ = reconcile_stratum_with_piped_budget(
+                    values, piped
+                )
+                for cat, value in adjusted.items():
+                    df.at[idx, f"{stratum}{cat}"] = value
+                if piped_effective is not None:
+                    df.at[idx, piped_col] = piped_effective
+    return df
 
 
 def prepare_source_breakdown_columns(df):
@@ -1017,9 +1113,9 @@ def main(
 
     # add region and subregion for Taiwan
     df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "region"] = "Asia"
-    df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "subregion"] = (
-        "Eastern Asia"
-    )
+    df_cleaned_merge.loc[
+        df_cleaned_merge["alpha3"] == "TWN", "subregion"
+    ] = "Eastern Asia"
 
     # import weight data
     df_weight = calculate_average_weight_per_country(
@@ -1034,9 +1130,12 @@ def main(
         df_cleaned_merge = df_cleaned_merge.merge(
             df_source_breakdown, on="alpha3", how="left"
         )
+        df_cleaned_merge = reconcile_research_breakdown_with_piped(df_cleaned_merge)
     df_cleaned_merge = prepare_source_breakdown_columns(df_cleaned_merge)
 
-    # List of variables to impute
+    # List of variables to impute (OtherUnpiped is zero-filled above, so
+    # imputation never fires on it; it is listed so it survives into the
+    # output column selection instead of being re-added as all zeros)
     list_of_vars = [
         "RURALPiped",
         "URBANPiped",
@@ -1046,6 +1145,8 @@ def main(
         "URBANDelivered",
         "RURALBorehole",
         "URBANBorehole",
+        "RURALOtherUnpiped",
+        "URBANOtherUnpiped",
         "PBO",
         "Average Weight",
         "Household_Size",
@@ -1110,6 +1211,16 @@ def main(
     # Add back % urban data
     df_output = add_back_percentage_urban_data(df_output, df_water)
     df_output = prepare_source_breakdown_columns(df_output)
+
+    # Final consistency pass: research-filled breakdowns vs the piped values
+    # that actually ship (some piped shares only exist after imputation)
+    if not df_source_breakdown.empty and "data_origin" in df_source_breakdown.columns:
+        df_output = df_output.merge(
+            df_source_breakdown[["alpha3", "data_origin"]], on="alpha3", how="left"
+        )
+        df_output = reconcile_research_rows_with_final_piped(
+            df_output, df_spatial_imputation_track
+        )
 
     # Save dataframes as CSV
     try:
