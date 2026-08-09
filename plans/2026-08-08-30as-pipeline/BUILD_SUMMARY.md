@@ -19,13 +19,13 @@
 | Legacy population is **unadjusted** GPW, NOT UN-WPP-adjusted (earlier hypothesis refuted by cell-level evidence) | Unadjusted stays default; adjusted converted + archived as `--pop-raster` alternate; downstream-neutral either way (renormalisation cancels per-country scalars) |
 | `--input` never reached spawned MC workers (pre-existing) | Fixed; earlier smoke evidence re-run |
 | Input-swap (legacy CSV → scripted extraction, fixed params): **global +0.044 pp**; country pop-weighted 0.44 pp; tails DJI +19 pp, district p90 4.7 pp | `results/validation/input_swap_comparison.md`; global story robust, district tails pipeline-sensitive |
-| **cos(latitude) missing from population placement** (people = density × area; area term omitted) | Real bug, modest effect: global −0.083 pp, worst NOR +1.32 pp, only 1 country >0.5 pp, resolution-stable. Implemented behind `area_weighted_population` (default OFF), chunk-safe, tests 109→121. `results/validation/cos_lat_diff.md` |
+| **cos(latitude) missing from population placement** (people = density × area; area term omitted) | Real bug, modest effect: global −0.083 pp, worst NOR +1.32 pp, only 1 country >0.5 pp, resolution-stable. Implemented behind `area_weighted_population`, **default ON since 2026-08-09** (Kevin: leaving a genuine bug off-by-default is a trap); legacy split reachable via `--no-area-weighted*`. Chunk-safe, tests 109→123, regression baseline re-frozen. `results/validation/cos_lat_diff.md` |
 | Legacy boundaries were originally Garmin-via-ArcGIS per the handwritten note, switched to CGAZ undocumented | Explains residual cell-count exceptions; recorded in methodology review |
 
 ## Decisions log (Kevin)
 
 - 2026-08-08: scope = Phases 1+2 + smoke only; TIME_GATHERING 2–4 h canonical; Gate 1 statistical bar; local M4 first.
-- 2026-08-09: ADR-3 slope amended to md. Unadjusted GPW retained (evidence-driven). **cos(lat): adopt at the production run** (flip `--area-weighted-population` ON and re-freeze the regression baseline in the same commit — NOT retroactively). **Production run: one more run, 1000 iterations at 30 arcsec, cos(lat) ON.** Population product ensemble: **deferred to the Kummu follow-up paper**; current manuscript takes a limitation note (see below).
+- 2026-08-09: ADR-3 slope amended to md. Unadjusted GPW retained (evidence-driven). **cos(lat): adopt at the production run** (flip `--area-weighted-population` ON and re-freeze the regression baseline in the same commit — NOT retroactively). **Superseded the same day: adopt as the DEFAULT now** — an off-by-default correction is a trap for the next reader; baseline re-frozen against the corrected model (legacy behaviour stays reachable, and the pre-correction baseline stays in git history). **Production run: one more run, 1000 iterations at 30 arcsec, cos(lat) ON.** Population product ensemble: **deferred to the Kummu follow-up paper**; current manuscript takes a limitation note (see below).
 - Kummu 2026 follow-up paper approved as a separate effort: `plans/2026-08-09-kummu-2026-followup/IDEA.md`.
 
 ## Manuscript limitation notes (draft language)
@@ -37,7 +37,7 @@
 
 ## Next steps
 
-1. **Production run (pending Kevin's go):** 1000 iterations, 30as, `--area-weighted-population` ON, baseline re-frozen in the same commit. Timing: ~8 min/draw single-worker ⇒ **~5.6 days on the M4**; options to compress: 2 workers at `--chunk-rows 6000000` (verify RSS on a 10-draw smoke first, projected ~2× ~8.2 GB), chunk-plan caching, or the GCP fallback. Also revisit whether 1000 draws are needed vs ~300 for the reported quantiles.
+1. **Production run (pending Kevin's go):** 1000 iterations, 30as — cos(lat) is now the default and the baseline is already re-frozen, so this is just GCP dry-run smoke, then the 1000. Timing: ~8 min/draw single-worker ⇒ **~5.6 days on the M4**; options to compress: 2 workers at `--chunk-rows 6000000` (verify RSS on a 10-draw smoke first, projected ~2× ~8.2 GB), chunk-plan caching, or the GCP fallback. Also revisit whether 1000 draws are needed vs ~300 for the reported quantiles.
 2. **Kummu 2026 follow-up** (separate paper): updated distance-to-water layer + assumption-matrix release (water definition × population product — see IDEA.md).
 3. Optional pre-submission: exactextract district-aggregation cross-check (~1 day, certifies the boundary-assignment shortcut).
 

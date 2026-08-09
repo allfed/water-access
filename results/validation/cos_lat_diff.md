@@ -1,5 +1,20 @@
 # cos-latitude cell-area weighting of the population split: OFF vs ON (5 arcmin)
 
+> **Status: ADOPTED AS DEFAULT, 2026-08-09 (Kevin sign-off).** The
+> recommendation below was written as "adopt, with the switch, default OFF";
+> Kevin overrode it the same day on the grounds that leaving a genuine bug
+> off-by-default is a trap for the next reader. `area_weighted_population` now
+> defaults to **True** everywhere and the regression baseline has been
+> re-frozen against the corrected model. The legacy density-only split stays
+> fully reachable (`--no-area-weighted`, `--no-area-weighted-population`,
+> `area_weighted_population=False`) and reproduces every pre-correction
+> published figure; the pre-correction baseline stays in git history at
+> `640dceb`. Re-frozen baseline (legacy 5-arcmin CSV, the input the baseline
+> has always used): global percent_with_water **77.7075 → 77.6298 (−0.0777 pp)**,
+> country pop-weighted mean |Δ| **0.110 pp**, max **NOR +1.328 pp**, districts
+> >100k max **Alaska 1.194 pp** — consistent with the parquet-input numbers
+> below.
+
 **Date:** 2026-08-09 · **Params:** AC-2 fixed set (crr 0, time_gathering 2.84, practical limits 40/20, met 4, watts 40, downhill_uphill, urban 1.3 / rural 1.4, calculate_distance, no plot) · **Input:** `data/GIS/extracted/master_5min.parquet` · **Only variable:** `area_weighted_population` False → True.
 
 ## The defect
@@ -19,9 +34,9 @@ renormalised nationally); only the *placement inside* a country moves — and
 placement is what the distance-to-water model consumes.
 
 The fix weights by `pop_density × cos(cell-centre latitude)`, behind the new
-trailing kwarg `area_weighted_population` (**default False** — every committed
-result, the frozen regression baseline included, was produced with it off and
-stays valid).
+trailing kwarg `area_weighted_population` (**default True** as of 2026-08-09; it
+landed default-False and was flipped the same day — see the status note above.
+Pass False to reproduce any pre-correction result).
 
 ## Results
 
@@ -152,6 +167,8 @@ by design rather than by regression.
 
 Reproduce:
 
-    .venv/bin/python scripts/capture_baseline.py --input data/GIS/extracted/master_5min.parquet --out /tmp/coslat_off
-    .venv/bin/python scripts/capture_baseline.py --input data/GIS/extracted/master_5min.parquet --area-weighted --out /tmp/coslat_on
-    .venv/bin/python scripts/validate_chunking.py --chunk-rows 350000 --area-weighted --report /tmp/chunk_check_aw.md
+    # (flags as they are now, i.e. area weighting on by default)
+    .venv/bin/python scripts/capture_baseline.py --input data/GIS/extracted/master_5min.parquet --no-area-weighted --out /tmp/coslat_off
+    .venv/bin/python scripts/capture_baseline.py --input data/GIS/extracted/master_5min.parquet --out /tmp/coslat_on
+    .venv/bin/python scripts/validate_chunking.py --chunk-rows 350000 --report /tmp/chunk_check_aw.md
+    .venv/bin/python scripts/validate_chunking.py --chunk-rows 350000 --no-area-weighted --report /tmp/chunk_check.md
