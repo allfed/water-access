@@ -144,3 +144,12 @@ data/original_data/jmp_country_files/
 
 # GCP deploy state (active zone after fallback create)
 gcp/.instance-zone
+
+# Claude Code session worktrees (machine-local, not a submodule)
+.claude/worktrees/
+
+# Large GIS rasters (30-arcsec population density, ~173 MB; exceeds GitHub file limit)
+data/GIS/*.zip
+
+# Personal project notes export (Roam), kept local
+data/GIS/Project-*scenario*.md
