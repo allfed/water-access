@@ -58,6 +58,16 @@ def main():
             "5 arc-minute CSV the committed baseline was captured from."
         ),
     )
+    parser.add_argument(
+        "--area-weighted",
+        action="store_true",
+        help=(
+            "split each country's population by pop_density x cos(latitude) "
+            "instead of pop_density alone. OFF by default: the committed "
+            "baseline was captured without it, and turning it on changes "
+            "within-country population placement."
+        ),
+    )
     args = parser.parse_args()
 
     out_dir = args.out if args.out.is_absolute() else Path.cwd() / args.out
@@ -66,9 +76,12 @@ def main():
     if args.input is not None:
         gis.URB_DATA_FILE = args.input
 
-    print(f"Running run_global_analysis with {BASELINE_PARAMETERS}")
+    parameters = dict(
+        BASELINE_PARAMETERS, area_weighted_population=bool(args.area_weighted)
+    )
+    print(f"Running run_global_analysis with {parameters}")
     started = time.perf_counter()
-    df_countries, df_districts, _df_zones = run_global_analysis(**BASELINE_PARAMETERS)
+    df_countries, df_districts, _df_zones = run_global_analysis(**parameters)
     total_seconds = time.perf_counter() - started
     load_seconds = gis.LAST_LOAD_SECONDS
 
@@ -83,6 +96,7 @@ def main():
         peak_rss *= 1024
     timing = {
         "input": str(gis.URB_DATA_FILE),
+        "area_weighted_population": bool(args.area_weighted),
         "total_seconds": round(total_seconds, 3),
         "load_seconds": round(load_seconds, 3),
         "seconds_excluding_load": round(total_seconds - load_seconds, 3),

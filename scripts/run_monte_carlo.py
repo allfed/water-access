@@ -170,6 +170,16 @@ def parse_args(argv=None):
         help="suppress them (default at 30as, and what you want on a headless box)",
     )
     parser.add_argument(
+        "--area-weighted-population",
+        action="store_true",
+        help=(
+            "split each country's population by pop_density x cos(latitude) "
+            "rather than pop_density alone, correcting the lat/long grid's "
+            "poleward cell-area shrinkage. Default: off, i.e. the historical "
+            "behaviour every committed result was produced under."
+        ),
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=None,
@@ -228,6 +238,14 @@ def main(argv=None):
         gis.URB_DATA_FILE = args.input
     print(f"Resolution: {args.resolution}")
     print(f"Zone frame: {gis.URB_DATA_FILE}")
+    print(
+        "Population split: "
+        + (
+            "pop_density x cos(latitude) (area weighted)"
+            if args.area_weighted_population
+            else "pop_density only (historical)"
+        )
+    )
 
     chunk_rows = (
         args.chunk_rows
@@ -243,7 +261,9 @@ def main(argv=None):
 
         print(f"Planning country chunks (budget {chunk_rows:,} cells) ...", flush=True)
         chunk_plan = chunked.plan_chunks(
-            gis.URB_DATA_FILE, max_rows_per_chunk=chunk_rows
+            gis.URB_DATA_FILE,
+            max_rows_per_chunk=chunk_rows,
+            area_weighted_population=args.area_weighted_population,
         )
         print(f"  {chunk_plan.describe()}", flush=True)
         largest_district = chunk_plan.notes.get("largest_district_rows", 0)
@@ -331,6 +351,7 @@ def main(argv=None):
                 zone_columns=ZONE_RESULT_COLUMNS if save_zone_parquet else [],
                 chunk_rows=chunk_rows or None,
                 chunk_plan=chunk_plan,
+                area_weighted_population=args.area_weighted_population,
             )
             for (
                 crr_adjustment,

@@ -206,27 +206,45 @@ def main():
         type=Path,
         default=PROJECT_ROOT / "results" / "validation" / "chunking_report.md",
     )
+    parser.add_argument(
+        "--area-weighted",
+        action="store_true",
+        help=(
+            "run both paths with cos-latitude area weighting of the population "
+            "split. Off by default. The equivalence bar is the same: the "
+            "planner's pre-pass has to reproduce the run's weight exactly, so "
+            "this is the check that the weighting is chunk-safe."
+        ),
+    )
     args = parser.parse_args()
 
     if args.input is not None:
         gis.URB_DATA_FILE = args.input
     zone_file = gis.URB_DATA_FILE
+    parameters = dict(
+        FIXED_PARAMETERS, area_weighted_population=bool(args.area_weighted)
+    )
 
     print(f"Input: {zone_file}")
+    print(f"Area-weighted population: {bool(args.area_weighted)}")
     print("Planning chunks ...", flush=True)
-    plan = chunked.plan_chunks(zone_file, max_rows_per_chunk=args.chunk_rows)
+    plan = chunked.plan_chunks(
+        zone_file,
+        max_rows_per_chunk=args.chunk_rows,
+        area_weighted_population=bool(args.area_weighted),
+    )
     print(f"  {plan.describe()}", flush=True)
 
     print("Monolithic run ...", flush=True)
     started = time.perf_counter()
-    mono_countries, mono_districts, _ = gis.run_global_analysis(**FIXED_PARAMETERS)
+    mono_countries, mono_districts, _ = gis.run_global_analysis(**parameters)
     mono_seconds = time.perf_counter() - started
     mono_rss = peak_rss_gb()
 
     print("Chunked run ...", flush=True)
     started = time.perf_counter()
     chunk_countries, chunk_districts, chunk_zones = gis.run_global_analysis(
-        **FIXED_PARAMETERS, chunk_rows=args.chunk_rows, chunk_plan=plan
+        **parameters, chunk_rows=args.chunk_rows, chunk_plan=plan
     )
     chunk_seconds = time.perf_counter() - started
 
@@ -273,6 +291,8 @@ def main():
         "# Chunked vs monolithic execution (ADR-5)",
         "",
         f"- Input: `{zone_file}`",
+        f"- Area-weighted population (cos-latitude): "
+        f"{'ON' if args.area_weighted else 'OFF (default)'}",
         f"- Chunk budget: {args.chunk_rows:,} modelled cells",
         f"- Plan: {plan.describe()}",
         f"- Global LUT ranges pinned to slope "
