@@ -108,6 +108,7 @@ def run_simulation(
     zone_columns=None,
     chunk_rows=None,
     chunk_plan=None,
+    area_weighted_population=False,
 ):
     """Run a simulation to analyze global water access from walking or cycling
     based on sensitivity parameters.
@@ -141,6 +142,13 @@ def run_simulation(
     - chunk_plan (optional): a ``src.chunked_analysis.ChunkPlan`` to reuse. Build
                              it once in the parent process rather than once per
                              draw -- it depends only on the input file.
+    - area_weighted_population (bool, optional): split each country's population
+                             by ``pop_density x cos(latitude)`` instead of
+                             ``pop_density`` alone, correcting the lat/long
+                             grid's poleward cell-area shrinkage. Defaults to
+                             False, the historical behaviour. A supplied
+                             ``chunk_plan`` must have been built with the same
+                             setting.
 
     Returns:
     - result: The result of the global analysis.
@@ -188,6 +196,7 @@ def run_simulation(
         zone_columns=zone_columns,
         chunk_rows=chunk_rows,
         chunk_plan=chunk_plan,
+        area_weighted_population=area_weighted_population,
     )
     return df_countries, df_districts, df_zones
 

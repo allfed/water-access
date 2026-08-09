@@ -32,6 +32,8 @@ from src.gis_global_module import (
     map_hill_polarity,
     adjust_euclidean,
     run_global_analysis,
+    cell_centre_latitude,
+    population_split_weights,
 )
 
 
@@ -228,6 +230,87 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame()
         with pytest.raises(AssertionError):
             merge_and_adjust_population(df_zones_input, df_input)
+
+
+class TestAreaWeightedPopulation:
+    """cos-latitude weighting of the within-country population split.
+
+    On a lat/long grid a cell's ground area shrinks as cos(latitude), so people
+    per cell is density x area, not density. The flag is off by default and the
+    off path must stay bit-identical to the historical one.
+    """
+
+    @staticmethod
+    def _frame():
+        # One country, two cells of equal density: one on the equator, one at
+        # 60 N where a cell is exactly half as wide on the ground.
+        return pd.DataFrame(
+            {
+                "ISOCODE": ["RUS", "RUS"],
+                "pop_density": np.float32([100.0, 100.0]),
+                "top": np.float32([0.5, 60.5]),
+                "bottom": np.float32([-0.5, 59.5]),
+            }
+        )
+
+    @staticmethod
+    def _countries():
+        return pd.DataFrame({"alpha3": ["RUS"], "Population": [1_000_000]})
+
+    def test_cell_centre_latitude_is_the_bound_midpoint(self):
+        latitude = cell_centre_latitude(self._frame())
+        assert latitude.tolist() == [0.0, 60.0]
+
+    def test_cell_centre_latitude_requires_the_bound_columns(self):
+        with pytest.raises(ValueError, match="top"):
+            cell_centre_latitude(pd.DataFrame({"pop_density": [1.0]}))
+
+    def test_population_split_weights_default_is_density_itself(self):
+        frame = self._frame()
+        weights = population_split_weights(frame)
+        pd.testing.assert_series_equal(weights, frame["pop_density"])
+
+    def test_population_split_weights_apply_cosine_of_latitude(self):
+        weights = population_split_weights(self._frame(), area_weighted_population=True)
+        assert weights.dtype == np.float32
+        np.testing.assert_allclose(weights.to_numpy(), [100.0, 50.0], rtol=1e-6)
+
+    def test_flag_off_splits_population_by_density_alone(self):
+        result = merge_and_adjust_population(self._frame(), self._countries())
+        np.testing.assert_allclose(result["pop_zone"].to_numpy(), [500_000, 500_000])
+
+    def test_flag_on_shifts_population_equatorward(self):
+        result = merge_and_adjust_population(
+            self._frame(), self._countries(), area_weighted_population=True
+        )
+        # cos(0) : cos(60) = 1 : 0.5, so 2/3 of the country lands on the equator.
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [666_666.7, 333_333.3], rtol=1e-5
+        )
+        # The national total is untouched -- only the placement moves.
+        assert result["pop_zone"].sum() == pytest.approx(1_000_000)
+
+    def test_flag_on_requires_the_bound_columns(self):
+        frame = self._frame().drop(columns=["top", "bottom"])
+        with pytest.raises(ValueError, match="area-weighted population"):
+            merge_and_adjust_population(
+                frame, self._countries(), area_weighted_population=True
+            )
+
+    def test_supplied_density_totals_are_used_when_area_weighted(self):
+        # A chunked run hands in the whole country's weight total. Doubling it
+        # must halve every share -- proof the divisor is really the supplied one.
+        frame = self._frame()
+        weights = population_split_weights(frame, area_weighted_population=True)
+        result = merge_and_adjust_population(
+            frame,
+            self._countries(),
+            density_totals={"RUS": weights.sum() * 2},
+            area_weighted_population=True,
+        )
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [333_333.3, 166_666.7], rtol=1e-5
+        )
 
 
 class TestCrrAddUncertainty:

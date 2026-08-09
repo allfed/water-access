@@ -392,9 +392,75 @@ def minimum_population_per_cell(cell_size_degrees):
     return MIN_POP_PER_CELL_5_ARCMIN * area_ratio
 
 
+#: Columns the cos-latitude area weight needs. The 22-column input contract
+#: guarantees them; only the minimal frames used in unit tests lack them.
+LATITUDE_COLUMNS = ("top", "bottom")
+
+
+def cell_centre_latitude(df):
+    """Latitude of each cell's centre, from the ``top``/``bottom`` bounds.
+
+    Args:
+        df (DataFrame): a zone frame carrying the ``top`` and ``bottom`` cell
+            bounds (both are part of the 22-column input contract).
+
+    Returns:
+        Series: cell-centre latitude in degrees, in the frame's own dtype
+        (``float32`` after :func:`optimise_zone_dtypes`).
+
+    Raises:
+        ValueError: if either bound column is missing. There is deliberately no
+            fallback: silently assuming a latitude would silently reweight the
+            world's population, which is the exact failure this is here to fix.
+    """
+    missing = [column for column in LATITUDE_COLUMNS if column not in df.columns]
+    if missing:
+        raise ValueError(
+            "area-weighted population needs the cell-bound columns "
+            f"{list(LATITUDE_COLUMNS)}; missing {missing}. The 22-column zone "
+            "contract carries them, so this frame is either a test stub or a "
+            "column-trimmed read that needs 'top' and 'bottom' added back."
+        )
+    return (df["top"] + df["bottom"]) / 2
+
+
+def population_split_weights(df, area_weighted_population=False):
+    """The per-cell weight a country's population is split in proportion to.
+
+    Historically this was population *density* alone. On a lat/long grid that is
+    wrong by a factor of the cell's ground area: cells are a constant number of
+    degrees wide, so their east-west extent shrinks as ``cos(latitude)`` toward
+    the poles, and people-per-cell is ``density x area``. Weighting by density
+    alone therefore over-weights a country's poleward cells relative to its
+    equatorward ones. National totals are unaffected (the weights are
+    renormalised per country); the *placement* within a country is not.
+
+    Args:
+        df (DataFrame): zone frame carrying ``pop_density`` and, when
+            ``area_weighted_population`` is set, ``top``/``bottom``.
+        area_weighted_population (bool): False (default) reproduces the
+            historical density-only weight exactly, dtype included.
+
+    Returns:
+        Series: the weight, aligned to ``df``'s index.
+    """
+    density = df["pop_density"]
+    if not area_weighted_population:
+        return density
+    # float32 in, float32 out (pop_density and the bounds are both float32 after
+    # optimise_zone_dtypes), so the per-country sums below stay in the same
+    # precision regime as the density-only path -- which is what lets the
+    # chunked planner's pre-pass reproduce them bit for bit.
+    return density * np.cos(np.radians(cell_centre_latitude(df)))
+
+
 # Function for merging dataframes and adjusting populations
 def merge_and_adjust_population(
-    df_zones_input, df_input, cell_size_degrees=None, density_totals=None
+    df_zones_input,
+    df_input,
+    cell_size_degrees=None,
+    density_totals=None,
+    area_weighted_population=False,
 ):
     """
     Merge and adjust population data based on zone and country information.
@@ -415,7 +481,16 @@ def merge_and_adjust_population(
             normalised nationally, so a partial country would otherwise
             normalise against its own fragment and invent people. Values must be
             the same dtype the column carries, or the arithmetic will promote
-            and stop matching a whole-world run bit for bit.
+            and stop matching a whole-world run bit for bit. When
+            ``area_weighted_population`` is set these must be totals of the
+            *area-weighted* weight, i.e. the same quantity
+            :func:`population_split_weights` returns.
+        area_weighted_population (bool, optional): split each country's
+            population in proportion to ``pop_density x cos(latitude)`` rather
+            than ``pop_density`` alone -- see
+            :func:`population_split_weights`. Defaults to False, the historical
+            behaviour, which is bit-identical to the code before this argument
+            existed.
 
     Returns:
         DataFrame: DataFrame with merged and adjusted population data.
@@ -438,10 +513,18 @@ def merge_and_adjust_population(
     # original (flat) index here; pandas 2.x prepends the group keys, producing a
     # MultiIndex that cannot be assigned back onto df_zones. group_keys=False
     # restores the pandas 1.x result exactly -- values are unchanged.
+    # The weight is pop_density by default and pop_density * cos(latitude) when
+    # area weighting is on; everything below is indifferent to which.
+    split_weights = population_split_weights(
+        df_zones, area_weighted_population=area_weighted_population
+    )
+    grouped = split_weights.groupby(
+        df_zones["ISOCODE"], group_keys=False, observed=True, sort=True
+    )
     if density_totals is None:
-        df_zones["pop_density_perc"] = df_zones.groupby(
-            "ISOCODE", group_keys=False, observed=True
-        )["pop_density"].apply(lambda x: x / x.sum() if x.sum() > 0 else x * 0)
+        df_zones["pop_density_perc"] = grouped.apply(
+            lambda x: x / x.sum() if x.sum() > 0 else x * 0
+        )
     else:
         # Same expression, but with the divisor supplied rather than derived
         # from the rows in hand -- see the density_totals argument.
@@ -449,9 +532,7 @@ def merge_and_adjust_population(
             total = density_totals[x.name]
             return x / total if total > 0 else x * 0
 
-        df_zones["pop_density_perc"] = df_zones.groupby(
-            "ISOCODE", group_keys=False, observed=True
-        )["pop_density"].apply(_share)
+        df_zones["pop_density_perc"] = grouped.apply(_share)
     # multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
 
@@ -708,6 +789,7 @@ def preprocess_frame(
     rural_adjustment,
     cell_size_degrees=None,
     density_totals=None,
+    area_weighted_population=False,
 ):
     """Run the preprocessing pipeline over frames that are already in memory.
 
@@ -723,6 +805,10 @@ def preprocess_frame(
         urban_adjustment, rural_adjustment (float): Euclidean-distance factors.
         cell_size_degrees (float, optional): see
             :func:`merge_and_adjust_population`.
+        density_totals (mapping, optional): see
+            :func:`merge_and_adjust_population`.
+        area_weighted_population (bool, optional): see
+            :func:`merge_and_adjust_population`. Defaults to False.
 
     Returns:
         pandas.DataFrame: the preprocessed zone frame.
@@ -739,6 +825,7 @@ def preprocess_frame(
         df_input,
         cell_size_degrees=cell_size_degrees,
         density_totals=density_totals,
+        area_weighted_population=area_weighted_population,
     )
     df_zones = road_analysis(df_zones, crr_adjustment=crr_adjustment)
     df_zones = calculate_nat_piped(df_zones)
@@ -761,13 +848,19 @@ def zone_input_file(use_sample_data=False):
 
 # Main function to run all steps
 def preprocess_data(
-    crr_adjustment, urban_adjustment, rural_adjustment, use_sample_data=False
+    crr_adjustment,
+    urban_adjustment,
+    rural_adjustment,
+    use_sample_data=False,
+    area_weighted_population=False,
 ):
     """
     Preprocesses data by loading, managing, merging, and adjusting population data.
 
     Args:
         crr_adjustment (float): The adjustment factor for road analysis.
+        area_weighted_population (bool, optional): see
+            :func:`merge_and_adjust_population`. Defaults to False.
 
     Returns:
         pandas.DataFrame: The preprocessed data.
@@ -782,6 +875,7 @@ def preprocess_data(
         crr_adjustment=crr_adjustment,
         urban_adjustment=urban_adjustment,
         rural_adjustment=rural_adjustment,
+        area_weighted_population=area_weighted_population,
     )
 
 
@@ -1942,6 +2036,7 @@ def run_global_analysis(
     zone_columns=None,  # ADR-5: trim the returned per-cell frame
     chunk_rows=None,  # ADR-5: run country-group by country-group
     chunk_plan=None,  # reuse a plan across draws
+    area_weighted_population=False,  # cos-latitude cell-area weighting
 ):
     """
     Runs one run of the global analysis for water access.
@@ -1975,6 +2070,13 @@ def run_global_analysis(
             :func:`src.chunked_analysis.plan_chunks` to reuse instead of
             recomputing it. The plan depends only on the input file, so a
             multi-draw run should build it once.
+        area_weighted_population (bool, optional): split each country's
+            population by ``pop_density x cos(latitude)`` rather than
+            ``pop_density`` alone (see
+            :func:`population_split_weights`). Defaults to False, which is the
+            historical, bit-identical behaviour. A supplied ``chunk_plan`` must
+            have been built with the same setting -- the planner's pre-pass
+            normalises with the same weight.
 
     Returns:
         pandas.DataFrame: The processed data for each country.
@@ -1997,6 +2099,7 @@ def run_global_analysis(
             use_sample_data=use_sample_data,
             chunk_rows=chunk_rows or chunked.DEFAULT_CHUNK_ROWS,
             plan=chunk_plan,
+            area_weighted_population=area_weighted_population,
         )
         if plot:
             plot_chloropleth(df_countries)
@@ -2007,6 +2110,7 @@ def run_global_analysis(
         urban_adjustment=urban_adjustment,
         rural_adjustment=rural_adjustment,
         use_sample_data=use_sample_data,
+        area_weighted_population=area_weighted_population,
     )
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,

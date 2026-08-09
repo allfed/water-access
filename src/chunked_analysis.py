@@ -80,6 +80,10 @@ PLANNING_COLUMNS = ("ISOCODE", "shapeID", "pop_density", "slope_1")
 #: Four float64 coordinate columns are ~37% of the frame's footprint.
 COORDINATE_COLUMNS = ("left", "top", "right", "bottom")
 
+#: The two of those a cos-latitude area weighting *does* need back (they give
+#: the cell-centre latitude). Half the saving, and only when the flag is on.
+LATITUDE_COLUMNS = tuple(gis.LATITUDE_COLUMNS)
+
 #: Every column anything downstream of preprocessing reads. The preprocessed
 #: frame carries roughly twice this many -- the GRIP road densities (consumed by
 #: road_analysis and dead thereafter), the nodata indicators, the raw population
@@ -153,9 +157,16 @@ class ChunkPlan:
     #: Total surviving rows.
     total_rows: int
     #: Per-ISOCODE ``pop_density`` totals, for chunks holding a partial country.
+    #: Totals of the *area-weighted* weight when :attr:`area_weighted_population`
+    #: is set, since that is what the run will normalise against.
     density_totals: dict = field(default_factory=dict)
     #: Diagnostics for the run header.
     notes: dict = field(default_factory=dict)
+    #: Whether the plan was built with cos-latitude area weighting. The survivor
+    #: set (and hence the chunk sizes, the pinned LUT ranges and the density
+    #: totals) depends on it, so a plan may only be reused by a run with the
+    #: same setting.
+    area_weighted_population: bool = False
 
     def __len__(self):
         return len(self.chunks)
@@ -183,6 +194,7 @@ class ChunkPlan:
             f"= {self.notes.get('largest_country', '?')}"
             + (f", split by district: {', '.join(split)}" if split else "")
             + f"), cell {self.cell_size_degrees * 3600:.0f} arcsec"
+            + (", cos-lat area weighted" if self.area_weighted_population else "")
         )
 
 
@@ -235,6 +247,7 @@ def plan_chunks(
     country_file=None,
     max_rows_per_chunk=DEFAULT_CHUNK_ROWS,
     cell_size_degrees=None,
+    area_weighted_population=False,
 ):
     """Work out which countries go in which chunk, and the global LUT ranges.
 
@@ -252,6 +265,12 @@ def plan_chunks(
         max_rows_per_chunk (int): budget, in post-filter rows.
         cell_size_degrees (float, optional): overrides both the Parquet footer
             and the ``left``/``right`` inference.
+        area_weighted_population (bool, optional): normalise population by
+            ``pop_density x cos(latitude)`` rather than ``pop_density`` alone,
+            matching :func:`gis_global_module.merge_and_adjust_population`'s
+            argument of the same name. Must match the setting the run itself
+            uses: it changes the survivor set, the chunk sizes and the density
+            totals handed to split countries. Defaults to False.
 
     Returns:
         ChunkPlan
@@ -263,6 +282,10 @@ def plan_chunks(
         cell_size_degrees = read_parquet_cell_size(zone_file)
 
     columns = list(PLANNING_COLUMNS)
+    if area_weighted_population:
+        # The pre-pass has to reproduce the run's weight exactly, so it needs
+        # the cell-centre latitude too.
+        columns += [c for c in LATITUDE_COLUMNS if c not in columns]
     if cell_size_degrees is None:
         # Fall back to the column-based inference (ADR-8) -- the CSV path, and
         # any Parquet without the footer stamp.
@@ -302,18 +325,21 @@ def plan_chunks(
     # scalar is kept as-is, *not* coerced to a Python float: pop_density is
     # float32, and dividing by a float64 would promote the result and stop it
     # matching a whole-world run.
+    split_weights = gis.population_split_weights(
+        frame, area_weighted_population=area_weighted_population
+    )
     density_totals = {
         str(key): group.sum()
-        for key, group in frame.groupby(iso, observed=True)["pop_density"]
+        for key, group in split_weights.groupby(iso, observed=True, sort=True)
     }
 
     def _share(x):
         total = density_totals[x.name]
         return x / total if total > 0 else x * 0
 
-    density_share = frame.groupby(iso, group_keys=False, observed=True)[
-        "pop_density"
-    ].apply(_share)
+    density_share = split_weights.groupby(
+        iso, group_keys=False, observed=True, sort=True
+    ).apply(_share)
     # Look the national population up through the categorical codes rather than
     # Series.map, which on a categorical returns another categorical and cannot
     # then be multiplied. This also keeps the int64 dtype the merge would give,
@@ -400,6 +426,7 @@ def plan_chunks(
         cell_size_degrees=float(cell_size_degrees),
         total_rows=int(counts.sum()),
         density_totals=density_totals,
+        area_weighted_population=bool(area_weighted_population),
         notes={
             "countries": list(counts.index),
             "largest_country": str(counts.index[0]),
@@ -414,13 +441,16 @@ def plan_chunks(
     )
 
 
-def _chunk_columns(zone_file):
+def _chunk_columns(zone_file, area_weighted_population=False):
     """Which zone columns a chunk needs to read.
 
     The cell size comes from the plan, so the four float64 coordinate columns
     can be skipped -- worth ~37% of the frame at 30 arc-seconds. Only possible
     for Parquet; a CSV read is all-or-nothing here because the column set has to
     survive :func:`gis_global_module.optimise_zone_dtypes` unchanged.
+
+    Area weighting needs the cell-centre latitude, so ``top``/``bottom`` come
+    back when it is on; ``left``/``right`` still do not.
     """
     if not _is_parquet(zone_file):
         return None  # everything
@@ -428,8 +458,11 @@ def _chunk_columns(zone_file):
 
     if gis.Path(zone_file).is_dir():
         return None
+    dropped = set(COORDINATE_COLUMNS)
+    if area_weighted_population:
+        dropped -= set(LATITUDE_COLUMNS)
     available = [f.name for f in pq.ParquetFile(str(zone_file)).schema_arrow]
-    return [c for c in available if c not in COORDINATE_COLUMNS]
+    return [c for c in available if c not in dropped]
 
 
 def run_chunked_global_analysis(
@@ -450,6 +483,7 @@ def run_chunked_global_analysis(
     zone_file=None,
     progress=True,
     spill_dir=None,
+    area_weighted_population=False,
 ):
     """Run the global analysis one country-group at a time.
 
@@ -476,6 +510,9 @@ def run_chunked_global_analysis(
             ``32 bytes x every modelled cell`` -- 4.5 GB at 30 arc-seconds --
             to the peak *while a chunk frame is also live*, which is the worst
             possible moment for it.
+        area_weighted_population (bool): see
+            :func:`gis_global_module.merge_and_adjust_population`. A supplied
+            ``plan`` must agree with it.
 
     Returns:
         tuple: ``(df_countries, df_districts)``.
@@ -488,10 +525,25 @@ def run_chunked_global_analysis(
 
     zone_file = zone_file or gis.zone_input_file(use_sample_data)
     if plan is None:
-        plan = plan_chunks(zone_file, max_rows_per_chunk=chunk_rows)
+        plan = plan_chunks(
+            zone_file,
+            max_rows_per_chunk=chunk_rows,
+            area_weighted_population=area_weighted_population,
+        )
+    elif bool(plan.area_weighted_population) != bool(area_weighted_population):
+        # The plan's density totals, survivor set and pinned LUT ranges are all
+        # computed under one weighting or the other. Reusing the wrong one would
+        # silently normalise split countries against the wrong divisor.
+        raise ValueError(
+            "chunk plan was built with area_weighted_population="
+            f"{plan.area_weighted_population}, but the run asks for "
+            f"{bool(area_weighted_population)}; rebuild the plan."
+        )
 
     df_input = _compact_country_table(pd.read_csv(gis.COUNTRY_DATA_FILE))
-    columns = _chunk_columns(zone_file)
+    columns = _chunk_columns(
+        zone_file, area_weighted_population=area_weighted_population
+    )
 
     country_parts, district_parts = [], []
     weighted_files, country_weighted_files = [], []
@@ -526,6 +578,7 @@ def run_chunked_global_analysis(
                 density_totals=(
                     plan.density_totals if selection.is_partial_country else None
                 ),
+                area_weighted_population=area_weighted_population,
             )
             del df_zones_input
             df_zones = df_zones[list(CHUNK_KEEP_COLUMNS)].copy()
