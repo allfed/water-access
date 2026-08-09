@@ -208,12 +208,14 @@ def main():
     )
     parser.add_argument(
         "--area-weighted",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help=(
             "run both paths with cos-latitude area weighting of the population "
-            "split. Off by default. The equivalence bar is the same: the "
-            "planner's pre-pass has to reproduce the run's weight exactly, so "
-            "this is the check that the weighting is chunk-safe."
+            "split. On by default, matching the model default. The equivalence "
+            "bar is the same either way: the planner's pre-pass has to "
+            "reproduce the run's weight exactly. --no-area-weighted checks the "
+            "legacy path still chunks identically too."
         ),
     )
     args = parser.parse_args()

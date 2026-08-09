@@ -1,8 +1,10 @@
 """Local Monte Carlo driver.
 
-Defaults reproduce the historical behaviour exactly: 1000 iterations against the
+Defaults reproduce the historical *harness*: 1000 iterations against the
 5 arc-minute CSV, per-iteration zone/district/country Parquet dumps, and the two
-pickles the notebooks read.
+pickles the notebooks read. The one deliberate model change since is the
+cos-latitude population split, on by default since 2026-08-09 --
+``--no-area-weighted-population`` restores the pre-correction placement.
 
 ``--resolution 30as`` switches to the ADR-5 profile: aggregate-only persistence
 (no per-cell Parquet, no pickles -- at ~140M cells those are terabytes and
@@ -171,12 +173,14 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--area-weighted-population",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help=(
             "split each country's population by pop_density x cos(latitude) "
             "rather than pop_density alone, correcting the lat/long grid's "
-            "poleward cell-area shrinkage. Default: off, i.e. the historical "
-            "behaviour every committed result was produced under."
+            "poleward cell-area shrinkage. Default: on (2026-08-09). "
+            "--no-area-weighted-population reproduces the pre-correction "
+            "behaviour every earlier published result was produced under."
         ),
     )
     parser.add_argument(

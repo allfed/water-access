@@ -10,6 +10,11 @@ country- and district-level frames. The committed copy under
 
     python scripts/capture_baseline.py                      # writes the baseline
     python scripts/capture_baseline.py --out results/regression_new
+    python scripts/capture_baseline.py --no-area-weighted   # legacy placement
+
+Population is split within a country by ``pop_density x cos(latitude)`` by
+default (2026-08-09, Kevin sign-off); ``--no-area-weighted`` reproduces the
+pre-correction density-only placement.
 """
 
 import argparse
@@ -60,12 +65,13 @@ def main():
     )
     parser.add_argument(
         "--area-weighted",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help=(
             "split each country's population by pop_density x cos(latitude) "
-            "instead of pop_density alone. OFF by default: the committed "
-            "baseline was captured without it, and turning it on changes "
-            "within-country population placement."
+            "instead of pop_density alone. ON by default since 2026-08-09 -- "
+            "the committed baseline is captured with it. --no-area-weighted "
+            "reproduces the legacy, pre-correction placement."
         ),
     )
     args = parser.parse_args()
