@@ -424,7 +424,7 @@ def cell_centre_latitude(df):
     return (df["top"] + df["bottom"]) / 2
 
 
-def population_split_weights(df, area_weighted_population=False):
+def population_split_weights(df, area_weighted_population=True):
     """The per-cell weight a country's population is split in proportion to.
 
     Historically this was population *density* alone. On a lat/long grid that is
@@ -435,11 +435,16 @@ def population_split_weights(df, area_weighted_population=False):
     equatorward ones. National totals are unaffected (the weights are
     renormalised per country); the *placement* within a country is not.
 
+    The area-weighted form is the default as of 2026-08-09 (Kevin sign-off);
+    see ``results/validation/cos_lat_diff.md`` for the size of the correction.
+
     Args:
-        df (DataFrame): zone frame carrying ``pop_density`` and, when
-            ``area_weighted_population`` is set, ``top``/``bottom``.
-        area_weighted_population (bool): False (default) reproduces the
-            historical density-only weight exactly, dtype included.
+        df (DataFrame): zone frame carrying ``pop_density`` and ``top``/
+            ``bottom`` (the latter two only when area weighting is on).
+        area_weighted_population (bool): True (default) weights by
+            ``pop_density x cos(latitude)``. False reproduces the historical
+            density-only weight exactly, dtype included, and is what the
+            pre-2026-08-09 published results were produced with.
 
     Returns:
         Series: the weight, aligned to ``df``'s index.
@@ -460,7 +465,7 @@ def merge_and_adjust_population(
     df_input,
     cell_size_degrees=None,
     density_totals=None,
-    area_weighted_population=False,
+    area_weighted_population=True,
 ):
     """
     Merge and adjust population data based on zone and country information.
@@ -488,9 +493,12 @@ def merge_and_adjust_population(
         area_weighted_population (bool, optional): split each country's
             population in proportion to ``pop_density x cos(latitude)`` rather
             than ``pop_density`` alone -- see
-            :func:`population_split_weights`. Defaults to False, the historical
-            behaviour, which is bit-identical to the code before this argument
-            existed.
+            :func:`population_split_weights`. **Defaults to True** as of
+            2026-08-09: weighting by density alone mis-places population within
+            any country spanning latitudes, and leaving the correction off by
+            default was judged a trap. Pass False for the legacy behaviour,
+            which is bit-identical to the code before this argument existed and
+            is what every pre-2026-08-09 published figure used.
 
     Returns:
         DataFrame: DataFrame with merged and adjusted population data.
@@ -789,7 +797,7 @@ def preprocess_frame(
     rural_adjustment,
     cell_size_degrees=None,
     density_totals=None,
-    area_weighted_population=False,
+    area_weighted_population=True,
 ):
     """Run the preprocessing pipeline over frames that are already in memory.
 
@@ -808,7 +816,8 @@ def preprocess_frame(
         density_totals (mapping, optional): see
             :func:`merge_and_adjust_population`.
         area_weighted_population (bool, optional): see
-            :func:`merge_and_adjust_population`. Defaults to False.
+            :func:`merge_and_adjust_population`. Defaults to True; pass False
+            for the legacy density-only split.
 
     Returns:
         pandas.DataFrame: the preprocessed zone frame.
@@ -852,7 +861,7 @@ def preprocess_data(
     urban_adjustment,
     rural_adjustment,
     use_sample_data=False,
-    area_weighted_population=False,
+    area_weighted_population=True,
 ):
     """
     Preprocesses data by loading, managing, merging, and adjusting population data.
@@ -860,7 +869,8 @@ def preprocess_data(
     Args:
         crr_adjustment (float): The adjustment factor for road analysis.
         area_weighted_population (bool, optional): see
-            :func:`merge_and_adjust_population`. Defaults to False.
+            :func:`merge_and_adjust_population`. Defaults to True; pass False
+            for the legacy density-only split.
 
     Returns:
         pandas.DataFrame: The preprocessed data.
@@ -2036,7 +2046,7 @@ def run_global_analysis(
     zone_columns=None,  # ADR-5: trim the returned per-cell frame
     chunk_rows=None,  # ADR-5: run country-group by country-group
     chunk_plan=None,  # reuse a plan across draws
-    area_weighted_population=False,  # cos-latitude cell-area weighting
+    area_weighted_population=True,  # cos-latitude cell-area weighting; False = legacy
 ):
     """
     Runs one run of the global analysis for water access.
@@ -2072,8 +2082,8 @@ def run_global_analysis(
             multi-draw run should build it once.
         area_weighted_population (bool, optional): split each country's
             population by ``pop_density x cos(latitude)`` rather than
-            ``pop_density`` alone (see
-            :func:`population_split_weights`). Defaults to False, which is the
+            ``pop_density`` alone (see :func:`population_split_weights`).
+            **Defaults to True** as of 2026-08-09; pass False for the
             historical, bit-identical behaviour. A supplied ``chunk_plan`` must
             have been built with the same setting -- the planner's pre-pass
             normalises with the same weight.

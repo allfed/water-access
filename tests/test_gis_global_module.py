@@ -193,6 +193,15 @@ class TestManageSlope:
 
 
 class TestMergeAndAdjustPopulation:
+    """Legacy density-only split.
+
+    These two pin the pre-2026-08-09 behaviour, so they pass
+    ``area_weighted_population=False`` explicitly now that the area-weighted
+    split is the default. Their stub frames carry no ``top``/``bottom``, which
+    the default path requires; the pinned values are unchanged either way (one
+    cell per country means the share is 1.0 under any weighting).
+    """
+
     def test_merge_and_adjust_population_returns_dataframe(self):
         df_zones_input = pd.DataFrame(
             {"ISOCODE": ["USA", "CAN"], "pop_density": [1000, 2000]}
@@ -200,7 +209,9 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
         )
-        result = merge_and_adjust_population(df_zones_input, df_input)
+        result = merge_and_adjust_population(
+            df_zones_input, df_input, area_weighted_population=False
+        )
         assert isinstance(result, pd.DataFrame)
 
     def test_merge_and_adjust_population_returns_expected_result(self):
@@ -210,7 +221,9 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
         )
-        result = merge_and_adjust_population(df_zones_input, df_input)
+        result = merge_and_adjust_population(
+            df_zones_input, df_input, area_weighted_population=False
+        )
         expected_result = pd.DataFrame(
             {
                 "ISOCODE": ["USA", "CAN"],
@@ -236,8 +249,9 @@ class TestAreaWeightedPopulation:
     """cos-latitude weighting of the within-country population split.
 
     On a lat/long grid a cell's ground area shrinks as cos(latitude), so people
-    per cell is density x area, not density. The flag is off by default and the
-    off path must stay bit-identical to the historical one.
+    per cell is density x area, not density. Area weighting is ON by default as
+    of 2026-08-09; ``area_weighted_population=False`` must still reproduce the
+    historical density-only split bit for bit.
     """
 
     @staticmethod
@@ -265,10 +279,16 @@ class TestAreaWeightedPopulation:
         with pytest.raises(ValueError, match="top"):
             cell_centre_latitude(pd.DataFrame({"pop_density": [1.0]}))
 
-    def test_population_split_weights_default_is_density_itself(self):
+    def test_population_split_weights_explicit_off_is_density_itself(self):
         frame = self._frame()
-        weights = population_split_weights(frame)
+        weights = population_split_weights(frame, area_weighted_population=False)
         pd.testing.assert_series_equal(weights, frame["pop_density"])
+
+    def test_population_split_weights_default_applies_cosine_of_latitude(self):
+        # No kwarg: the default must be the corrected, area-weighted form.
+        weights = population_split_weights(self._frame())
+        assert weights.dtype == np.float32
+        np.testing.assert_allclose(weights.to_numpy(), [100.0, 50.0], rtol=1e-6)
 
     def test_population_split_weights_apply_cosine_of_latitude(self):
         weights = population_split_weights(self._frame(), area_weighted_population=True)
@@ -276,8 +296,17 @@ class TestAreaWeightedPopulation:
         np.testing.assert_allclose(weights.to_numpy(), [100.0, 50.0], rtol=1e-6)
 
     def test_flag_off_splits_population_by_density_alone(self):
-        result = merge_and_adjust_population(self._frame(), self._countries())
+        result = merge_and_adjust_population(
+            self._frame(), self._countries(), area_weighted_population=False
+        )
         np.testing.assert_allclose(result["pop_zone"].to_numpy(), [500_000, 500_000])
+
+    def test_default_shifts_population_equatorward(self):
+        # No kwarg -- this is what the model now does out of the box.
+        result = merge_and_adjust_population(self._frame(), self._countries())
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [666_666.7, 333_333.3], rtol=1e-5
+        )
 
     def test_flag_on_shifts_population_equatorward(self):
         result = merge_and_adjust_population(

@@ -166,7 +166,7 @@ class ChunkPlan:
     #: set (and hence the chunk sizes, the pinned LUT ranges and the density
     #: totals) depends on it, so a plan may only be reused by a run with the
     #: same setting.
-    area_weighted_population: bool = False
+    area_weighted_population: bool = True
 
     def __len__(self):
         return len(self.chunks)
@@ -247,7 +247,7 @@ def plan_chunks(
     country_file=None,
     max_rows_per_chunk=DEFAULT_CHUNK_ROWS,
     cell_size_degrees=None,
-    area_weighted_population=False,
+    area_weighted_population=True,
 ):
     """Work out which countries go in which chunk, and the global LUT ranges.
 
@@ -270,7 +270,7 @@ def plan_chunks(
             matching :func:`gis_global_module.merge_and_adjust_population`'s
             argument of the same name. Must match the setting the run itself
             uses: it changes the survivor set, the chunk sizes and the density
-            totals handed to split countries. Defaults to False.
+            totals handed to split countries. Defaults to True.
 
     Returns:
         ChunkPlan
@@ -441,7 +441,7 @@ def plan_chunks(
     )
 
 
-def _chunk_columns(zone_file, area_weighted_population=False):
+def _chunk_columns(zone_file, area_weighted_population=True):
     """Which zone columns a chunk needs to read.
 
     The cell size comes from the plan, so the four float64 coordinate columns
@@ -483,7 +483,7 @@ def run_chunked_global_analysis(
     zone_file=None,
     progress=True,
     spill_dir=None,
-    area_weighted_population=False,
+    area_weighted_population=True,
 ):
     """Run the global analysis one country-group at a time.
 

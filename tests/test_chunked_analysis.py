@@ -54,10 +54,16 @@ class TestPlanChunksAreaWeighting:
         _country_table().to_csv(country_file, index=False)
         zone_file = _write(tmp_path, _zone_frame())
 
-        off = chunked.plan_chunks(zone_file, country_file=country_file)
+        default = chunked.plan_chunks(zone_file, country_file=country_file)
+        off = chunked.plan_chunks(
+            zone_file, country_file=country_file, area_weighted_population=False
+        )
         on = chunked.plan_chunks(
             zone_file, country_file=country_file, area_weighted_population=True
         )
+        # Area weighting is the model default, so a plan built without the
+        # kwarg must be usable by a default run.
+        assert default.area_weighted_population is True
         assert off.area_weighted_population is False
         assert on.area_weighted_population is True
 
@@ -93,11 +99,15 @@ class TestPlanChunksAreaWeighting:
 class TestChunkColumns:
     def test_latitude_columns_return_only_when_area_weighted(self, tmp_path):
         zone_file = _write(tmp_path, _zone_frame())
-        off = chunked._chunk_columns(zone_file)
+        off = chunked._chunk_columns(zone_file, area_weighted_population=False)
         on = chunked._chunk_columns(zone_file, area_weighted_population=True)
+        default = chunked._chunk_columns(zone_file)
         assert set(off).isdisjoint(chunked.COORDINATE_COLUMNS)
         assert {"top", "bottom"}.issubset(on)
+        # left/right stay dropped either way -- only the latitude bounds are
+        # needed, and they are half the coordinate footprint.
         assert {"left", "right"}.isdisjoint(on)
+        assert default == on
 
 
 class TestPlanFlagMustMatchRun:
@@ -107,7 +117,9 @@ class TestPlanFlagMustMatchRun:
         zone_file = _write(tmp_path, _zone_frame())
         monkeypatch.setattr(gis, "COUNTRY_DATA_FILE", country_file)
 
-        plan = chunked.plan_chunks(zone_file, country_file=country_file)
+        plan = chunked.plan_chunks(
+            zone_file, country_file=country_file, area_weighted_population=False
+        )
         with pytest.raises(ValueError, match="rebuild the plan"):
             chunked.run_chunked_global_analysis(
                 crr_adjustment=0,

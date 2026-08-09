@@ -108,7 +108,7 @@ def run_simulation(
     zone_columns=None,
     chunk_rows=None,
     chunk_plan=None,
-    area_weighted_population=False,
+    area_weighted_population=True,
 ):
     """Run a simulation to analyze global water access from walking or cycling
     based on sensitivity parameters.
@@ -146,9 +146,9 @@ def run_simulation(
                              by ``pop_density x cos(latitude)`` instead of
                              ``pop_density`` alone, correcting the lat/long
                              grid's poleward cell-area shrinkage. Defaults to
-                             False, the historical behaviour. A supplied
-                             ``chunk_plan`` must have been built with the same
-                             setting.
+                             True as of 2026-08-09; pass False for the
+                             historical behaviour. A supplied ``chunk_plan``
+                             must have been built with the same setting.
 
     Returns:
     - result: The result of the global analysis.
