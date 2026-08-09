@@ -112,11 +112,11 @@ flag on it now reads `top`/`bottom` too and calls the same
 holds this to the same bar as the default path — every country and district row
 bit-identical, `GLOBAL` and split countries within 1e−12 relative:
 
-| Run | Verdict | Largest absolute difference |
-|---|---|---|
-| OFF, legacy CSV, 350k-row chunks | PASS | 0.000e+00 |
-| ON, legacy CSV, 350k-row chunks | PASS | 0.000e+00 |
-| ON, `master_5min.parquet`, 350k-row chunks | PASS | 0.000e+00 |
+| Run | Verdict | Largest abs. difference (all rows except GLOBAL) | GLOBAL row, relative |
+|---|---|---|---|
+| OFF, legacy CSV, 350k-row chunks | PASS | 0.000e+00 | 0.000e+00 |
+| ON, legacy CSV, 350k-row chunks | PASS | 0.000e+00 | 2.043e−16 |
+| ON, `master_5min.parquet`, 350k-row chunks | PASS | 0.000e+00 | 4.161e−16 |
 
 The Parquet run matters separately: the chunk reader drops the four coordinate
 columns for memory, so it is the case where a missing `top`/`bottom` would have
