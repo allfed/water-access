@@ -13,7 +13,13 @@
 > has always used): global percent_with_water **77.7075 → 77.6298 (−0.0777 pp)**,
 > country pop-weighted mean |Δ| **0.110 pp**, max **NOR +1.328 pp**, districts
 > >100k max **Alaska 1.194 pp** — consistent with the parquet-input numbers
-> below.
+> below. (Those figures diff the new baseline against the *pre-refactor* one,
+> so they carry the pre-existing refactor drift too; isolating the correction by
+> running the current code both ways on the same input gives −0.077676 pp
+> against −0.077654 pp, i.e. the drift contributes ~2e−5 pp. `--no-area-weighted`
+> is byte-identical to the pre-flip run of this code, and still clears Gate 2's
+> tolerances against the pre-refactor baseline at max 0.0015 pp country /
+> 0.049 pp district.)
 
 **Date:** 2026-08-09 · **Params:** AC-2 fixed set (crr 0, time_gathering 2.84, practical limits 40/20, met 4, watts 40, downhill_uphill, urban 1.3 / rural 1.4, calculate_distance, no plot) · **Input:** `data/GIS/extracted/master_5min.parquet` · **Only variable:** `area_weighted_population` False → True.
 
