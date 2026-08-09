@@ -294,7 +294,7 @@ def main():
         "",
         f"- Input: `{zone_file}`",
         f"- Area-weighted population (cos-latitude): "
-        f"{'ON' if args.area_weighted else 'OFF (default)'}",
+        f"{'ON (default)' if args.area_weighted else 'OFF (legacy split)'}",
         f"- Chunk budget: {args.chunk_rows:,} modelled cells",
         f"- Plan: {plan.describe()}",
         f"- Global LUT ranges pinned to slope "
