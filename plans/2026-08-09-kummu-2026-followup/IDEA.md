@@ -22,6 +22,10 @@ Kummu et al. 2011 (PLoS ONE, "How close do we live to water?", doi:10.1371/journ
 
 The scripted extraction pipeline (scripts/extraction/, built 2026-08) has a frozen 22-column contract: a new layer drops into the `dtw_1` slot and the ENTIRE water-access model re-runs with zero code change (fixed-param run ≈ 26 s at 5 arcmin; 10-draw 30as MC ≈ 100 min). The comparison table (Kummu vs 2026 layer, population-weighted, by country) falls straight out of the existing validation harness pattern.
 
+## Extension idea (Kevin, 2026-08-09): assumption-matrix data release
+
+Because the pipeline makes each run cheap (~26 s fixed-param at 5 arcmin; ~100 min per 10 MC draws at 30as), publish not one layer but a small matrix of outputs: **water definition × population product**. E.g. water ∈ {permanent-only (Kummu-comparable), permanent+seasonal} × population ∈ {GPW v4.11 (areal-weighted), WorldPop constrained, GHS-POP} → 6 distance/access variants, so downstream users choose their assumptions instead of inheriting ours. Scope guard: the paper's headline stays the water-layer update; the matrix is an SI/data-release artefact, not six papers. The population dimension also absorbs the product-ensemble sensitivity deliberately deferred from the main manuscript (which takes a limitation note instead — see BUILD_SUMMARY.md §Manuscript limitation notes). Plumbing cost: WorldPop 100 m → 30as aggregation and GHS-POP fractional-offset windowing (~half a day each; GHS-POP offset already measured in Phase B).
+
 ## Framing / scope guards
 
 - Companion note / short paper, NOT part of the current review response (results-changing input swap mid-review = new validation cycle + second reviewer front).
