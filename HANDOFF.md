@@ -1,11 +1,11 @@
 # HANDOFF — branch `kr/unpiped-breakdown`
 
-Updated 2026-08-10 (evening). For the next agent, zero context assumed. The
+Updated 2026-08-11. For the next agent, zero context assumed. The
 what/how is documented in the repo; this file covers only what isn't.
 
 ## Where we got to
 
-Two phases done on this branch:
+Three phases done on this branch:
 
 1. **Unified source breakdown** (76 blank JMP rows filled, model switched
    over, `merged_data.csv` regenerated). Read
@@ -22,21 +22,32 @@ Two phases done on this branch:
    Data: `data/original_data/borehole_pump_type_estimates.csv` (+ raw research
    in `borehole_pump_type_research.json`); aggregation script:
    `scripts/Data_Manipulation_Scripts/aggregate_borehole_pump_estimates.py`.
+3. **Lose fractions wired into the Monte Carlo — DONE** (commit `24af047`).
+   `scripts/run_monte_carlo.py` samples `urban/rural_borehole_lose_fraction`
+   uniformly over the HEMP ranges above and threads them through
+   `run_simulation()`/`run_global_analysis()` into
+   `calculate_population_water_access()`. Previously they were never sampled
+   and the production path silently ran on 1.0/1.0 defaults. Smoke-tested
+   end-to-end with 3 iterations (commit `5811ddf`,
+   `results/smoketest_3runs/` — pipeline completes, sampled fractions vary
+   per run; the numbers themselves are noise, not results).
 
 ## Single next action
 
-Wire the estimate into the Monte Carlo scenario configs and rerun. Model code
-was deliberately NOT touched: per Kevin's decision, scenario logic lives in
-the `urban/rural_borehole_lose_fraction` parameters of
+Run the full NUM_ITERATIONS=1000 production Monte Carlo (cloud) and re-derive
+the manuscript numbers from it. The wiring is done; nothing needs to change
+in code first. Scenario logic lives in the
+`urban/rural_borehole_lose_fraction` parameters of
 `gis_global_module.calculate_population_water_access()` (HEMP vs CIL as
-different parameter ranges), NOT baked into the dataset. The code defaults
-(0.5/0.25) understate urban losses — don't quote results run on them.
+different parameter ranges), NOT baked into the dataset — per Kevin's
+decision. Don't quote anything run on the old code-default fractions.
 
 ## In-flight / out of scope
 
-- **All Monte Carlo results in `results/` are stale twice over**: they
-  predate the new `merged_data.csv` AND the new lose-fraction ranges. Rerun
-  before quoting any numbers in the manuscript.
+- **All Monte Carlo results in `results/` are stale twice over** (except the
+  explicitly-labelled `results/smoketest_3runs/`, which is a wiring test, not
+  results): they predate the new `merged_data.csv` AND the new lose-fraction
+  ranges. Rerun before quoting any numbers in the manuscript.
 - Per-country lose fractions (rather than the two global scalars) are
   supported by the CSV but not implemented; a single global scalar
   misallocates *where* displaced people are (matters for spatial results) —
@@ -83,8 +94,10 @@ different parameter ranges), NOT baked into the dataset. The code defaults
 
 ## Blocking open questions / who holds the ball
 
-- Rerunning the MC with the new ranges + manuscript numbers: James (Kevin to
-  confirm the scenario parameterization choice — envelope vs triangular).
+- Rerunning the MC with the new ranges + manuscript numbers: James. The
+  wiring as committed samples uniform over the envelope ranges; the estimate
+  doc says uniform or triangular are both defensible, so switching to
+  triangular is a two-line change in `run_monte_carlo.py` if preferred.
 - India post-2018 handpump/tubewell split: unresolvable until the next NSS
   drinking-water round or census; the 70–80/25–38 ranges carry it.
 - 30-arcsec feasibility call: Kevin (branch `kr/30as-feasibility`).
