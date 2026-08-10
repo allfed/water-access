@@ -13,6 +13,7 @@ import src.gis_monte_carlo as mc  # noqa
 # Results path
 RESULTS_PATH = project_root / "results"
 PARQUET_PATH = RESULTS_PATH / "parquet_files"
+PARQUET_PATH.mkdir(parents=True, exist_ok=True)
 
 # -------------------------------------------------------------------------------
 # DEFINE MONTE CARLO SIMULATION PARAMETERS
@@ -84,6 +85,16 @@ RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
 RURAL_PDR_PARETO_SCALE = 0.19953125000000005
 RURAL_PDR_PARETO_LOC = 1.0
 
+# Share of borehole users who lose access when electric pumping fails,
+# sampled uniformly over the HEMP-scenario ranges (population-weighted
+# envelopes of per-country bounds) from ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md.
+# Scenario logic lives in these parameters, not the dataset.
+URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.63
+URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.80
+
+RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.23
+RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.35
+
 # -------------------------------------------------------------------------------
 
 
@@ -126,6 +137,17 @@ if __name__ == "__main__":
         NUM_ITERATIONS,
     )
 
+    urban_borehole_lose_fractions = np.random.uniform(
+        URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
+        URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
+        size=NUM_ITERATIONS,
+    )
+    rural_borehole_lose_fractions = np.random.uniform(
+        RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
+        RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
+        size=NUM_ITERATIONS,
+    )
+
     print(crr_adjustments)
     print(time_gatherings)
     print(practical_limits_bicycle)
@@ -134,6 +156,8 @@ if __name__ == "__main__":
     print(hill_polarities)
     print(urban_adjustments)
     print(rural_adjustments)
+    print(urban_borehole_lose_fractions)
+    print(rural_borehole_lose_fractions)
 
     # Initialize lists to store results from each output
     districts_simulation_results = []
@@ -162,6 +186,8 @@ if __name__ == "__main__":
                 hill_polarity,
                 urban_adjustment,
                 rural_adjustment,
+                urban_borehole_lose_fraction,
+                rural_borehole_lose_fraction,
                 use_sample_data=False,  # Enable sample data
             )
             for (
@@ -174,6 +200,8 @@ if __name__ == "__main__":
                 hill_polarity,
                 urban_adjustment,
                 rural_adjustment,
+                urban_borehole_lose_fraction,
+                rural_borehole_lose_fraction,
             ) in zip(
                 crr_adjustments,
                 time_gatherings,
@@ -184,6 +212,8 @@ if __name__ == "__main__":
                 hill_polarities,
                 urban_adjustments,
                 rural_adjustments,  # type: ignore
+                urban_borehole_lose_fractions,
+                rural_borehole_lose_fractions,
             )
         ]
 

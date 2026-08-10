@@ -103,6 +103,8 @@ def run_simulation(
     hill_polarity,
     urban_adjustment,
     rural_adjustment,
+    urban_borehole_lose_fraction=0.5,
+    rural_borehole_lose_fraction=0.25,
     calculate_distance=True,
     use_sample_data=False,
 ):
@@ -119,6 +121,12 @@ def run_simulation(
     - practical_limit_buckets (int or float): The practical limit of water
                                               transportation using buckets.
     - met (int or float): The metabolic equivalent of task (MET) value.
+    - urban_borehole_lose_fraction (float): Share of urban borehole users who
+                                            lose access when electric pumping
+                                            fails.
+    - rural_borehole_lose_fraction (float): Share of rural borehole users who
+                                            lose access when electric pumping
+                                            fails.
     - calculate_distance (bool, optional): Whether to calculate the distance
                                            during the simulation.
     - use_sample_data (bool, optional): Whether to use sample data. Defaults
@@ -152,6 +160,18 @@ def run_simulation(
     assert isinstance(
         rural_adjustment, (int, float)
     ), "Rural adjustment must be a number."
+    assert isinstance(
+        urban_borehole_lose_fraction, (int, float)
+    ), "Urban borehole lose fraction must be a number."
+    assert (
+        0 <= urban_borehole_lose_fraction <= 1
+    ), "Urban borehole lose fraction must be between 0 and 1."
+    assert isinstance(
+        rural_borehole_lose_fraction, (int, float)
+    ), "Rural borehole lose fraction must be a number."
+    assert (
+        0 <= rural_borehole_lose_fraction <= 1
+    ), "Rural borehole lose fraction must be between 0 and 1."
 
     df_countries, df_districts, df_zones = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
@@ -163,6 +183,8 @@ def run_simulation(
         hill_polarity=hill_polarity,
         urban_adjustment=urban_adjustment,
         rural_adjustment=rural_adjustment,
+        urban_borehole_lose_fraction=urban_borehole_lose_fraction,
+        rural_borehole_lose_fraction=rural_borehole_lose_fraction,
         calculate_distance=calculate_distance,
         plot=False,
         use_sample_data=use_sample_data,

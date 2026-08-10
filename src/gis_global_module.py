@@ -1602,6 +1602,8 @@ def run_global_analysis(
     hill_polarity,
     urban_adjustment,
     rural_adjustment,
+    urban_borehole_lose_fraction=0.5,
+    rural_borehole_lose_fraction=0.25,
     calculate_distance=True,
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
@@ -1617,6 +1619,10 @@ def run_global_analysis(
         practical_limit_buckets (float): The practical limit for distance traveled by carrying buckets in kilometers.
         met (str): metabolic equivalent of task (energy for walking).
         watts (float): The power output in watts (energy for cycling).
+        urban_borehole_lose_fraction (float): Share of urban borehole users who lose access
+            when electric pumping fails (scenario parameter, see ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md).
+        rural_borehole_lose_fraction (float): Share of rural borehole users who lose access
+            when electric pumping fails.
         calculate_distance (bool, optional): Whether to calculate distance or not. Defaults to True, otherwise new results are not generated.
         human_mass (float): The mass of an average human carrying water in kilograms.
         plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
@@ -1650,7 +1656,10 @@ def run_global_analysis(
         hill_polarity=hill_polarity,
     )
     df_zones = process_zones_for_water_access(
-        df_zones, time_gathering_water=time_gathering_water
+        df_zones,
+        time_gathering_water=time_gathering_water,
+        urban_borehole_lose_fraction=urban_borehole_lose_fraction,
+        rural_borehole_lose_fraction=rural_borehole_lose_fraction,
     )
 
     # print("\n\n 1 \n\n")
