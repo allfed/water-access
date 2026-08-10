@@ -153,3 +153,9 @@ data/GIS/*.zip
 
 # Personal project notes export (Roam), kept local
 data/GIS/Project-*scenario*.md
+
+# Smoke-test outputs are deliberately committed (unlike results/*) so the
+# lose-fraction wiring run is reviewable; zone-level parquets are too large.
+!results/smoketest_3runs/
+!results/smoketest_3runs/**
+results/smoketest_3runs/parquet_files/zone_simulation_result_*.parquet
