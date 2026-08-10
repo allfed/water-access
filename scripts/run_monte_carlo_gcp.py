@@ -1,3 +1,19 @@
+"""Monte Carlo driver (GCP Spot VM; launched by gcp/deploy-spot.sh).
+
+This is the ONLY Monte Carlo driver on this branch. The local
+scripts/run_monte_carlo.py was retired 2026-08-11: keeping two drivers let
+their parameter ranges drift apart (the local copy still had the pre-review
+mobility ranges), and this script's per-worker disk writes are the only setup
+that survives a 1000-iteration run without exhausting parent-process memory.
+For a small local test run, set NUM_ITERATIONS/MAX_WORKERS below.
+
+NOTE for the kr/30as-feasibility merge: that branch reintroduces a local CLI
+harness (its own run_monte_carlo.py) plus a shared sampling module,
+src/monte_carlo_constants.py (ADR-7). When merging, take the 30as versions
+and move the borehole lose-fraction sampling below into sample_parameters()
+in that module, so parameters stay defined in exactly one place.
+"""
+
 import multiprocessing
 import numpy as np
 from pathlib import Path
@@ -95,6 +111,16 @@ RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
 RURAL_PDR_PARETO_SCALE = 0.19953125000000005
 RURAL_PDR_PARETO_LOC = 1.0
 
+# Share of borehole users who lose access when electric pumping fails,
+# sampled uniformly over the HEMP-scenario ranges (population-weighted
+# envelopes of per-country bounds) from ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md.
+# Scenario logic lives in these parameters, not the dataset.
+URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.63
+URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.80
+
+RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.23
+RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.35
+
 # -------------------------------------------------------------------------------
 
 # Global flag for graceful shutdown
@@ -122,7 +148,19 @@ def save_checkpoint(completed_iterations, parameters):
 
 
 def load_checkpoint():
-    """Load checkpoint if it exists"""
+    """Load checkpoint if it exists.
+
+    ⚠️ RESUME HAZARD: a surviving checkpoint.json restores ALL parameter
+    arrays from the moment the run started — every constant defined at the
+    top of this file is silently ignored on resume. Editing parameter ranges
+    and redeploying has NO effect unless the checkpoint (and the copies
+    deploy-spot.sh pulls back from the GCS bucket) are deleted first. Before
+    any fresh production run: wipe checkpoints/ AND results/parquet_files/
+    in the bucket, or the run will resume the old parameters and/or skip
+    "completed" iterations from the previous run (see
+    get_completed_iterations, which trusts file presence with no provenance
+    check).
+    """
     if CHECKPOINT_FILE.exists():
         with open(CHECKPOINT_FILE, "r") as f:
             checkpoint = json.load(f)
@@ -193,6 +231,8 @@ def run_and_save_simulation(
     hill_polarity,
     urban_adjustment,
     rural_adjustment,
+    urban_borehole_lose_fraction,
+    rural_borehole_lose_fraction,
 ):
     """Run one simulation in a worker process and write its results to disk.
 
@@ -212,6 +252,8 @@ def run_and_save_simulation(
         hill_polarity,
         urban_adjustment,
         rural_adjustment,
+        urban_borehole_lose_fraction=urban_borehole_lose_fraction,
+        rural_borehole_lose_fraction=rural_borehole_lose_fraction,
         use_sample_data=False,
     )
 
@@ -255,10 +297,25 @@ if __name__ == "__main__":
             process_saved_results()
             sys.exit(0)
 
-    # Generate or restore parameters
+    # Generate or restore parameters (see the resume hazard note on
+    # load_checkpoint: a checkpoint beats every constant in this file)
     if checkpoint and "parameters" in checkpoint:
         # Restore parameters from checkpoint
         params = checkpoint["parameters"]
+        if "urban_borehole_lose_fractions" not in params:
+            sys.exit(
+                "❌ checkpoint.json predates the borehole lose-fraction "
+                "sampling — resuming it would run the wrong scenario. "
+                "Delete the stale checkpoint (and the bucket copies "
+                "deploy-spot.sh restores) and start fresh."
+            )
+        if checkpoint.get("total_iterations") != NUM_ITERATIONS:
+            sys.exit(
+                f"❌ checkpoint.json was written for "
+                f"{checkpoint.get('total_iterations')} iterations but "
+                f"NUM_ITERATIONS is {NUM_ITERATIONS}. Delete the stale "
+                "checkpoint (and bucket copies) and start fresh."
+            )
         crr_adjustments = np.array(params["crr_adjustments"])
         time_gatherings = np.array(params["time_gatherings"])
         practical_limits_bicycle = np.array(params["practical_limits_bicycle"])
@@ -268,6 +325,12 @@ if __name__ == "__main__":
         hill_polarities = np.array(params["hill_polarities"])
         urban_adjustments = np.array(params["urban_adjustments"])
         rural_adjustments = np.array(params["rural_adjustments"])
+        urban_borehole_lose_fractions = np.array(
+            params["urban_borehole_lose_fractions"]
+        )
+        rural_borehole_lose_fractions = np.array(
+            params["rural_borehole_lose_fractions"]
+        )
         # Keep `parameters` bound so the periodic and final save_checkpoint
         # calls below still work on a resumed run. Without this it is only
         # defined in the else-branch, so any resume (i.e. every Spot VM
@@ -312,8 +375,21 @@ if __name__ == "__main__":
             RURAL_PDR_PARETO_LOC,
             NUM_ITERATIONS,
         )
+        urban_borehole_lose_fractions = np.random.uniform(
+            URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
+            URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
+            size=NUM_ITERATIONS,
+        )
+        rural_borehole_lose_fractions = np.random.uniform(
+            RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
+            RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
+            size=NUM_ITERATIONS,
+        )
 
-        # Save parameters for potential resume
+        # Save parameters for potential resume. The checkpoint doubles as the
+        # per-iteration parameter log: parquet files are named by the same
+        # index that addresses these arrays, so iteration k's inputs are
+        # element k here.
         parameters = {
             "crr_adjustments": crr_adjustments.tolist(),
             "time_gatherings": time_gatherings.tolist(),
@@ -324,6 +400,8 @@ if __name__ == "__main__":
             "hill_polarities": hill_polarities.tolist(),
             "urban_adjustments": urban_adjustments.tolist(),
             "rural_adjustments": rural_adjustments.tolist(),
+            "urban_borehole_lose_fractions": urban_borehole_lose_fractions.tolist(),
+            "rural_borehole_lose_fractions": rural_borehole_lose_fractions.tolist(),
         }
         save_checkpoint(completed_iterations, parameters)
 
@@ -369,6 +447,8 @@ if __name__ == "__main__":
                 hill_polarities[idx],
                 urban_adjustments[idx],
                 rural_adjustments[idx],
+                urban_borehole_lose_fractions[idx],
+                rural_borehole_lose_fractions[idx],
             ),
         )
         pending.append((idx, async_result))

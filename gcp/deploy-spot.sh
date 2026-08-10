@@ -155,6 +155,15 @@ pip install -e .
 mkdir -p results/parquet_files
 
 # Check for existing checkpoint and results
+#
+# ⚠️ STALE-STATE HAZARD: these two copies restore whatever the bucket holds,
+# with no check that it belongs to THIS run. A leftover checkpoint.json makes
+# the simulation resume the OLD parameter arrays (every constant edit in
+# run_monte_carlo_gcp.py is ignored on resume), and leftover parquets count
+# as "completed" iterations, so a full stale set means the run does nothing
+# and re-emits the previous results as if fresh. Before any new production
+# run, wipe the bucket state first, e.g.:
+#   gsutil -m rm -r gs://<bucket>/checkpoints gs://<bucket>/results/parquet_files
 log "Checking for existing checkpoints..."
 gsutil -m cp -r gs://__BUCKET_NAME__/checkpoints/* results/parquet_files/ 2>/dev/null || true
 gsutil -m cp -r gs://__BUCKET_NAME__/results/parquet_files/*.parquet results/parquet_files/ 2>/dev/null || true

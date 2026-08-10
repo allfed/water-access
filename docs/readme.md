@@ -16,12 +16,7 @@ From the repository root, either:
 python src/gis_global_module.py
 ```
 
-(b) Run Monte Carlo simulations locally (this is very RAM intensive):
-```bash
-python scripts/run_monte_carlo.py
-```
-
-(c) Run Monte Carlo simulations on Google Cloud. This will involve setting up a server instance; see gcp/ for details or reach out to us.
+(b) Run Monte Carlo simulations with `scripts/run_monte_carlo_gcp.py` — designed for a Google Cloud Spot VM (see gcp/ for details or reach out to us), but it can be run locally for small test batches by lowering `NUM_ITERATIONS`/`MAX_WORKERS` at the top of the script. Full batches are very RAM- and CPU-intensive.
 
 ```bash
 ./gcp/deploy-spot.sh deploy

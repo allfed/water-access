@@ -57,7 +57,7 @@ Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distr
 
 ### Re-run the model with new assumptions
 
-1. Run [`scripts/run_monte_carlo.py`](scripts/run_monte_carlo.py) — Monte Carlo simulations (resource-intensive; parameter ranges are defined at the top of the script).
+1. Run [`scripts/run_monte_carlo_gcp.py`](scripts/run_monte_carlo_gcp.py) — Monte Carlo simulations (the single driver; parameter ranges are defined at the top of the script). Deployed to a Spot VM by [`gcp/deploy-spot.sh`](gcp/deploy-spot.sh); for a small local test run, lower `NUM_ITERATIONS`/`MAX_WORKERS` at the top of the script.
 2. Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](scripts/distribution_plots.ipynb) to analyze the new outputs.
 
 For a single deterministic run (no Monte Carlo), use [`src/gis_global_module.py`](src/gis_global_module.py).
@@ -75,7 +75,7 @@ python scripts/Data_Manipulation_Scripts/download_jmp_country_files.py
 # 2. Parse source-type percentages for all countries
 python scripts/Data_Manipulation_Scripts/extract_jmp_source_breakdown.py
 
-# 3. Merge in researched fills for the 76 countries whose JMP files are blank
+# 3. Merge in researched fills for the countries whose JMP files are blank
 #    (data/original_data/researched_source_breakdown.csv; see its README)
 python scripts/Data_Manipulation_Scripts/build_unified_source_breakdown.py
 
@@ -83,10 +83,11 @@ python scripts/Data_Manipulation_Scripts/build_unified_source_breakdown.py
 python scripts/Data_Manipulation_Scripts/imputation_script.py
 ```
 
-The 76 countries with blank JMP source breakdowns (mostly high-income and
-small-island territories) are filled from national censuses, DHS/EPHS reports
-and regulator statistics, with per-row provenance, confidence, and
-verification status. Sources, the mapping rubric, and the piped-share
+Of the 76 countries with blank JMP source breakdowns (mostly high-income and
+small-island territories), 53 are filled from national censuses, DHS/EPHS
+reports and regulator statistics, with per-row provenance, confidence, and
+verification status (the other 23 were judged not fillable from available
+sources). Sources, the mapping rubric, and the piped-share
 reconciliation rule (unpiped-budget scaling with a rounded-piped carve-out)
 are documented in
 [`data/original_data/researched_source_breakdown_README.md`](data/original_data/researched_source_breakdown_README.md).
