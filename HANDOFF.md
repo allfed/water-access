@@ -7,8 +7,9 @@ what/how is documented in the repo; this file covers only what isn't.
 
 Three phases done on this branch:
 
-1. **Unified source breakdown** (76 blank JMP rows filled, model switched
-   over, `merged_data.csv` regenerated). Read
+1. **Unified source breakdown** (53 of the 76 blank JMP rows filled, 23
+   judged not fillable; model switched over, `merged_data.csv`
+   regenerated). Read
    `HANDOVER_unified_source_breakdown.md`, then
    `data/original_data/researched_source_breakdown_README.md`, then README
    §"Unpiped source breakdown".
@@ -22,25 +23,39 @@ Three phases done on this branch:
    Data: `data/original_data/borehole_pump_type_estimates.csv` (+ raw research
    in `borehole_pump_type_research.json`); aggregation script:
    `scripts/Data_Manipulation_Scripts/aggregate_borehole_pump_estimates.py`.
-3. **Lose fractions wired into the Monte Carlo — DONE** (commit `24af047`).
-   `scripts/run_monte_carlo.py` samples `urban/rural_borehole_lose_fraction`
-   uniformly over the HEMP ranges above and threads them through
-   `run_simulation()`/`run_global_analysis()` into
-   `calculate_population_water_access()`. Previously they were never sampled
-   and the production path silently ran on 1.0/1.0 defaults. Smoke-tested
-   end-to-end with 3 iterations (commit `5811ddf`,
-   `results/smoketest_3runs/` — pipeline completes, sampled fractions vary
-   per run; the numbers themselves are noise, not results).
+3. **Lose fractions wired into the Monte Carlo — DONE, single driver.**
+   `scripts/run_monte_carlo_gcp.py` (the script `gcp/deploy-spot.sh`
+   launches) samples `urban/rural_borehole_lose_fraction` uniformly over the
+   HEMP ranges above and threads them through `run_simulation()` into
+   `calculate_population_water_access()`. The old local driver
+   `scripts/run_monte_carlo.py` was RETIRED 2026-08-11 (Kevin's call: two
+   drivers had let parameter ranges drift apart — the local copy still had
+   the pre-review mobility ranges, and its retained-futures memory pattern
+   could not survive 1000 iterations anyway). Smoke-tested end-to-end with
+   3 iterations (commit `5811ddf`, `results/smoketest_3runs/` — pipeline
+   completes, sampled lose fractions vary per run; note the smoke ran on
+   the since-retired local script, so its *mobility* draws used the stale
+   ranges — treat it purely as evidence the wiring works, never as results).
 
 ## Single next action
 
-Run the full NUM_ITERATIONS=1000 production Monte Carlo (cloud) and re-derive
-the manuscript numbers from it. The wiring is done; nothing needs to change
-in code first. Scenario logic lives in the
+Run the full NUM_ITERATIONS=1000 production Monte Carlo via
+`gcp/deploy-spot.sh` and re-derive the manuscript numbers from it.
+**Before launching: wipe the GCS bucket state**
+(`gs://<bucket>/checkpoints` and `gs://<bucket>/results/parquet_files`) —
+a leftover checkpoint silently restores the OLD parameter arrays and
+leftover parquets count as completed iterations (hazard notes are in the
+script and deploy-spot.sh). Scenario logic lives in the
 `urban/rural_borehole_lose_fraction` parameters of
 `gis_global_module.calculate_population_water_access()` (HEMP vs CIL as
 different parameter ranges), NOT baked into the dataset — per Kevin's
 decision. Don't quote anything run on the old code-default fractions.
+
+Merge note for `kr/30as-feasibility`: that branch reintroduces its own
+`run_monte_carlo.py` (the 30as CLI harness) plus a shared sampling module
+`src/monte_carlo_constants.py`. At merge, take the 30as versions and move
+the lose-fraction sampling from `run_monte_carlo_gcp.py` into
+`sample_parameters()` there, so parameters live in exactly one place.
 
 ## In-flight / out of scope
 
@@ -55,8 +70,20 @@ decision. Don't quote anything run on the old code-default fractions.
 - Venezuela source breakdown still deliberately unfilled (ENCOVI microdata is
   the fix); retrievable-but-not-retrieved sources listed in
   `HANDOVER_unified_source_breakdown.md` §follow-ups.
-- USA rural / SLB urban sum >100 in merged_data: pre-existing parser
-  mismatch, deliberately untouched, flagged to James.
+- USA rural / SLB urban sum >100 in merged_data: root cause now known
+  (`jmp_source_parser.py` takes the latest WHO year's piped value even when
+  that cell is blank, so 25 strata skip unpiped-budget normalisation; only
+  these two visibly break 100). Deliberately untouched — harmless to model
+  outputs because the resilient share is a residual, not a sum.
+- Deferred from the 2026-08-11 three-agent review (Kevin holds both):
+  (a) downhill walking velocity is uncapped and peaks at 3.74 m/s (~13.5
+  km/h) around 6° downhill — an artifact of the Lankford polynomial exposed
+  by the slope-units fix; capping it is a modelling decision, not plumbing.
+  (b) ~348M people (4.4% of world pop) sit in the share-sum gap (source
+  columns sum <100) and are implicitly classed as retaining access via the
+  resilient residual — Kevin is investigating with a separate agent; do not
+  quietly "fix" the residual to use `zone_pop_other_unpiped` (dead column),
+  as that reclassifies those 348M and jumps the headline number.
 
 ## Decisions made (don't relitigate without new information)
 
@@ -97,7 +124,7 @@ decision. Don't quote anything run on the old code-default fractions.
 - Rerunning the MC with the new ranges + manuscript numbers: James. The
   wiring as committed samples uniform over the envelope ranges; the estimate
   doc says uniform or triangular are both defensible, so switching to
-  triangular is a two-line change in `run_monte_carlo.py` if preferred.
+  triangular is a two-line change in `run_monte_carlo_gcp.py` if preferred.
 - India post-2018 handpump/tubewell split: unresolvable until the next NSS
   drinking-water round or census; the 70–80/25–38 ranges carry it.
 - 30-arcsec feasibility call: Kevin (branch `kr/30as-feasibility`).

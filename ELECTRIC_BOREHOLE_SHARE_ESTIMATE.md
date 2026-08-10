@@ -62,7 +62,7 @@ countries, weighted by where the borehole population actually is:
   (52M). Sub-Saharan Africa is 20%, South-East Asia 8%; everything else <4%.
 
 Research effort followed those weights: India got a dedicated agent; the
-long tail got regional defaults. 47 countries have researched per-country
+long tail got regional defaults. 46 countries have researched per-country
 bounds covering **94.3% of the urban and 96.7% of the rural** borehole
 population; the remaining ~5% use regional default ranges.
 
@@ -84,7 +84,7 @@ refuted.
 | Uganda | 50–85 | 88–99 | MWE water atlas: ~41k hand-pumped deep boreholes are the only point-source fleet serving ~16M rural borehole users; motorized boreholes feed piped schemes (whose users report taps, i.e. leave the Borehole category) | PLAUSIBLE (two source-conflation defects found and repaired; conclusion survives via category structure) |
 | Ukraine | 0–5 | 5–20 | No pump-type split exists post-MICS-2012; bracketed on the Bosnia census analogue (11:1 electric:manual) adjusted for documented Ukrainian street hand-pump columns / Abyssinian wells | PLAUSIBLE |
 
-The full 227-row table (all countries, bounds, evidence kind, confidence,
+The full 226-row table (all countries, bounds, evidence kind, confidence,
 source, URL, verification status) is
 `data/original_data/borehole_pump_type_estimates.csv`; the raw research
 findings and verification records (quotes, arithmetic, caveats) are
