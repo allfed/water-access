@@ -248,14 +248,19 @@ def merge_and_adjust_population(df_zones_input, df_input):
     # multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
 
-    # sum the population in each zone
+    # trim the dataframe to only include rows where there is a population
+    df_zones["any_pop"] = df_zones["pop_zone"].apply(lambda x: 1 if x > 10 else 0)
+    df_zones = df_zones[df_zones["any_pop"] == 1].copy()
+
+    # sum the population in each zone. Computed AFTER the tiny-zone trim so
+    # that country_pop_raw equals the population the model actually
+    # evaluates; computing it before the trim left percent_with_water +
+    # percent_without_water up to ~1.3 pp short of 100 in sparse countries
+    # (the districts denominator was already post-trim, so the two levels
+    # disagreed).
     df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")["pop_zone"].transform(
         "sum"
     )
-
-    # trim the dataframe to only include rows where there is a population
-    df_zones["any_pop"] = df_zones["pop_zone"].apply(lambda x: 1 if x > 10 else 0)
-    df_zones = df_zones[df_zones["any_pop"] == 1]
 
     return df_zones
 
@@ -908,7 +913,10 @@ def calculate_population_water_access(
         / 100
     )
     df_zones["zone_pop_delivered"] = (
-        df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANDelivered"] / 100
+        df_zones["pop_zone"]
+        * df_zones["urban_rural"]
+        * df_zones["URBANDelivered"]
+        / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
         * df_zones["RURALDelivered"]
@@ -1195,7 +1203,9 @@ def aggregate_global(df_zones):
         "country_pop_raw": df_zones["pop_zone"].sum(),
         "zone_pop_with_water": df_zones["zone_pop_with_water"].sum(),
         "zone_pop_without_water": df_zones["zone_pop_without_water"].sum(),
-        "population_affected_with_access": df_zones["population_affected_with_access"].sum(),
+        "population_affected_with_access": df_zones[
+            "population_affected_with_access"
+        ].sum(),
         "population_affected_with_cycling_access": df_zones[
             "population_affected_with_cycling_access"
         ].sum(),
@@ -1315,17 +1325,8 @@ def process_country_data(df_zones):
         df_median_group, on="ISOCODE"
     )  # Merge weighted median
 
-    # Add global row
-    df_global = aggregate_global(df_zones)
-    # replace country_pop_raw with sum of countries
-    df_global["country_pop_raw"] = df_countries["country_pop_raw"].sum()
-
-    df_countries = pd.concat([df_countries, df_global], ignore_index=True)
-
-    # drop rows from the dataframe that have Nan in pop_zone and dtw_1
-    df_zones = df_zones.dropna(subset=["pop_zone", "dtw_1"])
-
-    # Rename and create percentage columns
+    # Rename population columns before clean-up so the GLOBAL row (added
+    # below) can share the same column names
     df_countries = df_countries.rename(
         columns={
             "zone_pop_with_water": "country_pop_with_water",
@@ -1340,6 +1341,36 @@ def process_country_data(df_zones):
                 df_countries.columns
             )
         )
+
+    df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
+        df_countries
+    )
+
+    # Log or print summary of removed countries
+    if not removed_further_than_libya.empty:
+        print(
+            "Countries removed from analysis due to being further than Libya's median:",
+            removed_further_than_libya["Entity"].tolist(),
+        )
+    print("Countries removed manually:", removed_countries_list)
+
+    # Add global row AFTER clean-up, aggregated over the retained countries'
+    # zones only, so GLOBAL is consistent with the country rows it sits
+    # alongside. (Previously it was built before outlier removal, leaving
+    # its totals ~2.1M people larger than the sum of the published rows.)
+    df_global = aggregate_global(
+        df_zones[df_zones["ISOCODE"].isin(df_countries["ISOCODE"])]
+    )
+    df_global = df_global.rename(
+        columns={
+            "zone_pop_with_water": "country_pop_with_water",
+            "zone_pop_without_water": "country_pop_without_water",
+        }
+    )
+    # replace country_pop_raw with sum of countries
+    df_global["country_pop_raw"] = df_countries["country_pop_raw"].sum()
+
+    df_countries = pd.concat([df_countries, df_global], ignore_index=True)
 
     df_countries["percent_with_water"] = (
         df_countries["country_pop_with_water"] / df_countries["country_pop_raw"] * 100
@@ -1374,18 +1405,6 @@ def process_country_data(df_zones):
         / df_countries["country_pop_raw"]
         * 100
     )
-
-    df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
-        df_countries
-    )
-
-    # Log or print summary of removed countries
-    if not removed_further_than_libya.empty:
-        print(
-            "Countries removed from analysis due to being further than Libya's median:",
-            removed_further_than_libya["Entity"].tolist(),
-        )
-    print("Countries removed manually:", removed_countries_list)
 
     return df_countries
 
@@ -1685,7 +1704,6 @@ def run_global_analysis(
 
 
 if __name__ == "__main__":
-
     df_countries, df_districts, zones_results = run_global_analysis(
         crr_adjustment=0,
         time_gathering_water=2.84,
