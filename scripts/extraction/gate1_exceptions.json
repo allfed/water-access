@@ -1,0 +1,54 @@
+{
+  "version": "2026-08-09",
+  "gate": "AC-3 / Gate 1 — scripted extraction vs legacy manual-QGIS output at 5 arc-minute",
+  "policy": [
+    "Every entry is an explicitly approved, cause-attributed deviation (SPEC ADR-9).",
+    "'max_magnitude' is a hard cap in the metric's own units: a failure larger than",
+    "the cap is NOT covered and the gate fails. Caps are set just above the magnitude",
+    "measured on 2026-08-08, so any regression that widens a residual will re-open the",
+    "gate rather than be silently absorbed.",
+    "'country': \"*\" is only used for the two causes that are demonstrably systematic",
+    "(both of them an unreproducible resampling of the undocumented manual QGIS warp",
+    "onto the coarse 5-arcmin validation lattice — continuous for pop_density,",
+    "categorical tie-break for GHS-SMOD); every other exception names its country."
+  ],
+  "exceptions": [
+    {
+      "country": "*",
+      "metric": "pop_total_pct",
+      "max_magnitude": 27.0,
+      "n_countries_2026_08_08": 115,
+      "worst_2026_08_08": "LBN -26.29%",
+      "hypothesis_refuted_2026_08_09": "An earlier version of this entry attributed the residual to the legacy having used the GPW v4.11 **UN WPP-adjusted** density while the pipeline used the unadjusted product. That hypothesis was tested on 2026-08-09 by obtaining the adjusted product (see scripts/extraction/convert_gpw_asc.py) and re-running this gate, and it is REFUTED: swapping to the adjusted product makes every summary statistic worse. It is retained here only so the question is not re-opened without new evidence.",
+      "cause": "The legacy population layer IS the unadjusted GPW v4.11 product; the residual is the undocumented QGIS resampling of a highly skewed density field onto the coarse 5-arcmin validation lattice, where each output cell covers 100 30-arcsec source cells. Evidence (all from validate_extraction.py's own ungated cell-level table, 2026-08-09): legacy-vs-unadjusted cell agreement is 61.12% under the default `--pop-agg average` and 73.24% under `nearest`, versus only 27.22% for the UN WPP-adjusted sibling — i.e. three quarters of the legacy cells are bit-equal to the unadjusted raster and could not be the adjusted one. Per-country |pop_total_pct| over the 160 gated countries: average median 1.94% / worst 26.29% (LBN), bilinear 2.02% / 29.03%, nearest 3.15% / 94.73%, adjusted+average 6.22% / 56.74%. `average` is the closest reconstruction of the legacy warp and is the default. Immaterial downstream: `merge_and_adjust_population` (src/gis_global_module.py:323-327) renormalises pop_density to a within-country share and multiplies by an external country Population, cancelling any uniform per-country scale factor exactly; the residual that can move results is tracked separately as `pop_share_l1_pct`. Global population-weighted difference is -0.26%."
+    },
+    {
+      "country": "*",
+      "metric": "smod_urban_pp",
+      "max_magnitude": 31.5,
+      "n_countries_2026_08_08": 46,
+      "worst_2026_08_08": "GMB +30.78 pp",
+      "cause": "GHS-SMOD is a 1 km categorical layer in Mollweide; on the 5-arcmin validation lattice each output cell covers ~85 source cells and nearest-neighbour picks exactly one of them, so the class assigned is a tie-break the undocumented QGIS warp made differently. Cell-level class agreement — as measured by this script's own ungated layer table — is 94.82% (V2-0) / 94.96% (V1-0 — tested, not materially better), global population-weighted urban-share difference is -0.42 pp, and the largest failing country is COL at 64M. This artefact is specific to the coarse validation grid: at the 30 arc-second production resolution GHS-SMOD is effectively native and the tie-break disappears."
+    },
+    {
+      "country": "118",
+      "metric": "smod_mode_match",
+      "max_magnitude": 1.0,
+      "cause": "geoBoundaries CGAZ disputed-territory pseudo-code '118', 6 cells total. The modal SMOD class flips on a 6-cell sample for the same nearest-neighbour tie-break reason as the entry above."
+    },
+    {
+      "country": "RWA",
+      "metric": "cell_count_pct",
+      "max_magnitude": 4.5,
+      "observed_2026_08_08": "+4.27% (281 -> 293 cells)",
+      "cause": "geoBoundaries CGAZ ADM1 release drift — the legacy join used an older CGAZ snapshot, and Rwanda's boundary polygon moved by well under one 5-arcmin cell along its borders. On a 281-cell country a 12-cell shift is 4.3%."
+    },
+    {
+      "country": "NZL",
+      "metric": "cell_count_pct",
+      "max_magnitude": 4.5,
+      "observed_2026_08_08": "+4.15% (3,757 -> 3,913 cells)",
+      "cause": "geoBoundaries CGAZ ADM1 release drift — the current CGAZ ADM1 layer covers offshore/outlying New Zealand polygons that the legacy snapshot's join did not reach."
+    }
+  ]
+}

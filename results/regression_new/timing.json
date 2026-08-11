@@ -1,0 +1,9 @@
+{
+  "input": "/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/data/GIS/updated_GIS_output_cleaned.csv",
+  "area_weighted_population": true,
+  "total_seconds": 39.161,
+  "load_seconds": 1.998,
+  "seconds_excluding_load": 37.162,
+  "peak_rss_gb": 3.073,
+  "modelled_cells": 1395693
+}

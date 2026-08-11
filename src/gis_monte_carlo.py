@@ -108,6 +108,10 @@ def run_simulation(
     unallocated_vulnerable_fraction=0.0,
     calculate_distance=True,
     use_sample_data=False,
+    zone_columns=None,
+    chunk_rows=None,
+    chunk_plan=None,
+    area_weighted_population=True,
 ):
     """Run a simulation to analyze global water access from walking or cycling
     based on sensitivity parameters.
@@ -140,6 +144,27 @@ def run_simulation(
     - use_sample_data (bool, optional): Whether to use sample data. Defaults
                                         to False, must be False to run a true
                                         simulation with the given parameters.
+    - zone_columns (list, optional): restrict the returned per-cell zone frame
+                                     to these columns. Defaults to None, i.e.
+                                     every column, the historical behaviour.
+                                     ADR-5: at 30 arc-seconds the full frame is
+                                     tens of GB and the callers keep three
+                                     columns of it.
+    - chunk_rows (int, optional): run the analysis one group of whole countries
+                                  at a time, at most this many modelled cells
+                                  per group (ADR-5). Defaults to None, i.e. the
+                                  monolithic path. The returned per-cell frame
+                                  is empty in this mode.
+    - chunk_plan (optional): a ``src.chunked_analysis.ChunkPlan`` to reuse. Build
+                             it once in the parent process rather than once per
+                             draw -- it depends only on the input file.
+    - area_weighted_population (bool, optional): split each country's population
+                             by ``pop_density x cos(latitude)`` instead of
+                             ``pop_density`` alone, correcting the lat/long
+                             grid's poleward cell-area shrinkage. Defaults to
+                             True as of 2026-08-09; pass False for the
+                             historical behaviour. A supplied ``chunk_plan``
+                             must have been built with the same setting.
 
     Returns:
     - result: The result of the global analysis.
@@ -210,11 +235,17 @@ def run_simulation(
         calculate_distance=calculate_distance,
         plot=False,
         use_sample_data=use_sample_data,
+        zone_columns=zone_columns,
+        chunk_rows=chunk_rows,
+        chunk_plan=chunk_plan,
+        area_weighted_population=area_weighted_population,
     )
     return df_countries, df_districts, df_zones
 
 
-def process_mc_results(countries_simulation_results, plot=True, output_dir="results"):
+def process_mc_results(
+    countries_simulation_results, plot=True, output_dir="results", write_pickle=True
+):
     """Process the Monte Carlo simulation results. Calculate the median, 95th
     percentile, 5th percentile, max, and min values and plot the results.
 
@@ -245,17 +276,37 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
         .reset_index()[["ISOCODE", "Entity", "region", "subregion"]]
     )  # noqa
 
+    # NOTE: numeric_only=True is required on pandas >= 2.0. Pandas 1.x silently
+    # dropped the non-numeric ("nuisance") columns here; pandas 2.x raises on them
+    # instead. Passing numeric_only=True restores the pandas 1.x result exactly --
+    # the non-numeric columns are merged back in below from `non_numeric_cols`.
     # Calculate the mean results for each country for all cols
-    all_means = pd.concat(ordered_results).groupby("ISOCODE").mean().reset_index()
+    all_means = (
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .mean(numeric_only=True)
+        .reset_index()
+    )
     # Calculate the median results for each country for all cols
-    all_medians = pd.concat(ordered_results).groupby("ISOCODE").median().reset_index()
+    all_medians = (
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .median(numeric_only=True)
+        .reset_index()
+    )
     # Calculate the 95th percentile results for each country for all cols
     all_percentile_95s = (
-        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.95).reset_index()
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .quantile(0.95, numeric_only=True)
+        .reset_index()
     )
     # Calculate the 5th percentile results for each country for all cols
     all_percentile_5s = (
-        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .quantile(0.05, numeric_only=True)
+        .reset_index()
     )
 
     # Merge with non-numeric
@@ -286,9 +337,15 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
         os.path.join(output_dir, "country_5th_percentile_results.csv")
     )
 
-    # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "countries_simulation_results.pkl"), "wb") as f:
-        pickle.dump(countries_simulation_results, f)
+    # Step 4: pickle the simulation results. Only two notebooks read these; at
+    # 30 arc-seconds they are enormous, so the 30as driver turns them off.
+    if write_pickle:
+        with open(
+            os.path.join(output_dir, "countries_simulation_results.pkl"), "wb"
+        ) as f:
+            pickle.dump(countries_simulation_results, f)
+    else:
+        print("Skipping countries_simulation_results.pkl (write_pickle=False).")
 
     print(
         "Country simulation results have been processed and saved to the "
@@ -296,7 +353,9 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
     )
 
 
-def process_districts_results(districts_simulation_results, output_dir="results"):
+def process_districts_results(
+    districts_simulation_results, output_dir="results", write_pickle=True
+):
     """Process the Monte Carlo simulation results. Calculate the median, 95th
     percentile, 5th percentile, max, and min values and plot the results.
 
@@ -324,7 +383,9 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     # are taken from the data in sorted order, and observed=False is required
     # because observed=True yields groups in order of appearance rather than
     # sorted order.
-    unique_ids = combined["shapeID"].dropna().unique()
+    # np.asarray, not the raw .unique(): on a categorical column .unique()
+    # returns a Categorical, which has no .sort().
+    unique_ids = np.asarray(combined["shapeID"].dropna().unique())
     unique_ids.sort()
     shape_id = pd.Series(
         pd.Categorical(combined["shapeID"], categories=unique_ids),
@@ -386,9 +447,14 @@ def process_districts_results(districts_simulation_results, output_dir="results"
         os.path.join(output_dir, "districts_5th_percentile_results.csv")
     )
 
-    # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "districts_simulation_results.pkl"), "wb") as f:
-        pickle.dump(districts_simulation_results, f)
+    # Step 4: pickle the simulation results. See process_mc_results.
+    if write_pickle:
+        with open(
+            os.path.join(output_dir, "districts_simulation_results.pkl"), "wb"
+        ) as f:
+            pickle.dump(districts_simulation_results, f)
+    else:
+        print("Skipping districts_simulation_results.pkl (write_pickle=False).")
 
     print(
         "Districts simulation results have been processed and saved to the "

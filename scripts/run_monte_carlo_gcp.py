@@ -1,21 +1,17 @@
-"""Monte Carlo driver (GCP Spot VM; launched by gcp/deploy-spot.sh).
+"""Monte Carlo driver for the GCP Spot VM (launched by gcp/deploy-spot.sh).
 
-This is the ONLY Monte Carlo driver on this branch. The local
-scripts/run_monte_carlo.py was retired 2026-08-11: keeping two drivers let
-their parameter ranges drift apart (the local copy still had the pre-review
-mobility ranges), and this script's per-worker disk writes are the only setup
-that survives a 1000-iteration run without exhausting parent-process memory.
+This is the PRODUCTION driver: checkpoint/resume across preemptions, per-worker
+disk writes, and no large frames retained in the parent process — the only
+setup that survives a 1000-iteration run. Its sibling
+scripts/run_monte_carlo.py is the local/CLI harness (resolution flag, chunked
+execution, seedable draws) and scripts/run_monte_carlo_test.py is a
+two-iteration smoke test. All three draw their parameters from the SAME module,
+src/monte_carlo_constants.py (ADR-7), so their ranges cannot drift apart again.
 For a small local test run, set NUM_ITERATIONS/MAX_WORKERS below.
 
-NOTE for the kr/30as-feasibility merge: that branch reintroduces a local CLI
-harness (its own run_monte_carlo.py) plus a shared sampling module,
-src/monte_carlo_constants.py (ADR-7). When merging, take the 30as versions
-and move the borehole lose-fraction sampling below into sample_parameters()
-in that module, so parameters stay defined in exactly one place.
-
 SCENARIO RUNS (deterministic, no sampling): set
-UNALLOCATED_VULNERABLE_FRACTION_FIXED below to hold the unallocated-allocation
-parameter g constant across every iteration.
+UNALLOCATED_VULNERABLE_FRACTION_FIXED in src/monte_carlo_constants.py to hold
+the unallocated-allocation parameter g constant across every iteration.
   * "prorata" — the recommended CENTRAL scenario: the unallocated population
     mirrors each stratum's known source mix (≈ +2.5% affected).
   * 0.0 — lower bracket, all unallocated people retain access (the pre-2026-08
@@ -23,7 +19,9 @@ parameter g constant across every iteration.
   * 1.0 — upper bracket, all unallocated people are grid-vulnerable
     (≈ +5.8% affected).
 Leave it as None for the default uncertainty run, which samples
-g ~ Uniform(0, 1) per iteration. See UNALLOCATED_GAP_INVESTIGATION.md §6.
+g ~ Uniform(0, 1) per iteration. See UNALLOCATED_GAP_INVESTIGATION.md §6. The
+borehole lose fractions are scenario parameters too, over the HEMP ranges in
+that same module (ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md).
 
 Every sampled parameter is recorded per iteration in checkpoint.json and in
 sampled_parameters.csv (one row per iteration, written next to the parquet
@@ -41,13 +39,17 @@ import json
 import signal
 import os
 
-# Resolve project root and update sys.path
-project_root = Path().resolve().parent
-sys.path.append(str(project_root))
+# Resolve project root and update sys.path.
+# Derived from __file__, not the CWD: the previous `Path().resolve().parent`
+# only landed on the right directory if the script was launched from a checkout
+# literally named "water-access", and silently pointed elsewhere otherwise.
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
 import src.gis_monte_carlo as mc  # noqa
+from src.monte_carlo_constants import sample_parameters  # noqa
 
 # Results path
-RESULTS_PATH = project_root / "water-access/results"
+RESULTS_PATH = project_root / "results"
 PARQUET_PATH = RESULTS_PATH / "parquet_files"
 CHECKPOINT_FILE = PARQUET_PATH / "checkpoint.json"
 SAMPLED_PARAMETERS_FILE = PARQUET_PATH / "sampled_parameters.csv"
@@ -74,83 +76,11 @@ ITERATION_TIMEOUT = 2 * 60 * 60
 
 # -------------------------------------------------------------------------------
 
-
-# -------------------------------------------------------------------------------
-# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
-# -------------------------------------------------------------------------------
-
-# CRR adjustments.
-# 1 means one road type better, -1 means one road type worse
-CRR_LOWER_ESTIMATE = -1
-CRR_UPPER_ESTIMATE = 1
-
-# Time gathering water in hours
-TIME_GATHERING_LOWER_ESTIMATE = 2
-TIME_GATHERING_UPPER_ESTIMATE = 4
-
-# Practical load limits for cycling in kg
-PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
-PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
-
-# Practical load limits for walking with buckets in kg
-PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
-PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
-
-# Average METS available for walking with buckets to and from water source
-METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 5
-
-# Average watts available for cycling to and from water source
-WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 60
-
-# Polarity options (randomly chosen from list each simulation run)
-# The first word defines the trip to the water source
-# The second word defines the trip from the water source
-# Options to include: "uphill_downhill", "downhill_uphill", "uphill_flat",
-# "flat_uphill", "downhill_flat", "flat_downhill", "flat_flat"
-
-POLARITY_OPTIONS = [
-    "uphill_downhill",
-    "uphill_flat",
-    "flat_uphill",
-    "downhill_uphill",
-]
-
-# Adjustments for euclidean distance to account for paths taken to water
-# not being straight lines
-URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
-URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-
-# Set the parameters for the GPD distribution for rural adjustments.
-# Shape, scale, and loc
-# These values were obtained from the scripts/create_pareto_distribution.py
-RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
-RURAL_PDR_PARETO_SCALE = 0.19953125000000005
-RURAL_PDR_PARETO_LOC = 1.0
-
-# Share of borehole users who lose access when electric pumping fails,
-# sampled uniformly over the HEMP-scenario ranges (population-weighted
-# envelopes of per-country bounds) from ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md.
-# Scenario logic lives in these parameters, not the dataset.
-URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.63
-URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.80
-
-RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.23
-RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.35
-
-# Share of the population whose water source type is UNALLOCATED after
-# harmonisation (~348M people, 4.4% of world population) that is treated as
-# grid-vulnerable. Sampled uniformly over the full 0-1 bracket by default:
-# 0 = the pre-2026-08 assumption that all of them retain access,
-# 1 = all of them are grid-dependent. See UNALLOCATED_GAP_INVESTIGATION.md.
-UNALLOCATED_VULNERABLE_FRACTION_LOWER_ESTIMATE = 0.0
-UNALLOCATED_VULNERABLE_FRACTION_UPPER_ESTIMATE = 1.0
-
-# Set to a float in [0, 1] or the string "prorata" to pin g for a deterministic
-# scenario run instead of sampling it (central scenario = "prorata",
-# bracket = 0.0 and 1.0). None = sample, see the module docstring.
-UNALLOCATED_VULNERABLE_FRACTION_FIXED = None
+# Every sampling parameter -- the walking/cycling ranges, the borehole lose
+# fractions and the unallocated-allocation parameter g -- lives in
+# src/monte_carlo_constants.py so that this script, run_monte_carlo.py and
+# run_monte_carlo_test.py can never disagree about them again (ADR-7). Edit
+# ranges and scenario switches there, not here.
 
 # -------------------------------------------------------------------------------
 
@@ -199,10 +129,12 @@ def load_checkpoint():
     """Load checkpoint if it exists.
 
     ⚠️ RESUME HAZARD: a surviving checkpoint.json restores ALL parameter
-    arrays from the moment the run started — every constant defined at the
-    top of this file is silently ignored on resume. Editing parameter ranges
-    and redeploying has NO effect unless the checkpoint (and the copies
-    deploy-spot.sh pulls back from the GCS bucket) are deleted first. Before
+    arrays from the moment the run started — every constant in
+    src/monte_carlo_constants.py, including the scenario switch
+    UNALLOCATED_VULNERABLE_FRACTION_FIXED, is silently ignored on resume.
+    Editing parameter ranges and redeploying has NO effect unless the
+    checkpoint (and the copies deploy-spot.sh pulls back from the GCS
+    bucket) are deleted first. Before
     any fresh production run: wipe checkpoints/ AND results/parquet_files/
     in the bucket, or the run will resume the old parameters and/or skip
     "completed" iterations from the previous run (see
@@ -266,77 +198,6 @@ def process_saved_results():
         print(f"✅ Processed {len(completed)} simulation results")
     else:
         print("⚠️  No results to process yet")
-
-
-def sample_parameters(num_iterations=NUM_ITERATIONS):
-    """Draw every Monte Carlo input, one value per iteration.
-
-    Returns a dict of plain Python lists (JSON- and CSV-serialisable), keyed by
-    parameter name; element k is the input of iteration k, matching the index in
-    the *_simulation_result_k.parquet filenames. The dict is written verbatim to
-    checkpoint.json and sampled_parameters.csv, so it is both the resume state
-    and the per-iteration parameter log.
-    """
-    unallocated_vulnerable_fractions = (
-        np.random.uniform(
-            UNALLOCATED_VULNERABLE_FRACTION_LOWER_ESTIMATE,
-            UNALLOCATED_VULNERABLE_FRACTION_UPPER_ESTIMATE,
-            size=num_iterations,
-        ).tolist()
-        if UNALLOCATED_VULNERABLE_FRACTION_FIXED is None
-        # Deterministic scenario run: the same g for every iteration.
-        else [UNALLOCATED_VULNERABLE_FRACTION_FIXED] * num_iterations
-    )
-
-    return {
-        "crr_adjustments": np.random.randint(
-            CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=num_iterations
-        ).tolist(),
-        "time_gatherings": mc.sample_lognormal(
-            TIME_GATHERING_LOWER_ESTIMATE,
-            TIME_GATHERING_UPPER_ESTIMATE,
-            num_iterations,
-        ).tolist(),
-        "practical_limits_bicycle": mc.sample_normal(
-            PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
-            num_iterations,
-        ).tolist(),
-        "practical_limits_buckets": mc.sample_normal(
-            PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
-            num_iterations,
-        ).tolist(),
-        "mets": mc.sample_normal(
-            METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, num_iterations
-        ).tolist(),
-        "watts_values": mc.sample_normal(
-            WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, num_iterations
-        ).tolist(),
-        "hill_polarities": np.random.choice(POLARITY_OPTIONS, num_iterations).tolist(),
-        "urban_adjustments": mc.sample_normal(
-            URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-            URBAN_ADJUSTMENT_UPPER_ESTIMATE,
-            num_iterations,
-        ).tolist(),
-        "rural_adjustments": mc.sample_gpd(
-            RURAL_PDR_PARETO_SHAPE,
-            RURAL_PDR_PARETO_SCALE,
-            RURAL_PDR_PARETO_LOC,
-            num_iterations,
-        ).tolist(),
-        "urban_borehole_lose_fractions": np.random.uniform(
-            URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
-            URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
-            size=num_iterations,
-        ).tolist(),
-        "rural_borehole_lose_fractions": np.random.uniform(
-            RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
-            RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
-            size=num_iterations,
-        ).tolist(),
-        "unallocated_vulnerable_fractions": unallocated_vulnerable_fractions,
-    }
 
 
 def run_and_save_simulation(
@@ -451,7 +312,15 @@ if __name__ == "__main__":
         parameters = params
         print("📂 Parameters restored from checkpoint")
     else:
-        parameters = sample_parameters(NUM_ITERATIONS)
+        # Generate new parameters (canonical distributions, see ADR-7).
+        # .tolist() rather than list(): checkpoint.json and
+        # sampled_parameters.csv need plain Python scalars, and json.dump
+        # refuses numpy ones. It also turns the object array a "prorata"
+        # scenario run produces back into plain strings.
+        drawn = sample_parameters(NUM_ITERATIONS)
+        parameters = {
+            name: np.asarray(values).tolist() for name, values in drawn.items()
+        }
         save_checkpoint(completed_iterations, parameters)
 
     # Element k of each list is the input of iteration k (the parquet files are

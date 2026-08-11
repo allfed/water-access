@@ -526,6 +526,28 @@ class TestUnallocatedVulnerableFractionThreading:
 
 
 class TestGcpDriverSamplesUnallocatedFraction:
+    """The GCP driver's parameter draws.
+
+    Since the 30as merge the draws themselves live in
+    :mod:`src.monte_carlo_constants` (ADR-7) -- the driver imports
+    ``sample_parameters`` rather than defining one. These tests exercise it
+    through the driver, which is what the production run does.
+    """
+
+    def test_driver_uses_the_shared_sampling_module(self):
+        import src.monte_carlo_constants as constants
+
+        driver = _load_gcp_driver()
+        # Not merely equivalent: the same function object. A second local copy
+        # is exactly how the ranges drifted apart last time.
+        assert driver.sample_parameters is constants.sample_parameters
+        for name in (
+            "URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE",
+            "RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE",
+            "UNALLOCATED_VULNERABLE_FRACTION_FIXED",
+        ):
+            assert not hasattr(driver, name), f"{name} must live in one place only"
+
     def test_sample_parameters_records_the_new_parameter(self):
         driver = _load_gcp_driver()
         params = driver.sample_parameters(50)
@@ -541,10 +563,29 @@ class TestGcpDriverSamplesUnallocatedFraction:
         assert all(len(values) == 50 for values in params.values())
 
     def test_fixed_scenario_value_pins_every_iteration(self, monkeypatch):
+        import src.monte_carlo_constants as constants
+
         driver = _load_gcp_driver()
-        monkeypatch.setattr(driver, "UNALLOCATED_VULNERABLE_FRACTION_FIXED", "prorata")
+        # The scenario switch lives with the distributions it overrides, so
+        # every driver honours it.
+        monkeypatch.setattr(
+            constants, "UNALLOCATED_VULNERABLE_FRACTION_FIXED", "prorata"
+        )
         params = driver.sample_parameters(10)
-        assert params["unallocated_vulnerable_fractions"] == ["prorata"] * 10
+        assert list(params["unallocated_vulnerable_fractions"]) == ["prorata"] * 10
+        # It must survive the round trip into checkpoint.json as plain strings.
+        assert (
+            np.asarray(params["unallocated_vulnerable_fractions"]).tolist()
+            == ["prorata"] * 10
+        )
+
+    def test_fixed_scenario_float_pins_every_iteration(self, monkeypatch):
+        import src.monte_carlo_constants as constants
+
+        driver = _load_gcp_driver()
+        monkeypatch.setattr(constants, "UNALLOCATED_VULNERABLE_FRACTION_FIXED", 0.0)
+        params = driver.sample_parameters(5)
+        assert list(params["unallocated_vulnerable_fractions"]) == [0.0] * 5
 
     def test_sampled_parameters_csv_gains_the_column(self, tmp_path):
         driver = _load_gcp_driver()

@@ -32,6 +32,11 @@ from src.gis_global_module import (
     map_hill_polarity,
     adjust_euclidean,
     run_global_analysis,
+    cell_centre_latitude,
+    population_split_weights,
+    country_partials,
+    finalise_country_data,
+    aggregate_global,
 )
 
 
@@ -191,6 +196,15 @@ class TestManageSlope:
 
 
 class TestMergeAndAdjustPopulation:
+    """Legacy density-only split.
+
+    These two pin the pre-2026-08-09 behaviour, so they pass
+    ``area_weighted_population=False`` explicitly now that the area-weighted
+    split is the default. Their stub frames carry no ``top``/``bottom``, which
+    the default path requires; the pinned values are unchanged either way (one
+    cell per country means the share is 1.0 under any weighting).
+    """
+
     def test_merge_and_adjust_population_returns_dataframe(self):
         df_zones_input = pd.DataFrame(
             {"ISOCODE": ["USA", "CAN"], "pop_density": [1000, 2000]}
@@ -198,7 +212,9 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
         )
-        result = merge_and_adjust_population(df_zones_input, df_input)
+        result = merge_and_adjust_population(
+            df_zones_input, df_input, area_weighted_population=False
+        )
         assert isinstance(result, pd.DataFrame)
 
     def test_merge_and_adjust_population_returns_expected_result(self):
@@ -208,7 +224,9 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
         )
-        result = merge_and_adjust_population(df_zones_input, df_input)
+        result = merge_and_adjust_population(
+            df_zones_input, df_input, area_weighted_population=False
+        )
         expected_result = pd.DataFrame(
             {
                 "ISOCODE": ["USA", "CAN"],
@@ -217,8 +235,11 @@ class TestMergeAndAdjustPopulation:
                 "Population": [1000000, 2000000],
                 "pop_density_perc": [1.0, 1.0],
                 "pop_zone": [1000000.0, 2000000.0],
-                "country_pop_raw": [1000000.0, 2000000.0],
+                # any_pop precedes country_pop_raw: the tiny-cell trim runs
+                # first so that country_pop_raw is the population the model
+                # actually evaluates (see merge_and_adjust_population).
                 "any_pop": [1, 1],
+                "country_pop_raw": [1000000.0, 2000000.0],
             }
         )
         pd.testing.assert_frame_equal(result, expected_result)
@@ -228,6 +249,103 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame()
         with pytest.raises(AssertionError):
             merge_and_adjust_population(df_zones_input, df_input)
+
+
+class TestAreaWeightedPopulation:
+    """cos-latitude weighting of the within-country population split.
+
+    On a lat/long grid a cell's ground area shrinks as cos(latitude), so people
+    per cell is density x area, not density. Area weighting is ON by default as
+    of 2026-08-09; ``area_weighted_population=False`` must still reproduce the
+    historical density-only split bit for bit.
+    """
+
+    @staticmethod
+    def _frame():
+        # One country, two cells of equal density: one on the equator, one at
+        # 60 N where a cell is exactly half as wide on the ground.
+        return pd.DataFrame(
+            {
+                "ISOCODE": ["RUS", "RUS"],
+                "pop_density": np.float32([100.0, 100.0]),
+                "top": np.float32([0.5, 60.5]),
+                "bottom": np.float32([-0.5, 59.5]),
+            }
+        )
+
+    @staticmethod
+    def _countries():
+        return pd.DataFrame({"alpha3": ["RUS"], "Population": [1_000_000]})
+
+    def test_cell_centre_latitude_is_the_bound_midpoint(self):
+        latitude = cell_centre_latitude(self._frame())
+        assert latitude.tolist() == [0.0, 60.0]
+
+    def test_cell_centre_latitude_requires_the_bound_columns(self):
+        with pytest.raises(ValueError, match="top"):
+            cell_centre_latitude(pd.DataFrame({"pop_density": [1.0]}))
+
+    def test_population_split_weights_explicit_off_is_density_itself(self):
+        frame = self._frame()
+        weights = population_split_weights(frame, area_weighted_population=False)
+        pd.testing.assert_series_equal(weights, frame["pop_density"])
+
+    def test_population_split_weights_default_applies_cosine_of_latitude(self):
+        # No kwarg: the default must be the corrected, area-weighted form.
+        weights = population_split_weights(self._frame())
+        assert weights.dtype == np.float32
+        np.testing.assert_allclose(weights.to_numpy(), [100.0, 50.0], rtol=1e-6)
+
+    def test_population_split_weights_apply_cosine_of_latitude(self):
+        weights = population_split_weights(self._frame(), area_weighted_population=True)
+        assert weights.dtype == np.float32
+        np.testing.assert_allclose(weights.to_numpy(), [100.0, 50.0], rtol=1e-6)
+
+    def test_flag_off_splits_population_by_density_alone(self):
+        result = merge_and_adjust_population(
+            self._frame(), self._countries(), area_weighted_population=False
+        )
+        np.testing.assert_allclose(result["pop_zone"].to_numpy(), [500_000, 500_000])
+
+    def test_default_shifts_population_equatorward(self):
+        # No kwarg -- this is what the model now does out of the box.
+        result = merge_and_adjust_population(self._frame(), self._countries())
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [666_666.7, 333_333.3], rtol=1e-5
+        )
+
+    def test_flag_on_shifts_population_equatorward(self):
+        result = merge_and_adjust_population(
+            self._frame(), self._countries(), area_weighted_population=True
+        )
+        # cos(0) : cos(60) = 1 : 0.5, so 2/3 of the country lands on the equator.
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [666_666.7, 333_333.3], rtol=1e-5
+        )
+        # The national total is untouched -- only the placement moves.
+        assert result["pop_zone"].sum() == pytest.approx(1_000_000)
+
+    def test_flag_on_requires_the_bound_columns(self):
+        frame = self._frame().drop(columns=["top", "bottom"])
+        with pytest.raises(ValueError, match="area-weighted population"):
+            merge_and_adjust_population(
+                frame, self._countries(), area_weighted_population=True
+            )
+
+    def test_supplied_density_totals_are_used_when_area_weighted(self):
+        # A chunked run hands in the whole country's weight total. Doubling it
+        # must halve every share -- proof the divisor is really the supplied one.
+        frame = self._frame()
+        weights = population_split_weights(frame, area_weighted_population=True)
+        result = merge_and_adjust_population(
+            frame,
+            self._countries(),
+            density_totals={"RUS": weights.sum() * 2},
+            area_weighted_population=True,
+        )
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [333_333.3, 166_666.7], rtol=1e-5
+        )
 
 
 class TestCrrAddUncertainty:
@@ -1397,6 +1515,102 @@ class TestCleanUpData:
         assert cleaned_df["weighted_med"].tolist() == [1.0, 4.0]
 
 
+class TestGlobalRowMatchesSurvivingCountries:
+    """GLOBAL must be the sum of the country rows published beside it.
+
+    The outlier cut (Libya's weighted median) and the manual removal list drop
+    countries *after* the per-country aggregates exist. Building GLOBAL before
+    that left it counting people who appear in no row of the output -- ~2.1M of
+    them in the real run.
+    """
+
+    @staticmethod
+    def _zones():
+        # ATG is on the manual removal list; FSM sits beyond Libya's median and
+        # is therefore cut by the outlier rule. Neither may reach GLOBAL.
+        return pd.DataFrame(
+            {
+                "ISOCODE": ["USA", "LBY", "ATG", "FSM"],
+                "pop_zone": [1000.0, 1500.0, 300.0, 700.0],
+                "dtw_1": [10.0, 100.0, 20.0, 250.0],
+                "Entity": ["USA", "Libya", "Antigua", "Micronesia"],
+                "NATPiped": [1000, 1500, 300, 700],
+                "country_pop_raw": [1000.0, 1500.0, 300.0, 700.0],
+                "population_affected_with_access": [1000.0, 0.0, 300.0, 700.0],
+                "population_affected_with_cycling_access": [900.0, 0.0, 200.0, 600.0],
+                "population_affected_with_walking_access": [800.0, 0.0, 100.0, 500.0],
+                "population_affected_with_only_cycling_access": [
+                    100.0,
+                    0.0,
+                    50.0,
+                    50.0,
+                ],
+                "region": ["North America", "Africa", "North America", "Oceania"],
+                "subregion": [
+                    "Northern America",
+                    "Northern Africa",
+                    "Caribbean",
+                    "Micronesia",
+                ],
+                "zone_pop_with_water": [1000.0, 0.0, 300.0, 0.0],
+                "zone_pop_without_water": [0.0, 1500.0, 0.0, 700.0],
+                "max distance cycling": [10.0, 30.0, 20.0, 40.0],
+                "max distance walking": [5.0, 15.0, 10.0, 20.0],
+            }
+        )
+
+    def test_removed_countries_are_absent_from_the_output(self):
+        result = process_country_data(self._zones())
+        assert set(result["ISOCODE"]) == {"USA", "LBY", "GLOBAL"}
+
+    @pytest.mark.parametrize(
+        "column",
+        [
+            "country_pop_raw",
+            "country_pop_with_water",
+            "country_pop_without_water",
+            "population_affected_with_access",
+            "population_affected_with_cycling_access",
+            "population_affected_with_walking_access",
+            "population_affected_with_only_cycling_access",
+        ],
+    )
+    def test_global_equals_the_sum_of_the_country_rows(self, column):
+        result = process_country_data(self._zones())
+        countries = result[result["ISOCODE"] != "GLOBAL"]
+        global_row = result[result["ISOCODE"] == "GLOBAL"]
+        assert len(global_row) == 1
+        assert global_row[column].iloc[0] == pytest.approx(countries[column].sum())
+
+    def test_global_weighted_median_ignores_removed_countries(self):
+        # Every surviving cell is at dtw_1 <= 100; FSM's 250 would drag the
+        # population-weighted 95th percentile up if it were still in the pool.
+        result = process_country_data(self._zones())
+        global_row = result[result["ISOCODE"] == "GLOBAL"]
+        assert global_row["weighted_med"].iloc[0] <= 100
+
+    def test_chunked_style_call_without_the_cells_still_re_sums(self):
+        # A caller with no cells to hand (df_global only) must still get sums
+        # taken over the survivors, not the pre-cut world.
+        zones = self._zones()
+        partials = country_partials(zones)
+        pre_cut_global = aggregate_global(zones)
+        result = finalise_country_data(partials, pre_cut_global)
+        countries = result[result["ISOCODE"] != "GLOBAL"]
+        global_row = result[result["ISOCODE"] == "GLOBAL"]
+        assert global_row["country_pop_raw"].iloc[0] == pytest.approx(
+            countries["country_pop_raw"].sum()
+        )
+        assert global_row["country_pop_with_water"].iloc[0] == pytest.approx(
+            countries["country_pop_with_water"].sum()
+        )
+
+    def test_needs_one_of_the_two_global_inputs(self):
+        partials = country_partials(self._zones())
+        with pytest.raises(ValueError):
+            finalise_country_data(partials)
+
+
 class TestProcessCountryData:
     def test_process_country_data_returns_dataframe(self):
         df_zones = pd.DataFrame(
@@ -1500,7 +1714,9 @@ class TestProcessCountryData:
                 ],
                 "percent_with_only_cycling_access": [0.0, 0.0, 0.0, 0.0],
             },
-            index=pd.Int64Index([0, 1, 2, 3], dtype="int64"),
+            # pd.Int64Index was removed in pandas 2.0; pd.Index(..., dtype="int64")
+            # is the drop-in replacement and compares equal to the pandas 1.x index.
+            index=pd.Index([0, 1, 2, 3], dtype="int64"),
         )
         # find all differences between result and expected result
         diff = result.compare(expected_result)

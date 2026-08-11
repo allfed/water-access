@@ -1,0 +1,118 @@
+=== 30as Monte Carlo smoke, 10 iterations (AC-6), Sat Aug  8 21:19:23 AEST 2026 ===
+seed: 20260808 (identical draws to the 5 arcmin twin)
+chunk-rows: default (12,000,000); workers: default (1)
+--- df before:
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s5   460Gi   414Gi    18Gi    96%    4.4M  185M    2%   /System/Volumes/Data
+--- load before (note: browser/editor running; RSS unaffected, wall clock may inflate):
+Processes: 702 total, 5 running, 697 sleeping, 4586 threads 
+2026/08/08 21:19:24
+Load Avg: 4.91, 6.43, 4.61 
+CPU usage: 12.60% user, 15.90% sys, 71.48% idle 
+SharedLibs: 606M resident, 110M data, 83M linkedit.
+MemRegions: 362443 total, 4496M resident, 225M private, 1768M shared.
+PhysMem: 15G used (3684M wired, 3269M compressor), 8202M unused.
+VM: 306T vsize, 6144M framework vsize, 5305051(0) swapins, 7925681(0) swapouts.
+
+Resolution: 30as
+Zone frame: data/GIS/extracted/master_30as.parquet
+Planning country chunks (budget 12,000,000 cells) ...
+  12 chunks over 194 countries, 137,930,520 modelled cells, largest chunk 11,999,999 rows (largest single country 21,979,082 = RUS, split by district: RUS), cell 30 arcsec
+30as profile: persisting per-draw country/district aggregates only (no per-cell Parquet, no simulation pickles).
+Parameter seed: 20260808
+PARAM_DRAW 000 crr_adjustments=0 time_gatherings=2.36720627872 practical_limits_bicycle=40.8133567635 practical_limits_buckets=23.431186915 mets=3.4420202703 watts_values=50.0787936764 hill_polarities=flat_uphill urban_adjustments=1.34651385137 rural_adjustments=1.6667592195
+PARAM_DRAW 001 crr_adjustments=1 time_gatherings=2.30864590037 practical_limits_bicycle=39.4385891779 practical_limits_buckets=17.9129754977 mets=3.73604933456 watts_values=44.5457460892 hill_polarities=uphill_flat urban_adjustments=1.32296662614 rural_adjustments=1.01621167572
+PARAM_DRAW 002 crr_adjustments=-1 time_gatherings=2.83925208221 practical_limits_bicycle=37.2678777411 practical_limits_buckets=19.3376766138 mets=4.55274691097 watts_values=36.1070565361 hill_polarities=flat_uphill urban_adjustments=1.15092270682 rural_adjustments=1.78429660281
+PARAM_DRAW 003 crr_adjustments=1 time_gatherings=2.61258126018 practical_limits_bicycle=44.6018482072 practical_limits_buckets=15.5888452685 mets=3.65166175257 watts_values=48.3575103355 hill_polarities=downhill_uphill urban_adjustments=1.37955218218 rural_adjustments=1.09590603022
+PARAM_DRAW 004 crr_adjustments=-1 time_gatherings=2.88144407418 practical_limits_bicycle=33.1156708891 practical_limits_buckets=20.8673625317 mets=4.52014664556 watts_values=60.2061234938 hill_polarities=flat_uphill urban_adjustments=1.31451619217 rural_adjustments=1.71944652652
+PARAM_DRAW 005 crr_adjustments=-1 time_gatherings=2.8619876891 practical_limits_bicycle=40.6695648915 practical_limits_buckets=21.7488748936 mets=3.99210217988 watts_values=33.4615063102 hill_polarities=flat_uphill urban_adjustments=1.42023876124 rural_adjustments=1.11060739068
+PARAM_DRAW 006 crr_adjustments=1 time_gatherings=3.33872815912 practical_limits_bicycle=38.7058056209 practical_limits_buckets=19.3669464734 mets=4.34156430056 watts_values=35.6222295397 hill_polarities=uphill_flat urban_adjustments=1.41020441377 rural_adjustments=1.26856680768
+PARAM_DRAW 007 crr_adjustments=0 time_gatherings=3.28268115722 practical_limits_bicycle=30.9834132002 practical_limits_buckets=22.2779691144 mets=4.07369847609 watts_values=43.0687156916 hill_polarities=flat_uphill urban_adjustments=1.24529141124 rural_adjustments=1.24551736371
+PARAM_DRAW 008 crr_adjustments=1 time_gatherings=2.41993562858 practical_limits_bicycle=37.3352232577 practical_limits_buckets=21.0593728629 mets=4.29802823152 watts_values=46.9335404231 hill_polarities=uphill_downhill urban_adjustments=1.50893969481 rural_adjustments=1.00810491904
+PARAM_DRAW 009 crr_adjustments=0 time_gatherings=3.26260642934 practical_limits_bicycle=35.179573158 practical_limits_buckets=20.2031014061 mets=4.14194030852 watts_values=39.5765203313 hill_polarities=flat_uphill urban_adjustments=1.40334186485 rural_adjustments=1.07612185643
+Starting Monte Carlo simulations...
+Running 10 simulations...
+Running 1 simulations concurrently...
+Start time: 22:04:38
+
+
+
+Simulating:   0%|          | 0/10 [00:00<?, ?it/s]/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+<class 'numpy.int64'>
+  chunk 1/12: 11 countries, 11,999,963 cells, 42.8s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 2/12: 5 countries, 11,999,962 cells, 28.5s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 3/12: 5 countries, 11,999,812 cells, 30.9s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 4/12: 7 countries, 11,999,999 cells, 25.1s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 5/12: 9 countries, 11,999,979 cells, 25.2s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 6/12: 11 countries, 11,999,950 cells, 39.3s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 7/12: 14 countries, 11,999,908 cells, 24.0s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 8/12: 18 countries, 11,999,841 cells, 23.7s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 9/12: 28 countries, 11,999,856 cells, 24.0s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 10/12: 85 countries, 7,952,168 cells, 19.9s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 11/12: RUS (14 districts), 11,998,242 cells, 33.1s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 12/12: RUS (69 districts), 9,980,840 cells, 22.8s
+Countries removed from analysis due to being further than Libya's median: ['Comoros', 'Cabo Verde', 'Micronesia, Federated States of', 'Kiribati', 'Maldives', 'Marshall Islands', 'Nauru', 'Seychelles', 'Tuvalu']
+Countries removed manually: ['GUM', 'ASM', 'TON', 'MNP', 'ATG', 'DMA', 'ABW', 'BRB']
+  chunked analysis complete in 520.2s
+Simulating:  10%|█         | 1/10 [08:41<1:18:16, 521.79s/it]/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+<class 'numpy.int64'>
+  chunk 1/12: 11 countries, 11,999,963 cells, 36.3s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 2/12: 5 countries, 11,999,962 cells, 24.9s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 3/12: 5 countries, 11,999,812 cells, 26.9s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 4/12: 7 countries, 11,999,999 cells, 22.2s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 5/12: 9 countries, 11,999,979 cells, 22.8s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 6/12: 11 countries, 11,999,950 cells, 37.1s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 7/12: 14 countries, 11,999,908 cells, 22.9s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 8/12: 18 countries, 11,999,841 cells, 24.3s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 9/12: 28 countries, 11,999,856 cells, 23.6s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 10/12: 85 countries, 7,952,168 cells, 19.0s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 11/12: RUS (14 districts), 11,998,242 cells, 31.3s
+/Users/kevin/Documents/ProgrammingIsFun/ALLFED/water-access/.claude/worktrees/30as-feasibility/src/gis_global_module.py:1586: UserWarning: Input dataframe contains NaN values
+  warnings.warn("Input dataframe contains NaN values")
+  chunk 12/12: RUS (69 districts), 9,980,840 cells, 21.3s
+/Users/kevin/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 6 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
