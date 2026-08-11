@@ -21,6 +21,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from jmp_source_parser import (  # noqa: E402
     DEFAULT_MANUAL_ALPHA3_MAPPING,
+    DIAGNOSTIC_COLUMNS,
     parse_all_countries,
     load_piped_reference_from_water_csv,
 )
@@ -56,6 +57,10 @@ def main() -> int:
             "survey_year": row.get("survey_year"),
             "piped_reference_year": row.get("piped_reference_year"),
         }
+        # Diagnostic (non-model) columns: carried so the ambiguous row-99
+        # remainder is visible, never consumed by the model.
+        for col in DIAGNOSTIC_COLUMNS:
+            model_row[col] = row.get(col)
         model_rows.append(model_row)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -80,6 +85,12 @@ def main() -> int:
             n = df[col].notna().sum()
             nz = (df[col].fillna(0) > 0).sum()
             print(f"{col}: {n} countries with data ({nz} > 0)")
+
+    for col in DIAGNOSTIC_COLUMNS:
+        if col in df.columns:
+            n = df[col].notna().sum()
+            over = (df[col].fillna(0) > 2.0).sum()
+            print(f"{col} (diagnostic): {n} countries with data ({over} > 2pp)")
 
     with_survey = df["survey"].notna().sum() if "survey" in df.columns else 0
     print(f"countries with selected survey: {with_survey}")

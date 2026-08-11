@@ -6,8 +6,16 @@ national censuses, DHS/EPHS reports, regulator statistics and statistical-
 office publications for the countries whose JMP country files carry no
 source-type data).
 
-Priority: JMP-parsed values always win. Research values only fill rows where
-the JMP extract is entirely blank. Provenance is carried per row.
+Priority: the best source wins. JMP-parsed values beat research fills wherever
+the JMP row is *informative* — i.e. it carries a positive value in at least one
+of packaged / delivered / borehole, the categories a real household survey
+measures. A JMP row whose only content is the OtherUnpiped catch-all (or
+nothing at all) is not informative: sparse EU-SILC/HBS blocks like
+ROU_2012_EUSILC and BIH_2015_HBS say nothing about boreholes, and letting them
+demote a national census fill deleted ROU's 37% rural borehole share. Those
+rows fall back to research (data_origin="research", with the demotion recorded
+in research_notes and a WARNING printed). Research otherwise only fills rows
+where the JMP extract is entirely blank. Provenance is carried per row.
 
 Research-filled rows are then reconciled against the WHO/JMP piped share using
 the same "unpiped budget" rule the JMP parser applies to survey rows
@@ -51,6 +59,7 @@ from jmp_source_parser import (  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEMI_PROCESSED = REPO_ROOT / "data" / "processed" / "semi-processed"
 JMP_BREAKDOWN_CSV = SEMI_PROCESSED / "jmp_source_breakdown_latest.csv"
+JMP_ERRORS_CSV = SEMI_PROCESSED / "jmp_source_breakdown_errors.csv"
 RESEARCH_CSV = REPO_ROOT / "data" / "original_data" / "researched_source_breakdown.csv"
 WATER_CSV = (
     REPO_ROOT / "data" / "original_data" / "WHO Household Water Data - 2023 Data.csv"
@@ -84,6 +93,25 @@ PROVENANCE_COLS = [
 # Sum of piped + our four categories per stratum may exceed 100 by this much
 # before it is reported (rounding and reference-year mismatch tolerance).
 SUM_TOLERANCE = 2.0
+
+# Percentage points of the JMP row-99 "other improved sources" remainder that
+# may sit outside every model category before the build reports it. The
+# remainder is not reallocated (its composition is ambiguous, so it belongs in
+# the sampled Unallocated bucket) — this is a visibility threshold only.
+UNCLASSIFIED_REMAINDER_TOLERANCE = 2.0
+
+# Columns that make a JMP row "informative": the ones only a household survey
+# that actually asked about source type can fill. OtherUnpiped is excluded on
+# purpose — it is the catch-all every ladder-style block can populate without
+# measuring anything the model cares about.
+INFORMATIVE_COLS = [
+    "URBANPackaged",
+    "RURALPackaged",
+    "URBANDelivered",
+    "RURALDelivered",
+    "URBANBorehole",
+    "RURALBorehole",
+]
 
 # WHO piped shares at or above this are treated as rounded ">99" values whose
 # unpiped budget (100 - piped) is an artifact of rounding, not a measurement.
@@ -146,6 +174,29 @@ def reconcile_stratum_with_piped_budget(
     return adjusted, None, f"scaled_to_unpiped_budget(scale={round(scale, 4)})"
 
 
+def jmp_row_is_informative(row) -> bool:
+    """Whether a JMP row measured anything the research fill could not.
+
+    "Best source wins" (Kevin, 2026-08-11): a JMP row only outranks a curated
+    research row if it is informative, meaning it carries a positive value in
+    at least one of packaged / delivered / borehole. A row whose entire content
+    is the OtherUnpiped catch-all — the shape sparse EU-SILC / HBS blocks
+    produce — measured none of the model's source types and must not demote a
+    census-grade fill.
+
+    Note on zeros: the parser writes 0.0, not NaN, for every category a
+    selected survey did not report (apply_piped_reference_and_normalize), so
+    "non-null" cannot distinguish measured from absent here. A positive value
+    is therefore the only available evidence of content — the same convention
+    the displaced-research warning below already uses.
+    """
+    for col in INFORMATIVE_COLS:
+        value = row.get(col)
+        if value is not None and pd.notna(value) and float(value) > 0:
+            return True
+    return False
+
+
 def load_research(path: Path, exclude_low_confidence: bool) -> pd.DataFrame:
     research = pd.read_csv(path)
     for col in VALUE_COLS:
@@ -171,6 +222,13 @@ def validate(
     merged_alpha3: "list[str] | None" = None,
 ) -> pd.DataFrame:
     """Range, sum and coverage checks; returns warnings (may be empty).
+
+    Plus a diagnostic check: when the JMP row-99 "other improved sources"
+    remainder (the part cart + tanker do not explain, rows 102-103) exceeds
+    UNCLASSIFIED_REMAINDER_TOLERANCE in a stratum, it is reported. That mass is
+    deliberately left out of the five model categories, so it lands in the
+    sampled Unallocated bucket; the warning exists so a 45-61pp case like the
+    Philippines cannot pass unnoticed.
 
     Three checks per stratum:
       1. every category value inside [0, 100];
@@ -236,6 +294,24 @@ def validate(
                     )
                 )
 
+        for stratum in ("URBAN", "RURAL"):
+            remainder = row.get(f"OtherImprovedUnclassified_{stratum}")
+            if remainder is None or pd.isna(remainder):
+                continue
+            if float(remainder) > UNCLASSIFIED_REMAINDER_TOLERANCE:
+                problems.append(
+                    (
+                        alpha3,
+                        f"{stratum}OtherImprovedUnclassified",
+                        round(float(remainder), 2),
+                        (
+                            f"{round(float(remainder), 1)}pp of JMP 'other improved "
+                            "sources' is not cart or tanker and matches no model "
+                            "category; left unallocated by design (diagnostic)"
+                        ),
+                    )
+                )
+
     if merged_alpha3 is not None:
         present = set(unified["alpha3"])
         for alpha3 in sorted(set(merged_alpha3) - present):
@@ -273,12 +349,9 @@ def main() -> int:
 
     research_by_alpha3 = research.set_index("alpha3")
     filled = []
-    skipped_jmp_present = []
-    for idx in unified.index[~jmp_has_data]:
-        alpha3 = unified.at[idx, "alpha3"]
-        if alpha3 not in research_by_alpha3.index:
-            continue
-        r = research_by_alpha3.loc[alpha3]
+    demoted = []
+
+    def apply_research(idx, r, extra_note: str | None = None) -> None:
         for col in VALUE_COLS:
             unified.at[idx, col] = r[col]
         unified.at[idx, "survey"] = r.get("survey")
@@ -289,10 +362,46 @@ def main() -> int:
         unified.at[idx, "research_source"] = r.get("source")
         unified.at[idx, "research_url"] = r.get("url")
         unified.at[idx, "research_flags"] = r.get("flags")
-        unified.at[idx, "research_notes"] = r.get("mapping_notes")
+        notes = r.get("mapping_notes")
+        if extra_note:
+            notes = f"{notes} | {extra_note}" if pd.notna(notes) else extra_note
+        unified.at[idx, "research_notes"] = notes
         unified.at[idx, "research_bounds"] = r.get("bounds_notes")
         unified.at[idx, "research_verification"] = r.get("verification")
+
+    # Rows with no JMP data at all: straight research fill.
+    for idx in unified.index[~jmp_has_data]:
+        alpha3 = unified.at[idx, "alpha3"]
+        if alpha3 not in research_by_alpha3.index:
+            continue
+        apply_research(idx, research_by_alpha3.loc[alpha3])
         filled.append(alpha3)
+
+    # Rows where BOTH sources exist: best source wins. JMP keeps the row only
+    # when it is informative (see jmp_row_is_informative); a catch-all-only JMP
+    # row is demoted in favour of the research fill.
+    for idx in unified.index[jmp_has_data]:
+        alpha3 = unified.at[idx, "alpha3"]
+        if alpha3 not in research_by_alpha3.index:
+            continue
+        row = unified.loc[idx]
+        if jmp_row_is_informative(row):
+            continue
+        jmp_survey = row.get("survey")
+        jmp_survey = str(jmp_survey) if pd.notna(jmp_survey) else "unnamed survey"
+        note = (
+            f"JMP row demoted: {jmp_survey} reported no packaged, delivered or "
+            "borehole value (catch-all OtherUnpiped only), so the research fill "
+            "is the better source"
+        )
+        r = research_by_alpha3.loc[alpha3]
+        research_source = r.get("source")
+        research_source = (
+            str(research_source) if pd.notna(research_source) else "research fill"
+        )
+        apply_research(idx, r, extra_note=note)
+        filled.append(alpha3)
+        demoted.append((alpha3, jmp_survey, research_source))
 
     # Research rows for territories absent from the JMP extract entirely.
     missing = research_by_alpha3.index.difference(unified["alpha3"])
@@ -318,9 +427,12 @@ def main() -> int:
         unified = pd.concat([unified, pd.DataFrame([new_row])], ignore_index=True)
         filled.append(alpha3)
 
+    # Research rows still outranked by an informative JMP row. Read off
+    # data_origin rather than the pre-demotion mask, so demoted countries are
+    # not double-reported as both "ignored" and "used".
     research_available = set(research_by_alpha3.index)
     skipped_jmp_present = sorted(
-        research_available & set(unified.loc[jmp_has_data, "alpha3"])
+        research_available & set(unified.loc[unified["data_origin"] == "jmp", "alpha3"])
     )
 
     # Normalize garbled Entity names in the JMP extract (Arabic-script rows for
@@ -387,6 +499,31 @@ def main() -> int:
 
     validation = validate(unified, piped_reference, merged_alpha3=merged_alpha3)
 
+    # Provenance for the demoted-JMP rows, so the swap is auditable from the
+    # validation CSV alone.
+    if demoted:
+        validation = pd.concat(
+            [
+                validation,
+                pd.DataFrame(
+                    [
+                        {
+                            "alpha3": alpha3,
+                            "field": "data_origin",
+                            "value": "jmp -> research",
+                            "problem": (
+                                f"JMP row ({jmp_survey}) is catch-all only - no "
+                                "packaged/delivered/borehole value - so the research "
+                                f"fill ({research_source}) wins"
+                            ),
+                        }
+                        for alpha3, jmp_survey, research_source in demoted
+                    ]
+                ),
+            ],
+            ignore_index=True,
+        )
+
     # "JMP wins" can demote a curated research row to nothing when the JMP
     # survey reports a category as an explicit zero. Report those, because a
     # zero from a survey that never asked the question is not the same datum as
@@ -426,6 +563,15 @@ def main() -> int:
                 ignore_index=True,
             )
 
+    # Why the parser produced no row, verbatim, so a placeholder says which
+    # kind of gap it is (ISR/FLK are a classified, documented exclusion; other
+    # gaps are simply unfilled).
+    parse_errors: dict[str, str] = {}
+    if JMP_ERRORS_CSV.exists():
+        errors_df = pd.read_csv(JMP_ERRORS_CSV)
+        if {"iso3", "error"}.issubset(errors_df.columns):
+            parse_errors = dict(zip(errors_df["iso3"], errors_df["error"]))
+
     coverage_gaps: list[str] = []
     if merged_alpha3 is not None:
         coverage_gaps = sorted(set(merged_alpha3) - set(unified["alpha3"]))
@@ -434,10 +580,13 @@ def main() -> int:
             placeholder = {col: pd.NA for col in unified.columns}
             placeholder["alpha3"] = alpha3
             placeholder["data_origin"] = "none"
-            placeholder["research_notes"] = (
+            note = (
                 "no JMP source data and no research fill; placeholder row so the "
                 "country is visible in provenance instead of silently missing"
             )
+            if alpha3 in parse_errors:
+                note = f"{note}; JMP parse status: {parse_errors[alpha3]}"
+            placeholder["research_notes"] = note
             placeholders.append(placeholder)
         if placeholders:
             # Grown by reindex rather than concat: an all-NA frame would change
@@ -467,8 +616,14 @@ def main() -> int:
         )
     if skipped_jmp_present:
         print(
-            "research rows ignored because JMP already has data "
-            f"(JMP wins): {skipped_jmp_present}"
+            "research rows ignored because an informative JMP row exists "
+            f"(best source wins): {skipped_jmp_present}"
+        )
+    for alpha3, jmp_survey, research_source in demoted:
+        print(
+            f"  WARNING {alpha3}: JMP row demoted, data_origin jmp -> research. "
+            f"JMP source: {jmp_survey} (catch-all OtherUnpiped only, no "
+            f"packaged/delivered/borehole). Research source: {research_source}."
         )
     for alpha3, lost in displaced:
         print(

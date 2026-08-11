@@ -1,6 +1,17 @@
 # Investigation memo: the ~348M "resilient by gap" population
 
-**Date:** 2026-08-11 · **Branch:** `kr/unpiped-breakdown` · **Status:** analysis only — nothing applied, awaiting sign-off.
+**Date:** 2026-08-11 · **Branch:** `kr/unpiped-breakdown` · **Status:** recommendation approved and IMPLEMENTED — see "Implementation status" below.
+
+## Implementation status (2026-08-11, same day)
+
+The §6 recommendation was approved by Kevin and shipped in commit `53f6788` (two implementer agents, then an air-gapped Fable verifier: **SHIP**, every acceptance criterion independently reproduced). Outcome vs the analysis below:
+
+- Every stratum's five categories + `Unallocated` now sum to exactly 100 (USA rural was 138.7, SLB urban 116.3).
+- Layer-1 parser fixes recovered ~50M into named categories (+13.8M lands grid-affected deterministically — mostly Myanmar/Ukraine packaged water from the total-only fallback).
+- The JMP-ladder fill moved ~128M into `OtherUnpiped` (audit: `data/processed/semi-processed/ladder_fill_report.csv`).
+- **169.5M people (2.15%)** ship as explicit `URBAN/RURALUnallocated`, and `calculate_population_water_access` takes `unallocated_vulnerable_fraction` (float in [0,1] or `"prorata"`; the GCP Monte Carlo samples it Uniform(0,1) per iteration). Affected-side bracket: 0 to +169.5M; prorata central ≈ +127M.
+
+Follow-up decisions (Kevin, same day): (1) best source wins — a catch-all-only JMP row no longer demotes a researched breakdown (restores ROU/BIH borehole fills); (2) the row-99 "Other improved" remainder stays in `Unallocated` (the sampled bucket is the right home for ambiguous mass) with a parser diagnostic + validator warning; (3) ISR/FLK variant workbooks are documented exclusions (ladder-only admin sources, no subcategory data — parsing them would recover nothing).
 
 ## TL;DR
 

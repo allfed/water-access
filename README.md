@@ -79,7 +79,8 @@ python scripts/Data_Manipulation_Scripts/extract_jmp_source_breakdown.py
 #    (data/original_data/researched_source_breakdown.csv; see its README)
 python scripts/Data_Manipulation_Scripts/build_unified_source_breakdown.py
 
-# 4. Rebuild merged_data.csv (adds URBAN/RURAL Packaged, Delivered, Borehole, OtherUnpiped columns)
+# 4. Rebuild merged_data.csv (adds URBAN/RURAL Packaged, Delivered, Borehole,
+#    OtherUnpiped and Unallocated columns; writes ladder_fill_report.csv)
 python scripts/Data_Manipulation_Scripts/imputation_script.py
 ```
 
@@ -92,7 +93,17 @@ reconciliation rule (unpiped-budget scaling with a rounded-piped carve-out)
 are documented in
 [`data/original_data/researched_source_breakdown_README.md`](data/original_data/researched_source_breakdown_README.md).
 
-Code defaults for borehole displacement are 50% urban, 25% rural (JMP does not distinguish handpump vs motorized), but researched estimates now exist and supersede them: HEMP-scenario ranges of 63–80% urban and 23–35% rural, population-weighted from per-country handpump-share bounds — see [`ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md`](ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md), the per-country table in [`BOREHOLE_PUMP_TYPE_BY_COUNTRY.md`](BOREHOLE_PUMP_TYPE_BY_COUNTRY.md), and `data/original_data/borehole_pump_type_estimates.csv` (reproduce the aggregation with `scripts/Data_Manipulation_Scripts/aggregate_borehole_pump_estimates.py`). Displaced users — piped, packaged, delivered, and the displaced borehole share — all regain access only if walking or cycling range allows. Resilient unpiped users are the residual share after subtracting those displaced categories from total unpiped (`100% − piped`). Parsed `OtherUnpiped` columns are used only when scaling survey breakdowns to the unpiped budget. Override via `urban_borehole_lose_fraction` and `rural_borehole_lose_fraction` in `calculate_population_water_access()`.
+Code defaults for borehole displacement are 50% urban, 25% rural (JMP does not distinguish handpump vs motorized), but researched estimates now exist and supersede them: HEMP-scenario ranges of 63–80% urban and 23–35% rural, population-weighted from per-country handpump-share bounds — see [`ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md`](ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md), the per-country table in [`BOREHOLE_PUMP_TYPE_BY_COUNTRY.md`](BOREHOLE_PUMP_TYPE_BY_COUNTRY.md), and `data/original_data/borehole_pump_type_estimates.csv` (reproduce the aggregation with `scripts/Data_Manipulation_Scripts/aggregate_borehole_pump_estimates.py`). Displaced users — piped, packaged, delivered, and the displaced borehole share — all regain access only if walking or cycling range allows. Override via `urban_borehole_lose_fraction` and `rural_borehole_lose_fraction` in `calculate_population_water_access()`.
+
+#### The unallocated share
+
+Household-survey subcategories rarely cover the whole unpiped budget, mostly because a survey's own piped share differs from the harmonized JMP piped estimate the model ships (survey-vs-JMP "piped-definition drift"). Rather than letting that shortfall vanish into a residual, the pipeline makes it explicit (investigation and quantification in [`UNALLOCATED_GAP_INVESTIGATION.md`](UNALLOCATED_GAP_INVESTIGATION.md)):
+
+- The share of each stratum that JMP itself places on unimproved sources or surface water (same-vintage `Unimproved` + `Surface water` from the WHO CSV) is folded into `OtherUnpiped` — these users are not grid-dependent. Audit trail: `data/processed/semi-processed/ladder_fill_report.csv`.
+- The remainder ships as `URBANUnallocated` / `RURALUnallocated` (~2.2% of world population, concentrated in India, China, Pakistan, and the Philippines). Every stratum's six columns sum to exactly 100.
+- Its fate is a model parameter, `unallocated_vulnerable_fraction` in `calculate_population_water_access()`: `0.0` treats it all as resilient (the historical assumption), `1.0` all grid-vulnerable, `"prorata"` mirrors each stratum's known source mix (the central scenario). The Monte Carlo driver samples it Uniform(0, 1) per iteration alongside the borehole lose fractions, so the headline results carry this uncertainty explicitly.
+
+Resilient unpiped users are computed as an explicit sum — `OtherUnpiped + (1 − lose_fraction)·Borehole + (1 − g)·Unallocated` — not a residual; affected + resilient equals the zone population by construction.
 
 ## Full reproduction
 

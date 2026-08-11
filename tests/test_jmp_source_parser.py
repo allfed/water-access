@@ -10,12 +10,17 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from jmp_source_parser import (  # noqa: E402
     DEFAULT_MANUAL_ALPHA3_MAPPING,
+    SUBCATEGORY_ROWS,
+    VARIANT_LADDER_ONLY_ERROR,
+    _has_any_subcategory_cell,
     _resolve_raw_dir,
     apply_piped_reference_and_normalize,
     breakdown_to_model_columns,
+    diagnostic_columns,
     load_piped_reference_from_water_csv,
     map_country_names_to_alpha3,
     normalize_unpiped_subcategories,
+    other_improved_unclassified_pct,
     parse_country,
     resolve_borehole_urban_rural,
     resolve_urban_rural_with_total_fallback,
@@ -273,6 +278,159 @@ class TestTotalOnlySurveyFallback:
         assert mapped["URBANPackaged"] == 0.0
         assert mapped["RURALDelivered"] == 0.0
         assert mapped["URBANBorehole"] == 5.0
+
+
+class TestOtherImprovedUnclassifiedDiagnostic:
+    """Row 99 minus cart + tanker: the ambiguous remainder (rows 102-103).
+
+    It is reported, never reallocated — the mass belongs in the sampled
+    Unallocated bucket, so this must stay OUT of the five model categories.
+    """
+
+    def test_remainder_is_row99_minus_delivered(self):
+        assert other_improved_unclassified_pct(61.56186, 0.28063) == 61.2812
+
+    def test_none_row99_stays_unknown(self):
+        assert other_improved_unclassified_pct(None, 0.5) is None
+
+    def test_missing_delivered_counts_as_zero(self):
+        assert other_improved_unclassified_pct(45.5, None) == 45.5
+
+    def test_floored_at_zero(self):
+        # rounding can push the children a hair past the parent
+        assert other_improved_unclassified_pct(2.0, 2.0001) == 0.0
+
+    def test_diagnostic_columns_use_the_total_fallback(self):
+        row = {
+            "other_improved_unclassified_urban_pct": None,
+            "other_improved_unclassified_rural_pct": None,
+            "other_improved_unclassified_total_pct": 12.5,
+        }
+        assert diagnostic_columns(row) == {
+            "OtherImprovedUnclassified_URBAN": 12.5,
+            "OtherImprovedUnclassified_RURAL": 12.5,
+        }
+
+    def test_diagnostic_columns_stay_none_when_unknown(self):
+        assert diagnostic_columns({}) == {
+            "OtherImprovedUnclassified_URBAN": None,
+            "OtherImprovedUnclassified_RURAL": None,
+        }
+
+    def test_diagnostic_is_not_a_model_column(self):
+        row = {
+            "other_improved_unclassified_urban_pct": 61.2813,
+            "other_improved_unclassified_rural_pct": 45.4635,
+            "borehole_urban_pct": 1.0,
+        }
+        mapped = breakdown_to_model_columns(row)
+        assert "OtherImprovedUnclassified_URBAN" not in mapped
+        assert all(
+            mapped[col] in (None, 1.0)
+            for col in (
+                "URBANPackaged",
+                "URBANDelivered",
+                "URBANBorehole",
+                "URBANOtherUnpiped",
+            )
+        )
+
+    def test_philippines_workbook_reports_the_remainder(self, raw_dir):
+        path = raw_dir / "PHL.xlsx"
+        if not path.exists():
+            pytest.skip("PHL JMP file not available")
+        _iso3, records, err = parse_country(path)
+        assert err is None
+        fies = [r for r in records if r["survey"] == "PHL_2023_FIES"]
+        assert fies, "PHL_2023_FIES block not found"
+        record = fies[0]
+        # FIES "community water system": 61.3pp urban / 45.5pp rural sit in the
+        # unextracted sub-'Other' rows of the row-99 block.
+        assert record["other_improved_unclassified_urban_pct"] == pytest.approx(
+            61.28, abs=0.05
+        )
+        assert record["other_improved_unclassified_rural_pct"] == pytest.approx(
+            45.46, abs=0.05
+        )
+        # and none of it leaked into a model category: Delivered is still just
+        # cart + tanker, OtherUnpiped still just wells/springs/rain/surface.
+        mapped = breakdown_to_model_columns(record)
+        assert mapped["URBANDelivered"] == pytest.approx(0.28, abs=0.05)
+        assert mapped["URBANOtherUnpiped"] == pytest.approx(3.64, abs=0.05)
+        assert (
+            mapped["URBANOtherUnpiped"]
+            < record["other_improved_unclassified_urban_pct"]
+        )
+
+
+class TestVariantWorkbookClassification:
+    """ISR/FLK ship admin-source ladder workbooks: survey blocks, no household
+    subcategory data. They are a documented exclusion, not a parser gap, and
+    must say so precisely instead of reading as a generic parse failure."""
+
+    @pytest.mark.parametrize("iso3", ["ISR", "FLK"])
+    def test_ladder_only_workbooks_are_classified(self, raw_dir, iso3):
+        path = raw_dir / f"{iso3}.xlsx"
+        if not path.exists():
+            pytest.skip(f"{iso3} JMP file not available")
+        parsed_iso3, records, err = parse_country(path)
+        assert parsed_iso3 == iso3
+        assert records == []
+        assert err == VARIANT_LADDER_ONLY_ERROR
+
+    @staticmethod
+    def _rows_with(row_idx, col, offset, value):
+        rows = [tuple([None] * 12) for _ in range(120)]
+        row = list(rows[row_idx])
+        row[col + offset] = value
+        rows[row_idx] = tuple(row)
+        return rows
+
+    def test_empty_subcategory_rows_read_as_no_data(self):
+        rows = [tuple([None] * 12) for _ in range(120)]
+        assert not _has_any_subcategory_cell(rows, [(1, "ISR_2018_PWH")])
+
+    def test_a_numeric_subcategory_cell_counts_as_data(self):
+        rows = self._rows_with(SUBCATEGORY_ROWS[0], 1, 3, 12.5)
+        assert _has_any_subcategory_cell(rows, [(1, "XXX_2020_CEN")])
+
+    def test_text_numbers_count_as_data_too(self):
+        # deliberately generous: the check exists to PROVE absence, so a value
+        # we merely failed to parse must never be classified as "nothing there"
+        rows = self._rows_with(SUBCATEGORY_ROWS[-1], 1, 4, "12.5")
+        assert _has_any_subcategory_cell(rows, [(1, "XXX_2020_CEN")])
+
+    def test_parent_row_99_alone_is_not_subcategory_data(self):
+        # ISR_2018_PWH carries a harmonized ladder "100" in row 99 and nothing
+        # else; that must not disqualify the ladder-only classification.
+        from jmp_source_parser import ROW_OTHER_IMPROVED
+
+        assert ROW_OTHER_IMPROVED not in SUBCATEGORY_ROWS
+        rows = self._rows_with(ROW_OTHER_IMPROVED, 1, 3, "100")
+        assert not _has_any_subcategory_cell(rows, [(1, "ISR_2018_PWH")])
+
+    def test_non_numeric_text_is_not_data(self):
+        rows = self._rows_with(SUBCATEGORY_ROWS[0], 1, 3, "No")
+        assert not _has_any_subcategory_cell(rows, [(1, "ISR_2011_DWQ")])
+
+    def test_only_isr_and_flk_trip_the_classification(self):
+        """Regression guard on the repo's own workbook set."""
+        errors_csv = (
+            Path(__file__).resolve().parents[1]
+            / "data"
+            / "processed"
+            / "semi-processed"
+            / "jmp_source_breakdown_errors.csv"
+        )
+        if not errors_csv.exists():
+            pytest.skip("errors CSV not built")
+        import pandas as pd
+
+        errors = pd.read_csv(errors_csv)
+        classified = sorted(
+            errors.loc[errors["error"] == VARIANT_LADDER_ONLY_ERROR, "iso3"]
+        )
+        assert classified == ["FLK", "ISR"]
 
 
 class TestCountryNameMapping:

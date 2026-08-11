@@ -1,3 +1,3 @@
 iso3,error
-FLK,1 survey blocks but no numeric data in the expected template rows (possible template variant)
-ISR,50 survey blocks but no numeric data in the expected template rows (possible template variant)
+FLK,"variant admin-source workbook: ladder estimates only, no household subcategory data (documented exclusion)"
+ISR,"variant admin-source workbook: ladder estimates only, no household subcategory data (documented exclusion)"

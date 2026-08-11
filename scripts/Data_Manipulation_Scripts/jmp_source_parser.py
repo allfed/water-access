@@ -14,8 +14,11 @@ JMP template row indices (0-based, verified across GHA/BGD/IDN/KEN/MEX/NLD):
   85  Rainwater
   88  Packaged water
   91  Surface water
+  99  Other improved sources     (parent of 100-103; diagnostic only)
   100 Cart with small tank/drum  (delivered water)
   101 Tanker truck provided      (delivered water)
+  102 Other                      (unclassifiable remainder of row 99)
+  103 Other                      (unclassifiable remainder of row 99)
   104 Other non-improved
 """
 
@@ -53,6 +56,29 @@ OTHER_UNPIPED_ROWS = [61, 73, 85, 91, 104]
 
 ROW_PIPED = 6
 ROW_NON_PIPED = 7
+# Parent row of the "Other improved sources" block. Its children are cart (100),
+# tanker (101) and one or two unlabelled "Other" rows (102-103) that no model
+# category can absorb without guessing (see UNALLOCATED_GAP_INVESTIGATION.md
+# §"row-99"). The remainder is extracted as a DIAGNOSTIC only: it stays out of
+# the five model categories and therefore lands in the sampled Unallocated
+# bucket, which is where ambiguous mass belongs.
+ROW_OTHER_IMPROVED = 99
+
+# Leaf rows that only a household survey can fill in (wells, springs,
+# rainwater, packaged, surface water, cart, tanker, other non-improved). A
+# workbook that lists survey blocks but leaves every one of these empty carries
+# no subcategory data to recover (see parse_country / VARIANT_LADDER_ONLY_ERROR).
+# ROW_OTHER_IMPROVED is deliberately NOT in this set: it is a parent aggregate,
+# and admin-source ladder blocks populate it with a harmonized "100" while
+# measuring no source type at all (ISR_2018_PWH does exactly that).
+SUBCATEGORY_ROWS = sorted(
+    set(BOREHOLE_ROWS + PACKAGED_ROWS + DELIVERED_ROWS + OTHER_UNPIPED_ROWS)
+)
+
+VARIANT_LADDER_ONLY_ERROR = (
+    "variant admin-source workbook: ladder estimates only, no household "
+    "subcategory data (documented exclusion)"
+)
 
 
 def _resolve_raw_dir(raw_dir: Path | None = None) -> Path:
@@ -101,6 +127,20 @@ def _sum_pct(
     return round(total, 4) if found else None
 
 
+def other_improved_unclassified_pct(
+    other_improved_pct: float | None, delivered_pct: float | None
+) -> float | None:
+    """Part of row 99 that cart + tanker do not explain (rows 102-103).
+
+    None when row 99 itself is absent — "unknown", never a manufactured zero.
+    Floored at 0 because rounding can make the children sum a hair past the
+    parent. Purely diagnostic: it is never added to a model category.
+    """
+    if other_improved_pct is None:
+        return None
+    return round(max(0.0, other_improved_pct - (delivered_pct or 0.0)), 4)
+
+
 def _extract_block_pcts(rows: list[tuple], col: int) -> dict[str, float | None]:
     out: dict[str, float | None] = {}
     for suffix, offset in (("urban", 3), ("rural", 4), ("total", 5)):
@@ -112,6 +152,12 @@ def _extract_block_pcts(rows: list[tuple], col: int) -> dict[str, float | None]:
         out[f"other_unpiped_{suffix}_pct"] = _sum_pct(
             rows, OTHER_UNPIPED_ROWS, col, offset
         )
+        other_improved = _pct_value(rows, ROW_OTHER_IMPROVED, col, offset)
+        out[f"other_improved_{suffix}_pct"] = other_improved
+        unclassified = other_improved_unclassified_pct(
+            other_improved, out[f"delivered_{suffix}_pct"]
+        )
+        out[f"other_improved_unclassified_{suffix}_pct"] = unclassified
     return out
 
 
@@ -128,6 +174,42 @@ def _survey_has_subcategory_data(record: dict[str, Any]) -> bool:
         "other_unpiped_rural_pct",
     )
     return any(record.get(key) is not None for key in keys)
+
+
+def _is_numeric_cell(value: Any) -> bool:
+    """True for a number, or for a number stored as text (e.g. the '100' that
+    admin-source ladder workbooks write into their survey blocks)."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    if isinstance(value, str):
+        try:
+            float(value.strip().replace("%", ""))
+        except ValueError:
+            return False
+        return True
+    return False
+
+
+def _has_any_subcategory_cell(rows: list[tuple], blocks: list[tuple]) -> bool:
+    """Whether ANY survey block holds a value in ANY household-subcategory row.
+
+    Used to tell a *variant layout we could parse harder* apart from a workbook
+    that simply has no subcategory data to give (ISR, FLK). Text is counted as
+    data here on purpose: the point is to prove absence, so the check is
+    deliberately generous about what it accepts as presence.
+    """
+    for col, _survey_id in blocks:
+        for row_idx in SUBCATEGORY_ROWS:
+            if row_idx >= len(rows):
+                continue
+            row = rows[row_idx]
+            for offset in (3, 4, 5):
+                idx = col + offset
+                if idx < len(row) and _is_numeric_cell(row[idx]):
+                    return True
+    return False
 
 
 def parse_country(path: Path) -> tuple[str, list[dict[str, Any]], str | None]:
@@ -178,9 +260,18 @@ def parse_country(path: Path) -> tuple[str, list[dict[str, Any]], str | None]:
 
     if blocks and not records:
         # The workbook lists surveys but none of the fixed template rows hold a
-        # number — ISR and FLK ship a variant layout whose data rows are offset.
-        # Reported instead of returning silently empty, which is how these
-        # countries used to disappear from the breakdown without a trace.
+        # number. Two very different situations hide behind that:
+        #
+        #  * ISR and FLK: admin-source "ladder" workbooks. Same 6-column block
+        #    grid, but the blocks carry only harmonized ladder estimates (often
+        #    stored as TEXT, e.g. "100") and every household subcategory row is
+        #    empty. There is nothing to recover, so these are a documented
+        #    exclusion rather than a parser gap — ISR's piped is ~100 (gap ~0)
+        #    and FLK is ~3,800 people.
+        #  * anything else: real subcategory numbers sit somewhere we did not
+        #    look, i.e. a genuine template variant worth a parser.
+        if not _has_any_subcategory_cell(rows, blocks):
+            return iso3, [], VARIANT_LADDER_ONLY_ERROR
         return (
             iso3,
             [],
@@ -364,6 +455,7 @@ def build_country_breakdown(
             "piped_reference_year": ref.get("piped_year"),
         }
         entry.update(breakdown_to_model_columns(normalized))
+        entry.update(diagnostic_columns(normalized))
         breakdown_rows.append(entry)
 
     return breakdown_rows
@@ -392,6 +484,35 @@ def breakdown_to_model_columns(row: dict[str, Any]) -> dict[str, float | None]:
         "RURALBorehole": borehole_rural,
         "URBANOtherUnpiped": other_urban,
         "RURALOtherUnpiped": other_rural,
+    }
+
+
+DIAGNOSTIC_COLUMNS = (
+    "OtherImprovedUnclassified_URBAN",
+    "OtherImprovedUnclassified_RURAL",
+)
+
+
+def diagnostic_columns(row: dict[str, Any]) -> dict[str, float | None]:
+    """Diagnostic (non-model) columns for the per-country breakdown.
+
+    ``OtherImprovedUnclassified_*`` is the part of JMP's "Other improved
+    sources" row that cart + tanker do not explain (rows 102-103): 45.5pp rural
+    / 61.3pp urban for the Philippines, where it is the FIES "community water
+    system" category. It is deliberately NOT folded into any of the five model
+    categories — its composition is ambiguous, so the mass belongs in the
+    sampled Unallocated bucket, which is exactly where it already lands. The
+    column exists so that fact is visible instead of invisible.
+
+    None stays None (unknown), and the same total -> urban/rural fallback the
+    model columns use applies, so total-only surveys report the diagnostic too.
+    """
+    urban, rural = resolve_urban_rural_with_total_fallback(
+        row, "other_improved_unclassified"
+    )
+    return {
+        "OtherImprovedUnclassified_URBAN": urban,
+        "OtherImprovedUnclassified_RURAL": rural,
     }
 
 

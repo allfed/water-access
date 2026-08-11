@@ -15,7 +15,10 @@ SCRIPT_DIR = (
 )
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import pytest  # noqa: E402
+
 from build_unified_source_breakdown import (  # noqa: E402
+    jmp_row_is_informative,
     reconcile_stratum_with_piped_budget,
 )
 
@@ -200,6 +203,55 @@ class TestValidator:
         problems = validate(unified, piped_reference={})
         assert problems[problems["field"] == "URBAN"].empty
 
+    def test_row99_remainder_over_tolerance_is_reported(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        row = self._row("PHL", urban={"Borehole": 1.0}, rural={"Borehole": 1.0})
+        row["OtherImprovedUnclassified_URBAN"] = 61.2813
+        row["OtherImprovedUnclassified_RURAL"] = 45.4635
+        problems = validate(
+            pd.DataFrame([row]),
+            piped_reference={"PHL": {"URBANPiped": 60.0, "RURALPiped": 30.0}},
+        )
+        flagged = problems[
+            problems["field"].str.contains("OtherImprovedUnclassified", na=False)
+        ]
+        assert sorted(flagged["field"]) == [
+            "RURALOtherImprovedUnclassified",
+            "URBANOtherImprovedUnclassified",
+        ]
+        assert flagged["value"].tolist() == [61.28, 45.46]
+        assert all("unallocated by design" in p for p in flagged["problem"])
+
+    def test_small_or_missing_remainder_is_not_reported(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        row = self._row("KEN", urban={"Borehole": 1.0})
+        row["OtherImprovedUnclassified_URBAN"] = 2.0  # at the tolerance, not over
+        row["OtherImprovedUnclassified_RURAL"] = pd.NA
+        problems = validate(
+            pd.DataFrame([row]),
+            piped_reference={"KEN": {"URBANPiped": 60.0, "RURALPiped": 30.0}},
+        )
+        assert problems[
+            problems["field"].str.contains("OtherImprovedUnclassified", na=False)
+        ].empty
+
+    def test_validator_tolerates_frames_without_the_diagnostic(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        unified = pd.DataFrame([self._row("KEN", urban={"Borehole": 10.0})])
+        problems = validate(
+            unified, piped_reference={"KEN": {"URBANPiped": 60.0, "RURALPiped": 30.0}}
+        )
+        assert problems.empty
+
     def test_coverage_gap_is_reported(self):
         import pandas as pd
 
@@ -213,3 +265,95 @@ class TestValidator:
         )
         coverage = problems[problems["field"] == "coverage"]
         assert sorted(coverage["alpha3"]) == ["NIC", "TWN"]
+
+
+class TestBestSourceWins:
+    """A JMP row only outranks a research fill when it measured something.
+
+    ROU_2012_EUSILC / BIH_2015_HBS carry nothing but the OtherUnpiped catch-all;
+    letting them win deleted Romania's 37% rural borehole share (census) — the
+    wrong direction for the very review comment this branch answers.
+    """
+
+    @staticmethod
+    def _row(**kwargs):
+        import pandas as pd
+
+        row = {
+            col: kwargs.get(col, 0.0)
+            for col in (
+                "URBANPackaged",
+                "RURALPackaged",
+                "URBANDelivered",
+                "RURALDelivered",
+                "URBANBorehole",
+                "RURALBorehole",
+                "URBANOtherUnpiped",
+                "RURALOtherUnpiped",
+            )
+        }
+        row.update({k: v for k, v in kwargs.items() if k not in row})
+        return pd.Series(row)
+
+    def test_catch_all_only_row_is_not_informative(self):
+        # ROU_2012_EUSILC as shipped: 10 urban / 65 rural OtherUnpiped, nothing else
+        assert not jmp_row_is_informative(
+            self._row(URBANOtherUnpiped=10.0, RURALOtherUnpiped=65.0)
+        )
+
+    def test_all_zero_row_is_not_informative(self):
+        assert not jmp_row_is_informative(self._row())
+
+    @pytest.mark.parametrize(
+        "col", ["URBANPackaged", "RURALDelivered", "RURALBorehole"]
+    )
+    def test_any_positive_measured_category_is_informative(self, col):
+        assert jmp_row_is_informative(self._row(**{col: 0.9}))
+
+    def test_missing_values_are_not_informative(self):
+        import pandas as pd
+
+        assert not jmp_row_is_informative(
+            pd.Series(
+                {
+                    "URBANPackaged": pd.NA,
+                    "RURALBorehole": None,
+                    "RURALOtherUnpiped": 65.0,
+                }
+            )
+        )
+
+    def test_plain_dict_row_works_too(self):
+        assert jmp_row_is_informative({"URBANBorehole": 5.0})
+        assert not jmp_row_is_informative({"URBANOtherUnpiped": 5.0})
+
+
+class TestUnifiedCsvBestSourceOutcome:
+    """Regression on the built artifact: ROU/BIH must keep their research fills."""
+
+    @staticmethod
+    def _unified():
+        import pandas as pd
+
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "data"
+            / "processed"
+            / "semi-processed"
+            / "jmp_source_breakdown_unified.csv"
+        )
+        if not path.exists():
+            pytest.skip("unified breakdown not built")
+        return pd.read_csv(path).set_index("alpha3")
+
+    @pytest.mark.parametrize("alpha3", ["ROU", "BIH"])
+    def test_demoted_countries_ship_research_boreholes(self, alpha3):
+        row = self._unified().loc[alpha3]
+        assert row["data_origin"] == "research"
+        assert row["RURALBorehole"] > 0
+        assert "demoted" in str(row["research_notes"])
+
+    def test_an_informative_jmp_row_still_wins(self):
+        unified = self._unified()
+        # Kenya-style: a real household survey, research fill (if any) stays out
+        assert unified.loc["KEN", "data_origin"] == "jmp"
