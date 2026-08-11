@@ -391,8 +391,8 @@ def main() -> int:
         jmp_survey = str(jmp_survey) if pd.notna(jmp_survey) else "unnamed survey"
         note = (
             f"JMP row demoted: {jmp_survey} reported no packaged, delivered or "
-            "borehole value (catch-all OtherUnpiped only), so the research fill "
-            "is the better source"
+            "borehole value (at most a catch-all OtherUnpiped), so the research "
+            "fill is the better source"
         )
         r = research_by_alpha3.loc[alpha3]
         research_source = r.get("source")
