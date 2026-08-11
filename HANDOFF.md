@@ -46,10 +46,12 @@ Run the full NUM_ITERATIONS=1000 production Monte Carlo via
 a leftover checkpoint silently restores the OLD parameter arrays and
 leftover parquets count as completed iterations (hazard notes are in the
 script and deploy-spot.sh). Scenario logic lives in the
-`urban/rural_borehole_lose_fraction` parameters of
-`gis_global_module.calculate_population_water_access()` (HEMP vs CIL as
-different parameter ranges), NOT baked into the dataset — per Kevin's
-decision. Don't quote anything run on the old code-default fractions.
+`urban/rural_borehole_lose_fraction` AND `unallocated_vulnerable_fraction`
+parameters of `gis_global_module.calculate_population_water_access()`
+(HEMP vs CIL as different parameter ranges), NOT baked into the dataset —
+per Kevin's decision. Don't quote anything run on the old code-default
+fractions. Note a checkpoint that predates `unallocated_vulnerable_fractions`
+is rejected loudly — wipe and restart rather than resuming across it.
 
 Merge note for `kr/30as-feasibility`: that branch reintroduces its own
 `run_monte_carlo.py` (the 30as CLI harness) plus a shared sampling module
@@ -70,20 +72,32 @@ the lose-fraction sampling from `run_monte_carlo_gcp.py` into
 - Venezuela source breakdown still deliberately unfilled (ENCOVI microdata is
   the fix); retrievable-but-not-retrieved sources listed in
   `HANDOVER_unified_source_breakdown.md` §follow-ups.
-- USA rural / SLB urban sum >100 in merged_data: root cause now known
-  (`jmp_source_parser.py` takes the latest WHO year's piped value even when
-  that cell is blank, so 25 strata skip unpiped-budget normalisation; only
-  these two visibly break 100). Deliberately untouched — harmless to model
-  outputs because the resilient share is a residual, not a sum.
-- Deferred from the 2026-08-11 three-agent review (Kevin holds both):
-  (a) downhill walking velocity is uncapped and peaks at 3.74 m/s (~13.5
+- **RESOLVED 2026-08-11 (commits 3a4c507, 53f6788):** the 348M share-sum
+  gap and the USA/SLB >100 rows. Investigation in
+  `UNALLOCATED_GAP_INVESTIGATION.md`; implementation: parser reference and
+  extraction fixes, JMP-ladder fill into OtherUnpiped (~128M, audit CSV in
+  semi-processed), explicit `URBAN/RURALUnallocated` columns (169.5M
+  people), and the sampled `unallocated_vulnerable_fraction` parameter
+  (Uniform(0,1) in the GCP driver; deterministic scenarios: 0 = old
+  behaviour, "prorata" = central, 1 = all-vulnerable). Every stratum's six
+  shares now sum to exactly 100. Air-gapped verifier: SHIP, all criteria
+  reproduced.
+- **Open follow-ups from that change (Kevin holds the first):**
+  (a) ROU/BIH now select sparse EUSILC/HBS JMP rows and the "JMP beats
+  research" rule demotes richer research fills (ROU rural borehole 37→0,
+  wrong direction for review comment 2; loud WARNING in the build output).
+  Candidate fix is a per-category merge — JMP wins only where it measured —
+  but that refines a Kevin decision, so it awaits his call. (b) Parser
+  still ignores the "Other improved sources" sub-'Other' rows (102–103);
+  a validator warning when row-99 total ≫ cart+tanker was specced
+  (memo §6 L1.3) but not yet implemented — matters for PHL (45–61pp).
+  (c) ISR/FLK workbooks use a variant row layout and land in
+  jmp_source_breakdown_errors.csv rather than parsing. (d) ITA relabelled
+  research→jmp with identical values (benign, noting for provenance).
+- Deferred from the 2026-08-11 three-agent review (Kevin holds):
+  downhill walking velocity is uncapped and peaks at 3.74 m/s (~13.5
   km/h) around 6° downhill — an artifact of the Lankford polynomial exposed
   by the slope-units fix; capping it is a modelling decision, not plumbing.
-  (b) ~348M people (4.4% of world pop) sit in the share-sum gap (source
-  columns sum <100) and are implicitly classed as retaining access via the
-  resilient residual — Kevin is investigating with a separate agent; do not
-  quietly "fix" the residual to use `zone_pop_other_unpiped` (dead column),
-  as that reclassifies those 348M and jumps the headline number.
 
 ## Decisions made (don't relitigate without new information)
 
