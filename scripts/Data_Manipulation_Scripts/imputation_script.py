@@ -594,15 +594,18 @@ def reconcile_research_breakdown_with_piped(df):
     100 - sum(categories). Without this, piped + packaged/borehole users sum
     past 100% and the model double-counts the affected population.
 
-    JMP-origin rows are left untouched: the parser already fitted them to
-    its own piped reference (normalize_unpiped_subcategories).
+    JMP-origin rows are included too. The parser already fitted them to its own
+    WHO reference, so this is a no-op for almost all of them; it is not a no-op
+    where the piped share this script ships differs from the reference the
+    parser saw (e.g. strata whose reference was missing), which is exactly how
+    USA-rural and SLB-urban shipped category sums of 138.7 and 116.3.
     """
     from build_unified_source_breakdown import reconcile_stratum_with_piped_budget
 
     if "data_origin" not in df.columns:
         return df
     categories = ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
-    for idx in df.index[df["data_origin"] == "research"]:
+    for idx in df.index[df["data_origin"].isin(("research", "jmp"))]:
         for stratum in ("URBAN", "RURAL"):
             piped = df.at[idx, f"{stratum}Piped"]
             values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
@@ -633,6 +636,12 @@ def reconcile_research_rows_with_final_piped(df, spatial_track):
     - piped was measured: same rule as the build script
       (reconcile_stratum_with_piped_budget); a no-op for rows the earlier
       pass already fitted.
+
+    JMP-origin rows are also swept, with the scale-down rule always applied
+    (never the piped-lowering branch): a JMP row's piped share is the model's
+    headline input and is not overwritten by survey subcategories, but the
+    subcategories must still fit inside 100 - piped so the five shares can
+    never sum past 100.
     """
     from build_unified_source_breakdown import reconcile_stratum_with_piped_budget
 
@@ -640,8 +649,9 @@ def reconcile_research_rows_with_final_piped(df, spatial_track):
         return df
     categories = ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
     track = spatial_track.drop_duplicates("alpha3").set_index("alpha3")
-    for idx in df.index[df["data_origin"] == "research"]:
+    for idx in df.index[df["data_origin"].isin(("research", "jmp"))]:
         alpha3 = df.at[idx, "alpha3"]
+        origin = df.at[idx, "data_origin"]
         for stratum in ("URBAN", "RURAL"):
             piped_col = f"{stratum}Piped"
             piped = df.at[idx, piped_col]
@@ -649,8 +659,10 @@ def reconcile_research_rows_with_final_piped(df, spatial_track):
                 continue
             values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
             total = sum(v for v in values.values() if pd.notna(v))
-            piped_was_imputed = alpha3 in track.index and pd.notna(
-                track.at[alpha3, piped_col]
+            piped_was_imputed = (
+                origin == "research"
+                and alpha3 in track.index
+                and pd.notna(track.at[alpha3, piped_col])
             )
             if piped_was_imputed:
                 if piped + total > 100.0:
@@ -688,6 +700,175 @@ def prepare_source_breakdown_columns(df):
     for col in source_cols:
         df[col] = df[col].clip(lower=0, upper=100)
 
+    return df
+
+
+SOURCE_CATEGORIES = ("Piped", "Packaged", "Delivered", "Borehole", "OtherUnpiped")
+# Sum of the five source shares plus Unallocated may exceed 100 by at most this
+# much (rounding only) before the ladder-fill step refuses to write its output.
+LADDER_SUM_TOLERANCE = 0.5
+
+
+def load_who_ladder_shares(water_csv_path):
+    """Latest-year urban/rural 'unimproved + surface water' shares per alpha3.
+
+    Same WHO 2023 vintage as the piped shares the model ships, so the two are
+    directly comparable. Each column independently takes the most recent year
+    that has a value; a country present in the WHO file but missing a given
+    column is read as zero (the JMP ladder reports zero shares as blanks),
+    while a country absent from the file altogether is simply not returned.
+    """
+    ladder_cols = [
+        "URBANUnimproved",
+        "URBANSurface water",
+        "RURALUnimproved",
+        "RURALSurface water",
+    ]
+    df = pd.read_csv(water_csv_path, low_memory=False)
+    df = df.replace({"<1": 0.5, ">99": 100, "-": pd.NA})
+    missing = [col for col in ladder_cols if col not in df.columns]
+    if missing:
+        raise ValueError(f"WHO water CSV is missing ladder columns: {missing}")
+    for col in ladder_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Import the parser's mapping helper so the Niger/Nigeria fuzzy-match fix
+    # (and its collision guard) applies here too, rather than being reinvented.
+    from jmp_source_parser import (
+        DEFAULT_MANUAL_ALPHA3_MAPPING,
+        map_country_names_to_alpha3,
+    )
+
+    alpha3_by_name = map_country_names_to_alpha3(
+        df["Country"], manual_alpha3_mapping=DEFAULT_MANUAL_ALPHA3_MAPPING
+    )
+    df["alpha3"] = df["Country"].map(alpha3_by_name)
+    df = df[df["alpha3"].notna()]
+
+    shares = {}
+    for alpha3, group in df.groupby("alpha3", sort=False):
+        group = group.sort_values("Year", ascending=False)
+        entry = {}
+        for col in ladder_cols:
+            values = group[col].dropna()
+            entry[col] = float(values.iloc[0]) if not values.empty else 0.0
+        shares[alpha3] = entry
+    return shares
+
+
+def apply_ladder_fill_and_unallocated(df, water_csv_path, report_path=None):
+    """Make the residual explicit: ladder-backed fill plus an Unallocated column.
+
+    Every stratum's five source shares (piped + the four unpiped categories)
+    routinely sum to less than 100 — survey subcategories do not tile the JMP
+    harmonised piped estimate. That gap used to disappear into a silent
+    residual downstream, which implicitly classified all of it as resilient.
+
+    Here it is split into two named parts:
+      * the share JMP itself places on unimproved sources or surface water
+        (same 2023 vintage) is moved into OtherUnpiped, capped by the gap;
+      * whatever gap remains becomes URBANUnallocated / RURALUnallocated,
+        i.e. mass whose source type is genuinely unknown after harmonisation.
+
+    Writes a per-stratum audit CSV and raises if the resulting six shares are
+    out of range, contain NaN, or sum past 100 by more than rounding.
+    """
+    ladder = load_who_ladder_shares(water_csv_path)
+
+    for stratum in ("URBAN", "RURAL"):
+        for col in [f"{stratum}{cat}" for cat in SOURCE_CATEGORIES]:
+            if col not in df.columns:
+                raise ValueError(f"missing source column {col}")
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    report_rows = []
+    nan_piped = []
+    for idx in df.index:
+        alpha3 = df.at[idx, "alpha3"]
+        country_ladder = ladder.get(alpha3)
+        for stratum in ("URBAN", "RURAL"):
+            values = {}
+            for cat in SOURCE_CATEGORIES:
+                value = df.at[idx, f"{stratum}{cat}"]
+                if pd.isna(value):
+                    if cat == "Piped":
+                        nan_piped.append((alpha3, stratum))
+                    value = 0.0
+                values[cat] = float(value)
+            gap = max(0.0, 100.0 - sum(values.values()))
+
+            if country_ladder is None:
+                available = 0.0
+            else:
+                available = (
+                    country_ladder[f"{stratum}Unimproved"]
+                    + country_ladder[f"{stratum}Surface water"]
+                )
+            fill = min(gap, max(0.0, available))
+            unallocated = round(gap - fill, 6)
+
+            if fill > 0:
+                df.at[idx, f"{stratum}OtherUnpiped"] = round(
+                    values["OtherUnpiped"] + fill, 6
+                )
+            df.at[idx, f"{stratum}Unallocated"] = max(0.0, unallocated)
+            report_rows.append(
+                {
+                    "alpha3": alpha3,
+                    "stratum": stratum,
+                    "gap": round(gap, 4),
+                    "ladder_available": round(available, 4),
+                    "fill": round(fill, 4),
+                    "unallocated": round(max(0.0, unallocated), 4),
+                    "who_ladder_row": country_ladder is not None,
+                }
+            )
+
+    if nan_piped:
+        print(
+            f"WARNING: {len(nan_piped)} strata had a missing piped share and were "
+            f"treated as 0 in the ladder fill: {sorted(set(nan_piped))[:10]}"
+        )
+
+    # Post-conditions. These are cheap and catch every failure mode the
+    # investigation memo found (>100 sums, NaN categories, negative residuals).
+    checked_cols = [
+        f"{stratum}{cat}"
+        for stratum in ("URBAN", "RURAL")
+        for cat in SOURCE_CATEGORIES + ("Unallocated",)
+    ]
+    for col in checked_cols:
+        if df[col].isna().any():
+            bad = df.loc[df[col].isna(), "alpha3"].tolist()
+            raise ValueError(f"{col} contains NaN after ladder fill: {bad}")
+        out_of_range = df.loc[(df[col] < 0) | (df[col] > 100), ["alpha3", col]]
+        if not out_of_range.empty:
+            raise ValueError(
+                f"{col} outside [0, 100] after ladder fill:\n{out_of_range}"
+            )
+    for stratum in ("URBAN", "RURAL"):
+        total = sum(
+            df[f"{stratum}{cat}"] for cat in SOURCE_CATEGORIES + ("Unallocated",)
+        )
+        over = df.loc[total > 100.0 + LADDER_SUM_TOLERANCE, ["alpha3"]].copy()
+        if not over.empty:
+            over["sum"] = total[total > 100.0 + LADDER_SUM_TOLERANCE].round(2)
+            raise ValueError(
+                f"{stratum} source shares + Unallocated sum past "
+                f"{100.0 + LADDER_SUM_TOLERANCE}:\n{over.to_string(index=False)}"
+            )
+
+    report = pd.DataFrame(report_rows)
+    if report_path is not None:
+        Path(report_path).parent.mkdir(parents=True, exist_ok=True)
+        report.to_csv(report_path, index=False)
+    filled_strata = int((report["fill"] > 0).sum())
+    print(
+        f"ladder fill: {filled_strata} strata gained OtherUnpiped mass "
+        f"(mean fill {report['fill'].mean():.2f}pp); "
+        f"mean unallocated {report['unallocated'].mean():.2f}pp, "
+        f"max {report['unallocated'].max():.2f}pp"
+    )
     return df
 
 
@@ -1212,8 +1393,8 @@ def main(
     df_output = add_back_percentage_urban_data(df_output, df_water)
     df_output = prepare_source_breakdown_columns(df_output)
 
-    # Final consistency pass: research-filled breakdowns vs the piped values
-    # that actually ship (some piped shares only exist after imputation)
+    # Final consistency pass: research- and JMP-filled breakdowns vs the piped
+    # values that actually ship (some piped shares only exist after imputation)
     if not df_source_breakdown.empty and "data_origin" in df_source_breakdown.columns:
         df_output = df_output.merge(
             df_source_breakdown[["alpha3", "data_origin"]], on="alpha3", how="left"
@@ -1221,6 +1402,14 @@ def main(
         df_output = reconcile_research_rows_with_final_piped(
             df_output, df_spatial_imputation_track
         )
+
+    # Make the leftover share explicit (ladder-backed fill + Unallocated).
+    # Runs last so it sees the piped and category values that actually ship.
+    df_output = apply_ladder_fill_and_unallocated(
+        df_output,
+        water_JMP_file_path,
+        report_path=semi_processed_dir / "ladder_fill_report.csv",
+    )
 
     # Save dataframes as CSV
     try:
@@ -1237,19 +1426,23 @@ def main(
         )
 
 
-preprocess_country_info_file(country_info_csv_path, country_info_output_file_path)
-main(
-    water_JMP_file_path,
-    bicycle_file_path,
-    gdp_per_capita_file_path,
-    bmi_women_file_path,
-    bmi_men_file_path,
-    height_file_path,
-    population_file_path,
-    country_info_output_file_path,
-    household_size_file_path,
-    country_regions_file_path,
-)
+# Guarded so the helper functions above can be imported (by tests, or by other
+# scripts) without re-running the whole pipeline as an import side effect.
+# Running the file as a script is unchanged.
+if __name__ == "__main__":
+    preprocess_country_info_file(country_info_csv_path, country_info_output_file_path)
+    main(
+        water_JMP_file_path,
+        bicycle_file_path,
+        gdp_per_capita_file_path,
+        bmi_women_file_path,
+        bmi_men_file_path,
+        height_file_path,
+        population_file_path,
+        country_info_output_file_path,
+        household_size_file_path,
+        country_regions_file_path,
+    )
 
 
 # # Assuming you have an existing DataFrame `df_existing`

@@ -11,6 +11,7 @@ import pytest
 import os
 import tempfile
 import shutil
+from pathlib import Path
 
 
 class TestSampleNormal:
@@ -472,3 +473,116 @@ class TestProcessMCResults:
         # Act & Assert
         with pytest.raises(TypeError):
             process_mc_results(simulation_results, plot=False, output_dir=output_dir)
+
+
+def _load_gcp_driver():
+    """Import scripts/run_monte_carlo_gcp.py as a module (it is not a package)."""
+    import importlib.util
+
+    driver_path = (
+        Path(__file__).resolve().parent.parent / "scripts" / "run_monte_carlo_gcp.py"
+    )
+    spec = importlib.util.spec_from_file_location("run_monte_carlo_gcp", driver_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestUnallocatedVulnerableFractionThreading:
+    """run_simulation must accept and forward the unallocated-allocation parameter."""
+
+    BASE_ARGS = (1, 5.0, 10.0, 20.0, 3.0, 75.0, "flat_uphill", 1.2, 1.5)
+
+    def _patched_run_simulation(self, monkeypatch, **kwargs):
+        captured = {}
+
+        def fake_run_global_analysis(**call_kwargs):
+            captured.update(call_kwargs)
+            return "countries", "districts", "zones"
+
+        monkeypatch.setattr(
+            src.gis_monte_carlo.gis, "run_global_analysis", fake_run_global_analysis
+        )
+        result = run_simulation(*self.BASE_ARGS, **kwargs)
+        return result, captured
+
+    def test_defaults_to_zero_and_forwards_it(self, monkeypatch):
+        _, captured = self._patched_run_simulation(monkeypatch)
+        assert captured["unallocated_vulnerable_fraction"] == 0.0
+
+    @pytest.mark.parametrize("value", [0.0, 0.5, 1.0, "prorata"])
+    def test_forwards_scalar_and_prorata(self, monkeypatch, value):
+        _, captured = self._patched_run_simulation(
+            monkeypatch, unallocated_vulnerable_fraction=value
+        )
+        assert captured["unallocated_vulnerable_fraction"] == value
+
+    @pytest.mark.parametrize("bad_value", [-0.1, 1.5, "banana", None])
+    def test_invalid_value_raises_assertion_error(self, monkeypatch, bad_value):
+        with pytest.raises(AssertionError):
+            self._patched_run_simulation(
+                monkeypatch, unallocated_vulnerable_fraction=bad_value
+            )
+
+
+class TestGcpDriverSamplesUnallocatedFraction:
+    def test_sample_parameters_records_the_new_parameter(self):
+        driver = _load_gcp_driver()
+        params = driver.sample_parameters(50)
+
+        assert "unallocated_vulnerable_fractions" in params
+        drawn = params["unallocated_vulnerable_fractions"]
+        assert len(drawn) == 50
+        assert all(0.0 <= g <= 1.0 for g in drawn)
+        # Uniform(0, 1), so the draws must vary and span the range
+        assert len(set(drawn)) > 1
+        assert min(drawn) < 0.25 and max(drawn) > 0.75
+        # Every parameter is logged with one value per iteration
+        assert all(len(values) == 50 for values in params.values())
+
+    def test_fixed_scenario_value_pins_every_iteration(self, monkeypatch):
+        driver = _load_gcp_driver()
+        monkeypatch.setattr(driver, "UNALLOCATED_VULNERABLE_FRACTION_FIXED", "prorata")
+        params = driver.sample_parameters(10)
+        assert params["unallocated_vulnerable_fractions"] == ["prorata"] * 10
+
+    def test_sampled_parameters_csv_gains_the_column(self, tmp_path):
+        driver = _load_gcp_driver()
+        driver.SAMPLED_PARAMETERS_FILE = tmp_path / "sampled_parameters.csv"
+        params = driver.sample_parameters(7)
+
+        driver.save_sampled_parameters(params)
+
+        written = pd.read_csv(driver.SAMPLED_PARAMETERS_FILE)
+        assert "unallocated_vulnerable_fractions" in written.columns
+        assert "urban_borehole_lose_fractions" in written.columns
+        assert list(written["iteration"]) == list(range(7))
+        np.testing.assert_allclose(
+            written["unallocated_vulnerable_fractions"].to_numpy(),
+            np.array(params["unallocated_vulnerable_fractions"]),
+        )
+
+    def test_worker_forwards_the_parameter_to_run_simulation(
+        self, tmp_path, monkeypatch
+    ):
+        driver = _load_gcp_driver()
+        driver.PARQUET_PATH = tmp_path
+        captured = {}
+
+        def fake_run_simulation(*args, **kwargs):
+            captured.update(kwargs)
+            frame = pd.DataFrame(
+                {
+                    "fid": [1],
+                    "zone_pop_with_water": [1.0],
+                    "zone_pop_without_water": [2.0],
+                }
+            )
+            return frame, frame, frame
+
+        monkeypatch.setattr(driver.mc, "run_simulation", fake_run_simulation)
+
+        driver.run_and_save_simulation(
+            0, 1, 5.0, 10.0, 20.0, 3.0, 75.0, "flat_uphill", 1.2, 1.5, 0.7, 0.3, 0.42
+        )
+        assert captured["unallocated_vulnerable_fraction"] == 0.42

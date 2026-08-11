@@ -762,6 +762,8 @@ class TestCalculatePopulationWaterAccess:
                 "RURALPiped": [30, 40, 50],
                 "URBANNon-piped": [20, 30, 40],
                 "RURALNon-piped": [10, 20, 30],
+                "URBANUnallocated": [50.0, 40.0, 30.0],
+                "RURALUnallocated": [70.0, 60.0, 50.0],
                 "dtw_1": [100, 200, 300],
                 "max distance cycling": [500, 600, 700],
                 "max distance walking": [200, 300, 400],
@@ -780,6 +782,11 @@ class TestCalculatePopulationWaterAccess:
                 "RURALPiped": [30, 40, 50],
                 "URBANNon-piped": [20, 30, 40],
                 "RURALNon-piped": [10, 20, 30],
+                # Unallocated closes each stratum's shares to exactly 100, so
+                # with the default g = 0 the resilient population matches the
+                # pre-Unallocated residual behaviour exactly.
+                "URBANUnallocated": [50.0, 40.0, 30.0],
+                "RURALUnallocated": [70.0, 60.0, 50.0],
                 "dtw_1": [100, 200, 500],
                 "max distance cycling": [500, 600, 700],
                 "max distance walking": [200, 300, 400],
@@ -845,6 +852,8 @@ class TestCalculatePopulationWaterAccess:
                 "RURALDelivered": [5.0],
                 "URBANBorehole": [5.0],
                 "RURALBorehole": [20.0],
+                "URBANUnallocated": [15.0],
+                "RURALUnallocated": [45.0],
                 "dtw_1": [500],
                 "max distance cycling": [100],
                 "max distance walking": [50],
@@ -872,6 +881,8 @@ class TestCalculatePopulationWaterAccess:
                 "RURALDelivered": [0.0],
                 "URBANBorehole": [0.0],
                 "RURALBorehole": [0.0],
+                "URBANUnallocated": [0.0],
+                "RURALUnallocated": [100.0],
                 "dtw_1": [10],
                 "max distance cycling": [100],
                 "max distance walking": [50],
@@ -880,7 +891,331 @@ class TestCalculatePopulationWaterAccess:
         )
         result = calculate_population_water_access(df_zones)
         assert result["zone_pop_with_water"].iloc[0] == pytest.approx(1000.0)
-        assert result["population_affected_with_access"].iloc[0] == pytest.approx(1000.0)
+        assert result["population_affected_with_access"].iloc[0] == pytest.approx(
+            1000.0
+        )
+
+
+def _unallocated_zones_fixture():
+    """Synthetic zones whose six source shares sum to exactly 100 per stratum.
+
+    Deliberately mixes a fully-urban, a fully-rural and a blended zone so that
+    urban/rural blending is exercised, and gives the two strata different
+    source mixes so a pro-rata g differs between them.
+    """
+    return pd.DataFrame(
+        {
+            "alpha3": ["AAA", "BBB", "CCC"],
+            "pop_zone": [1000.0, 2000.0, 3000.0],
+            "urban_rural": [1.0, 0.0, 0.4],
+            "URBANPiped": [60.0, 50.0, 40.0],
+            "URBANPackaged": [10.0, 5.0, 5.0],
+            "URBANDelivered": [5.0, 5.0, 5.0],
+            "URBANBorehole": [10.0, 20.0, 20.0],
+            "URBANOtherUnpiped": [5.0, 10.0, 10.0],
+            "URBANUnallocated": [10.0, 10.0, 20.0],
+            "RURALPiped": [30.0, 20.0, 10.0],
+            "RURALPackaged": [5.0, 5.0, 0.0],
+            "RURALDelivered": [5.0, 0.0, 5.0],
+            "RURALBorehole": [20.0, 25.0, 30.0],
+            "RURALOtherUnpiped": [30.0, 40.0, 35.0],
+            "RURALUnallocated": [10.0, 10.0, 20.0],
+            "dtw_1": [100.0, 200.0, 500.0],
+            "max distance cycling": [500.0, 600.0, 700.0],
+            "max distance walking": [200.0, 300.0, 400.0],
+            "PBO": [80.0, 90.0, 100.0],
+        }
+    )
+
+
+class TestUnallocatedVulnerableFraction:
+    """Explicit accounting for the unallocated (unknown-source) population."""
+
+    LOSE_FRACTIONS = {
+        "urban_borehole_lose_fraction": 0.7,
+        "rural_borehole_lose_fraction": 0.3,
+    }
+
+    @pytest.mark.parametrize(
+        "unallocated_vulnerable_fraction", [0.0, 0.5, 1.0, "prorata"]
+    )
+    def test_affected_plus_resilient_equals_zone_population(
+        self, unallocated_vulnerable_fraction
+    ):
+        # The whole point of dropping the residual: nobody is created or lost.
+        df_zones = _unallocated_zones_fixture()
+        result = calculate_population_water_access(
+            df_zones,
+            unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
+            **self.LOSE_FRACTIONS,
+        )
+        total = result["zone_pop_affected"] + result["zone_pop_unpiped_resilient"]
+        np.testing.assert_allclose(total.to_numpy(), result["pop_zone"].to_numpy())
+
+    def test_g_zero_reproduces_old_residual_behaviour(self):
+        df_zones = _unallocated_zones_fixture()
+        f_u = self.LOSE_FRACTIONS["urban_borehole_lose_fraction"]
+        f_r = self.LOSE_FRACTIONS["rural_borehole_lose_fraction"]
+
+        # The pre-Unallocated formula: resilient as a clipped residual.
+        old_resilient = (
+            df_zones["pop_zone"]
+            * df_zones["urban_rural"]
+            * (
+                100
+                - df_zones["URBANPiped"]
+                - df_zones["URBANPackaged"]
+                - df_zones["URBANDelivered"]
+                - df_zones["URBANBorehole"] * f_u
+            )
+            / 100
+            + df_zones["pop_zone"]
+            * (1 - df_zones["urban_rural"])
+            * (
+                100
+                - df_zones["RURALPiped"]
+                - df_zones["RURALPackaged"]
+                - df_zones["RURALDelivered"]
+                - df_zones["RURALBorehole"] * f_r
+            )
+            / 100
+        ).clip(lower=0)
+
+        result = calculate_population_water_access(
+            df_zones,
+            unallocated_vulnerable_fraction=0.0,
+            **self.LOSE_FRACTIONS,
+        )
+        np.testing.assert_allclose(
+            result["zone_pop_unpiped_resilient"].to_numpy(),
+            old_resilient.to_numpy(),
+        )
+
+    def test_g_one_moves_all_unallocated_into_affected(self):
+        baseline = calculate_population_water_access(
+            _unallocated_zones_fixture(),
+            unallocated_vulnerable_fraction=0.0,
+            **self.LOSE_FRACTIONS,
+        )
+        vulnerable = calculate_population_water_access(
+            _unallocated_zones_fixture(),
+            unallocated_vulnerable_fraction=1.0,
+            **self.LOSE_FRACTIONS,
+        )
+        np.testing.assert_allclose(
+            vulnerable["zone_pop_affected"].to_numpy(),
+            (
+                baseline["zone_pop_affected"] + baseline["zone_pop_unallocated"]
+            ).to_numpy(),
+        )
+        np.testing.assert_allclose(
+            vulnerable["zone_pop_unallocated_resilient"].to_numpy(), 0.0, atol=1e-9
+        )
+        # ... and nothing unallocated is left in the resilient bucket.
+        np.testing.assert_allclose(
+            vulnerable["zone_pop_unpiped_resilient"].to_numpy(),
+            (
+                baseline["zone_pop_other_unpiped"]
+                + baseline["zone_pop_borehole_resilient"]
+            ).to_numpy(),
+        )
+
+    def test_unallocated_population_is_urban_rural_blended(self):
+        result = calculate_population_water_access(
+            _unallocated_zones_fixture(),
+            unallocated_vulnerable_fraction=0.0,
+            **self.LOSE_FRACTIONS,
+        )
+        # AAA fully urban: 10% of 1000. BBB fully rural: 10% of 2000.
+        # CCC 40% urban: 3000 * (0.4*20 + 0.6*20) / 100.
+        np.testing.assert_allclose(
+            result["zone_pop_unallocated"].to_numpy(), [100.0, 200.0, 600.0]
+        )
+
+    def test_prorata_matches_hand_computed_single_stratum_example(self):
+        df_zones = pd.DataFrame(
+            {
+                "alpha3": ["AAA"],
+                "pop_zone": [1000.0],
+                "urban_rural": [1.0],
+                "URBANPiped": [40.0],
+                "URBANPackaged": [10.0],
+                "URBANDelivered": [10.0],
+                "URBANBorehole": [20.0],
+                "URBANOtherUnpiped": [10.0],
+                "URBANUnallocated": [10.0],
+                "RURALPiped": [0.0],
+                "RURALPackaged": [0.0],
+                "RURALDelivered": [0.0],
+                "RURALBorehole": [0.0],
+                "RURALOtherUnpiped": [0.0],
+                "RURALUnallocated": [100.0],
+                "dtw_1": [100.0],
+                "max distance cycling": [500.0],
+                "max distance walking": [200.0],
+                "PBO": [100.0],
+            }
+        )
+        result = calculate_population_water_access(
+            df_zones,
+            urban_borehole_lose_fraction=0.5,
+            rural_borehole_lose_fraction=0.5,
+            unallocated_vulnerable_fraction="prorata",
+        )
+        # g_urban = (40 + 10 + 10 + 0.5*20) / (40 + 10 + 10 + 20 + 10) = 70/90
+        g = 70.0 / 90.0
+        assert result["zone_pop_unallocated"].iloc[0] == pytest.approx(100.0)
+        assert result["zone_pop_affected"].iloc[0] == pytest.approx(700.0 + 100.0 * g)
+        assert result["zone_pop_unpiped_resilient"].iloc[0] == pytest.approx(
+            100.0 + 100.0 + 100.0 * (1 - g)
+        )
+
+    def test_prorata_g_is_computed_per_stratum_then_blended(self):
+        df_zones = _unallocated_zones_fixture()
+        f_u = self.LOSE_FRACTIONS["urban_borehole_lose_fraction"]
+        f_r = self.LOSE_FRACTIONS["rural_borehole_lose_fraction"]
+        result = calculate_population_water_access(
+            df_zones.copy(),
+            unallocated_vulnerable_fraction="prorata",
+            **self.LOSE_FRACTIONS,
+        )
+
+        expected = []
+        for _, row in _unallocated_zones_fixture().iterrows():
+            affected = 0.0
+            for stratum, weight, f in (
+                ("URBAN", row["urban_rural"], f_u),
+                ("RURAL", 1 - row["urban_rural"], f_r),
+            ):
+                g = (
+                    row[f"{stratum}Piped"]
+                    + row[f"{stratum}Packaged"]
+                    + row[f"{stratum}Delivered"]
+                    + row[f"{stratum}Borehole"] * f
+                ) / (
+                    row[f"{stratum}Piped"]
+                    + row[f"{stratum}Packaged"]
+                    + row[f"{stratum}Delivered"]
+                    + row[f"{stratum}Borehole"]
+                    + row[f"{stratum}OtherUnpiped"]
+                )
+                affected += (
+                    row["pop_zone"] * weight * row[f"{stratum}Unallocated"] * g / 100
+                )
+            expected.append(affected)
+
+        np.testing.assert_allclose(
+            result["zone_pop_unallocated_affected"].to_numpy(), expected
+        )
+
+    def test_prorata_differs_from_g_computed_on_the_blended_aggregate(self):
+        # A zone that is half urban-all-piped and half rural-all-other-unpiped.
+        # Per stratum: g_urban = 1, g_rural = 0, so 0.5*20*1 + 0.5*10*0 = 10%
+        # of the population is unallocated-and-affected, i.e. 100 people.
+        # Computing g once on the blended aggregate instead gives
+        # (0.5*80) / (0.5*80 + 0.5*90) = 0.4706 of 150 people = 70.6.
+        df_zones = pd.DataFrame(
+            {
+                "alpha3": ["MIX"],
+                "pop_zone": [1000.0],
+                "urban_rural": [0.5],
+                "URBANPiped": [80.0],
+                "URBANPackaged": [0.0],
+                "URBANDelivered": [0.0],
+                "URBANBorehole": [0.0],
+                "URBANOtherUnpiped": [0.0],
+                "URBANUnallocated": [20.0],
+                "RURALPiped": [0.0],
+                "RURALPackaged": [0.0],
+                "RURALDelivered": [0.0],
+                "RURALBorehole": [0.0],
+                "RURALOtherUnpiped": [90.0],
+                "RURALUnallocated": [10.0],
+                "dtw_1": [100.0],
+                "max distance cycling": [500.0],
+                "max distance walking": [200.0],
+                "PBO": [100.0],
+            }
+        )
+        result = calculate_population_water_access(
+            df_zones, unallocated_vulnerable_fraction="prorata", **self.LOSE_FRACTIONS
+        )
+        assert result["zone_pop_unallocated"].iloc[0] == pytest.approx(150.0)
+        assert result["zone_pop_unallocated_affected"].iloc[0] == pytest.approx(100.0)
+        assert result["zone_pop_unallocated_affected"].iloc[0] != pytest.approx(
+            150.0 * (0.5 * 80.0) / (0.5 * 80.0 + 0.5 * 90.0)
+        )
+
+    def test_prorata_falls_back_to_half_when_no_source_data(self):
+        df_zones = pd.DataFrame(
+            {
+                "alpha3": ["ZZZ"],
+                "pop_zone": [1000.0],
+                "urban_rural": [1.0],
+                "URBANPiped": [0.0],
+                "URBANPackaged": [0.0],
+                "URBANDelivered": [0.0],
+                "URBANBorehole": [0.0],
+                "URBANOtherUnpiped": [0.0],
+                "URBANUnallocated": [100.0],
+                "RURALPiped": [0.0],
+                "RURALPackaged": [0.0],
+                "RURALDelivered": [0.0],
+                "RURALBorehole": [0.0],
+                "RURALOtherUnpiped": [0.0],
+                "RURALUnallocated": [100.0],
+                "dtw_1": [100.0],
+                "max distance cycling": [500.0],
+                "max distance walking": [200.0],
+                "PBO": [100.0],
+            }
+        )
+        result = calculate_population_water_access(
+            df_zones, unallocated_vulnerable_fraction="prorata", **self.LOSE_FRACTIONS
+        )
+        assert result["zone_pop_affected"].iloc[0] == pytest.approx(500.0)
+        assert result["zone_pop_unpiped_resilient"].iloc[0] == pytest.approx(500.0)
+
+    def test_missing_unallocated_columns_raise_key_error(self):
+        df_zones = _unallocated_zones_fixture().drop(
+            columns=["URBANUnallocated", "RURALUnallocated"]
+        )
+        with pytest.raises(KeyError, match="regenerate it"):
+            calculate_population_water_access(df_zones)
+
+    def test_share_sum_over_tolerance_raises_value_error_naming_alpha3(self):
+        df_zones = _unallocated_zones_fixture()
+        df_zones.loc[1, "RURALOtherUnpiped"] = 60.0  # rural shares now sum to 120
+        with pytest.raises(ValueError) as excinfo:
+            calculate_population_water_access(df_zones)
+        assert "BBB" in str(excinfo.value)
+        assert "AAA" not in str(excinfo.value)
+        assert "regenerate it" in str(excinfo.value)
+
+    def test_share_sum_tolerance_allows_rounding_slack(self):
+        df_zones = _unallocated_zones_fixture()
+        df_zones.loc[0, "URBANUnallocated"] = 10.4  # stratum sums to 100.4
+        result = calculate_population_water_access(df_zones)
+        assert isinstance(result, pd.DataFrame)
+
+    @pytest.mark.parametrize("bad_value", [-0.1, 1.5, "banana", None])
+    def test_invalid_parameter_raises_value_error(self, bad_value):
+        with pytest.raises(ValueError):
+            calculate_population_water_access(
+                _unallocated_zones_fixture(),
+                unallocated_vulnerable_fraction=bad_value,
+            )
+
+    def test_other_unpiped_column_is_used_not_dead(self):
+        result = calculate_population_water_access(
+            _unallocated_zones_fixture(),
+            unallocated_vulnerable_fraction=0.0,
+            **self.LOSE_FRACTIONS,
+        )
+        assert (result["zone_pop_other_unpiped"] > 0).all()
+        assert (
+            result["zone_pop_unpiped_resilient"] >= result["zone_pop_other_unpiped"]
+        ).all()
 
 
 class TestCalculateWaterRations:

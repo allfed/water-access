@@ -856,30 +856,162 @@ def calculate_max_distances(df_zones, time_gathering_water):
     return df_zones
 
 
+PRORATA = "prorata"
+
+# Fallback pro-rata weight used where a stratum has no source data at all
+# (every one of the five source shares is zero, so there is no known mix to
+# pro-rate over). Splitting the unallocated mass evenly is the least
+# informative choice available; see UNALLOCATED_GAP_INVESTIGATION.md §6.
+PRORATA_NO_DATA_FALLBACK = 0.5
+
+# Tolerance on the per-stratum share sum. The regenerated dataset guarantees
+# the five source shares plus Unallocated sum to <= 100.5 (rounding slack);
+# anything above that means the frame predates the Unallocated columns.
+SHARE_SUM_TOLERANCE = 100.5
+
+REGENERATE_MESSAGE = (
+    "merged_data.csv predates the Unallocated columns — regenerate it "
+    "(scripts/Data_Manipulation_Scripts)."
+)
+
+
+def _validate_unallocated_vulnerable_fraction(unallocated_vulnerable_fraction):
+    """Validate the unallocated-allocation parameter.
+
+    Accepts a float in [0, 1] or the string "prorata". Returns the value
+    unchanged (as a float, or the lower-cased string) so callers can rely on a
+    normalised value.
+    """
+    if isinstance(unallocated_vulnerable_fraction, str):
+        if unallocated_vulnerable_fraction.strip().lower() == PRORATA:
+            return PRORATA
+        raise ValueError(
+            "unallocated_vulnerable_fraction must be a float in [0, 1] or "
+            f'"{PRORATA}", got {unallocated_vulnerable_fraction!r}'
+        )
+    if isinstance(unallocated_vulnerable_fraction, (bool, np.bool_)):
+        raise ValueError(
+            "unallocated_vulnerable_fraction must be a float in [0, 1] or "
+            f'"{PRORATA}", got {unallocated_vulnerable_fraction!r}'
+        )
+    if isinstance(
+        unallocated_vulnerable_fraction, (int, float, np.integer, np.floating)
+    ):
+        value = float(unallocated_vulnerable_fraction)
+        if not 0 <= value <= 1:
+            raise ValueError(
+                "unallocated_vulnerable_fraction must be between 0 and 1, got "
+                f"{unallocated_vulnerable_fraction!r}"
+            )
+        return value
+    raise ValueError(
+        "unallocated_vulnerable_fraction must be a float in [0, 1] or "
+        f'"{PRORATA}", got {unallocated_vulnerable_fraction!r}'
+    )
+
+
+def _check_share_sums(df_zones):
+    """Raise if any stratum's five source shares plus Unallocated exceed 100.5.
+
+    After the Unallocated columns exist, the six shares are a partition of the
+    stratum and must sum to (at most) 100 up to rounding. A violation means the
+    frame is stale — mixing new-style Unallocated with old-style unnormalised
+    source shares — and every downstream population figure would be wrong.
+    """
+    offenders = pd.Series(False, index=df_zones.index)
+    for stratum in ("URBAN", "RURAL"):
+        share_sum = (
+            df_zones[f"{stratum}Piped"].fillna(0)
+            + df_zones[f"{stratum}Packaged"]
+            + df_zones[f"{stratum}Delivered"]
+            + df_zones[f"{stratum}Borehole"]
+            + df_zones[f"{stratum}OtherUnpiped"]
+            + df_zones[f"{stratum}Unallocated"]
+        )
+        offenders = offenders | (share_sum > SHARE_SUM_TOLERANCE)
+
+    if offenders.any():
+        id_col = next(
+            (col for col in ("alpha3", "ISOCODE") if col in df_zones.columns), None
+        )
+        if id_col is None:
+            offending = sorted(str(i) for i in df_zones.index[offenders].unique())
+            label = "row"
+        else:
+            offending = sorted(df_zones.loc[offenders, id_col].astype(str).unique())
+            label = id_col
+        raise ValueError(
+            f"Source shares plus Unallocated exceed {SHARE_SUM_TOLERANCE} for "
+            f"{label}(s): {', '.join(offending)}. {REGENERATE_MESSAGE}"
+        )
+
+
 def calculate_population_water_access(
     df_zones,
     urban_borehole_lose_fraction=0.5,
     rural_borehole_lose_fraction=0.25,
+    unallocated_vulnerable_fraction=0.0,
 ):
     """
     Calculates the population with and without access to water for each zone.
 
     Piped, packaged, delivered, and (a configurable fraction of) borehole users
     lose their usual supply and must reach an alternative source by walking or
-    cycling. Residual unpiped users (total unpiped minus displaced categories)
-    retain access under the prior assumption.
+    cycling. Other-unpiped users, the surviving share of borehole users, and
+    the resilient share of the *unallocated* population retain access.
+
+    The accounting is explicit, not residual. Per stratum s (urban/rural), with
+    borehole lose fraction f_s and unallocated vulnerable fraction g_s:
+
+        affected_s   = Piped + Packaged + Delivered + f_s*Borehole + g_s*Unallocated
+        resilient_s  = OtherUnpiped + (1-f_s)*Borehole + (1-g_s)*Unallocated
+
+    The two strata are blended by ``urban_rural`` exactly as the individual
+    source categories are, so ``zone_pop_affected + zone_pop_unpiped_resilient``
+    equals ``pop_zone`` whenever the six shares sum to 100 in both strata.
+
+    ``Unallocated`` is the share of a stratum whose source type is unknown
+    after harmonisation (see UNALLOCATED_GAP_INVESTIGATION.md). Its allocation
+    is a model parameter rather than a silent assumption: the previous code
+    computed the resilient population as a clipped residual, which implicitly
+    treated 100% of the unallocated mass as resilient (g = 0).
 
     Args:
         df_zones (pandas.DataFrame): DataFrame containing zone information.
+            Must contain URBANUnallocated / RURALUnallocated.
         urban_borehole_lose_fraction (float): Share of urban borehole users
             displaced from their usual source.
         rural_borehole_lose_fraction (float): Share of rural borehole users
             displaced from their usual source.
+        unallocated_vulnerable_fraction (float or str): Share of the
+            unallocated population treated as grid-vulnerable (i.e. added to
+            the affected population). Either a float g in [0, 1] — 0.0
+            reproduces the historical residual behaviour on clean data, 1.0 is
+            the all-vulnerable bracket — or the string "prorata", which sets
+
+                g_s = (Piped + Packaged + Delivered + f_s*Borehole)
+                      / (Piped + Packaged + Delivered + Borehole + OtherUnpiped)
+
+            per stratum per row, i.e. the unallocated mass mirrors the known
+            source mix of that stratum. Where the denominator is 0 (a stratum
+            with no source data at all) the fallback g_s = 0.5 is used, since
+            there is no known mix to mirror. Defaults to 0.0.
 
     Returns:
         pandas.DataFrame: DataFrame with additional columns representing the population
         with and without access to water for each zone.
+
+    Raises:
+        KeyError: if URBANUnallocated / RURALUnallocated are missing (the input
+            predates the Unallocated columns and must be regenerated).
+        ValueError: if any row's five source shares plus Unallocated exceed
+            100.5 in either stratum, or if unallocated_vulnerable_fraction is
+            not a float in [0, 1] or "prorata".
     """
+    unallocated_vulnerable_fraction = _validate_unallocated_vulnerable_fraction(
+        unallocated_vulnerable_fraction
+    )
+
     for col in (
         "URBANPackaged",
         "RURALPackaged",
@@ -894,6 +1026,23 @@ def calculate_population_water_access(
             df_zones[col] = 0
         else:
             df_zones[col] = df_zones[col].fillna(0)
+
+    # The Unallocated columns are NOT defaulted to zero: silently assuming
+    # zero would reinstate the residual behaviour on stale data and hide the
+    # ~348M-person share-sum gap the parameter exists to bracket.
+    missing_unallocated = [
+        col
+        for col in ("URBANUnallocated", "RURALUnallocated")
+        if col not in df_zones.columns
+    ]
+    if missing_unallocated:
+        raise KeyError(
+            f"Missing required column(s) {missing_unallocated}: {REGENERATE_MESSAGE}"
+        )
+    for col in ("URBANUnallocated", "RURALUnallocated"):
+        df_zones[col] = df_zones[col].fillna(0)
+
+    _check_share_sums(df_zones)
 
     df_zones["zone_pop_piped"] = 0
 
@@ -941,6 +1090,7 @@ def calculate_population_water_access(
         * rural_borehole_lose_fraction
         / 100
     )
+    # Now used in the resilient accounting below (it used to be dead code).
     df_zones["zone_pop_other_unpiped"] = (
         df_zones["pop_zone"]
         * df_zones["urban_rural"]
@@ -951,34 +1101,80 @@ def calculate_population_water_access(
         * df_zones["RURALOtherUnpiped"]
         / 100
     )
+
+    # Unallocated population, split into the vulnerable share g and the
+    # resilient share (1 - g). g is resolved PER STRATUM (before blending) so
+    # that "prorata" mirrors each stratum's own source mix, exactly as the
+    # five source categories are blended per stratum.
+    lose_fractions = {
+        "URBAN": urban_borehole_lose_fraction,
+        "RURAL": rural_borehole_lose_fraction,
+    }
+    stratum_weights = {
+        "URBAN": df_zones["urban_rural"],
+        "RURAL": 1 - df_zones["urban_rural"],
+    }
+
+    unallocated_total = 0
+    unallocated_affected = 0
+    unallocated_resilient = 0
+    for stratum, lose_fraction in lose_fractions.items():
+        weight = stratum_weights[stratum]
+        unallocated_share = df_zones[f"{stratum}Unallocated"]
+
+        if unallocated_vulnerable_fraction == PRORATA:
+            affected_share = (
+                df_zones[f"{stratum}Piped"].fillna(0)
+                + df_zones[f"{stratum}Packaged"]
+                + df_zones[f"{stratum}Delivered"]
+                + df_zones[f"{stratum}Borehole"] * lose_fraction
+            )
+            known_share = (
+                df_zones[f"{stratum}Piped"].fillna(0)
+                + df_zones[f"{stratum}Packaged"]
+                + df_zones[f"{stratum}Delivered"]
+                + df_zones[f"{stratum}Borehole"]
+                + df_zones[f"{stratum}OtherUnpiped"]
+            )
+            g = pd.Series(
+                np.where(
+                    known_share > 0,
+                    affected_share / known_share.where(known_share > 0, 1),
+                    PRORATA_NO_DATA_FALLBACK,
+                ),
+                index=df_zones.index,
+            )
+        else:
+            g = unallocated_vulnerable_fraction
+
+        stratum_pop = df_zones["pop_zone"] * weight * unallocated_share / 100
+        unallocated_total = unallocated_total + stratum_pop
+        unallocated_affected = unallocated_affected + stratum_pop * g
+        unallocated_resilient = unallocated_resilient + stratum_pop * (1 - g)
+
+    df_zones["zone_pop_unallocated"] = unallocated_total
+    df_zones["zone_pop_unallocated_affected"] = unallocated_affected
+    df_zones["zone_pop_unallocated_resilient"] = unallocated_resilient
+
     df_zones["zone_pop_affected"] = (
         df_zones["zone_pop_piped"]
         + df_zones["zone_pop_packaged"]
         + df_zones["zone_pop_delivered"]
         + df_zones["zone_pop_borehole_affected"]
+        + df_zones["zone_pop_unallocated_affected"]
+    )
+    # Explicit sum of the categories that retain access, not a residual: the
+    # surviving borehole users, everyone on other unpiped sources, and the
+    # resilient share of the unallocated population. No clip is needed because
+    # every term is non-negative by construction.
+    df_zones["zone_pop_borehole_resilient"] = (
+        df_zones["zone_pop_borehole"] - df_zones["zone_pop_borehole_affected"]
     )
     df_zones["zone_pop_unpiped_resilient"] = (
-        df_zones["pop_zone"]
-        * df_zones["urban_rural"]
-        * (
-            100
-            - df_zones["URBANPiped"]
-            - df_zones["URBANPackaged"]
-            - df_zones["URBANDelivered"]
-            - df_zones["URBANBorehole"] * urban_borehole_lose_fraction
-        )
-        / 100
-        + df_zones["pop_zone"]
-        * (1 - df_zones["urban_rural"])
-        * (
-            100
-            - df_zones["RURALPiped"]
-            - df_zones["RURALPackaged"]
-            - df_zones["RURALDelivered"]
-            - df_zones["RURALBorehole"] * rural_borehole_lose_fraction
-        )
-        / 100
-    ).clip(lower=0)
+        df_zones["zone_pop_other_unpiped"]
+        + df_zones["zone_pop_borehole_resilient"]
+        + df_zones["zone_pop_unallocated_resilient"]
+    )
 
     # Determine if it's possible to reach water with walking/cycling
     df_zones["zone_cycling_okay"] = (
@@ -1069,12 +1265,14 @@ def process_zones_for_water_access(
     time_gathering_water=16,
     urban_borehole_lose_fraction=1,
     rural_borehole_lose_fraction=1,
+    unallocated_vulnerable_fraction=0.0,
 ):
     df_zones = calculate_max_distances(df_zones, time_gathering_water)
     df_zones = calculate_population_water_access(
         df_zones,
         urban_borehole_lose_fraction=urban_borehole_lose_fraction,
         rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
     )
     df_zones = calculate_water_rations(df_zones)
     return df_zones
@@ -1623,6 +1821,7 @@ def run_global_analysis(
     rural_adjustment,
     urban_borehole_lose_fraction=0.5,
     rural_borehole_lose_fraction=0.25,
+    unallocated_vulnerable_fraction=0.0,
     calculate_distance=True,
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
@@ -1642,6 +1841,10 @@ def run_global_analysis(
             when electric pumping fails (scenario parameter, see ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md).
         rural_borehole_lose_fraction (float): Share of rural borehole users who lose access
             when electric pumping fails.
+        unallocated_vulnerable_fraction (float or str): Share of the population whose
+            source type is unallocated that is treated as grid-vulnerable. Float in
+            [0, 1] or "prorata" (mirror each stratum's known source mix). See
+            calculate_population_water_access and UNALLOCATED_GAP_INVESTIGATION.md.
         calculate_distance (bool, optional): Whether to calculate distance or not. Defaults to True, otherwise new results are not generated.
         human_mass (float): The mass of an average human carrying water in kilograms.
         plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
@@ -1679,6 +1882,7 @@ def run_global_analysis(
         time_gathering_water=time_gathering_water,
         urban_borehole_lose_fraction=urban_borehole_lose_fraction,
         rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
     )
 
     # print("\n\n 1 \n\n")

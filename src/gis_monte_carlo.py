@@ -105,6 +105,7 @@ def run_simulation(
     rural_adjustment,
     urban_borehole_lose_fraction=0.5,
     rural_borehole_lose_fraction=0.25,
+    unallocated_vulnerable_fraction=0.0,
     calculate_distance=True,
     use_sample_data=False,
 ):
@@ -127,6 +128,13 @@ def run_simulation(
     - rural_borehole_lose_fraction (float): Share of rural borehole users who
                                             lose access when electric pumping
                                             fails.
+    - unallocated_vulnerable_fraction (float or str): Share of the population
+                                            whose source type is unallocated
+                                            that is treated as grid-vulnerable.
+                                            A float in [0, 1] (0 = all
+                                            resilient, 1 = all vulnerable) or
+                                            the string "prorata" (mirror each
+                                            stratum's known source mix).
     - calculate_distance (bool, optional): Whether to calculate the distance
                                            during the simulation.
     - use_sample_data (bool, optional): Whether to use sample data. Defaults
@@ -172,6 +180,19 @@ def run_simulation(
     assert (
         0 <= rural_borehole_lose_fraction <= 1
     ), "Rural borehole lose fraction must be between 0 and 1."
+    if isinstance(unallocated_vulnerable_fraction, str):
+        assert (
+            unallocated_vulnerable_fraction.strip().lower() == gis.PRORATA
+        ), 'Unallocated vulnerable fraction must be a number or "prorata".'
+    else:
+        assert isinstance(
+            unallocated_vulnerable_fraction, (int, float)
+        ) and not isinstance(
+            unallocated_vulnerable_fraction, bool
+        ), 'Unallocated vulnerable fraction must be a number or "prorata".'
+        assert (
+            0 <= unallocated_vulnerable_fraction <= 1
+        ), "Unallocated vulnerable fraction must be between 0 and 1."
 
     df_countries, df_districts, df_zones = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
@@ -185,6 +206,7 @@ def run_simulation(
         rural_adjustment=rural_adjustment,
         urban_borehole_lose_fraction=urban_borehole_lose_fraction,
         rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
         calculate_distance=calculate_distance,
         plot=False,
         use_sample_data=use_sample_data,

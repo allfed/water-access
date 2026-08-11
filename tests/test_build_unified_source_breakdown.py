@@ -123,3 +123,93 @@ class TestNoReference:
         assert adjusted == values
         assert piped_eff is None
         assert note is None
+
+
+class TestValidator:
+    """The validator must not stay silent when it cannot check a row."""
+
+    @staticmethod
+    def _row(alpha3, urban=None, rural=None, piped_effective=None):
+        import pandas as pd
+
+        urban = urban or {}
+        rural = rural or {}
+        row = {"alpha3": alpha3}
+        for stratum, values in (("URBAN", urban), ("RURAL", rural)):
+            for cat in ("Packaged", "Delivered", "Borehole", "OtherUnpiped"):
+                row[f"{stratum}{cat}"] = values.get(cat, pd.NA)
+            row[f"{stratum}PipedEffective"] = (piped_effective or {}).get(stratum, pd.NA)
+        return row
+
+    def test_missing_reference_is_reported_not_silently_passed(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        unified = pd.DataFrame([self._row("SLB", urban={"Borehole": 20.0})])
+        problems = validate(unified, piped_reference={})
+        urban_problems = problems[problems["field"] == "URBAN"]
+        assert len(urban_problems) == 1
+        assert "unverifiable" in urban_problems.iloc[0]["problem"]
+
+    def test_present_reference_still_checks_the_sum(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        unified = pd.DataFrame([self._row("USA", rural={"OtherUnpiped": 43.7})])
+        reference = {"USA": {"URBANPiped": 100.0, "RURALPiped": 95.0}}
+        problems = validate(unified, piped_reference=reference)
+        rural_problems = problems[problems["field"] == "RURAL"]
+        assert len(rural_problems) == 1
+        assert "piped (95.0) + unpiped categories > 100" in (
+            rural_problems.iloc[0]["problem"]
+        )
+
+    def test_clean_row_produces_no_warnings(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        unified = pd.DataFrame(
+            [
+                self._row(
+                    "KEN",
+                    urban={"Borehole": 10.0, "OtherUnpiped": 5.0},
+                    rural={"Borehole": 20.0, "OtherUnpiped": 10.0},
+                )
+            ]
+        )
+        reference = {"KEN": {"URBANPiped": 60.0, "RURALPiped": 30.0}}
+        assert validate(unified, piped_reference=reference).empty
+
+    def test_piped_effective_satisfies_the_reference_requirement(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        unified = pd.DataFrame(
+            [
+                self._row(
+                    "DNK",
+                    urban={"Borehole": 4.0},
+                    piped_effective={"URBAN": 96.0},
+                )
+            ]
+        )
+        problems = validate(unified, piped_reference={})
+        assert problems[problems["field"] == "URBAN"].empty
+
+    def test_coverage_gap_is_reported(self):
+        import pandas as pd
+
+        from build_unified_source_breakdown import validate
+
+        unified = pd.DataFrame([self._row("KEN", urban={"Borehole": 10.0})])
+        problems = validate(
+            unified,
+            piped_reference={"KEN": {"URBANPiped": 60.0, "RURALPiped": 30.0}},
+            merged_alpha3=["KEN", "NIC", "TWN"],
+        )
+        coverage = problems[problems["field"] == "coverage"]
+        assert sorted(coverage["alpha3"]) == ["NIC", "TWN"]

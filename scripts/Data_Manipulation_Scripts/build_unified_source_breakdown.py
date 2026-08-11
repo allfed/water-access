@@ -55,6 +55,7 @@ RESEARCH_CSV = REPO_ROOT / "data" / "original_data" / "researched_source_breakdo
 WATER_CSV = (
     REPO_ROOT / "data" / "original_data" / "WHO Household Water Data - 2023 Data.csv"
 )
+MERGED_DATA_CSV = REPO_ROOT / "data" / "processed" / "merged_data.csv"
 OUTPUT_CSV = SEMI_PROCESSED / "jmp_source_breakdown_unified.csv"
 VALIDATION_CSV = SEMI_PROCESSED / "jmp_source_breakdown_unified_validation.csv"
 
@@ -164,8 +165,26 @@ def load_research(path: Path, exclude_low_confidence: bool) -> pd.DataFrame:
     return research
 
 
-def validate(unified: pd.DataFrame, piped_reference: dict) -> pd.DataFrame:
-    """Range and sum checks; returns a dataframe of warnings (may be empty)."""
+def validate(
+    unified: pd.DataFrame,
+    piped_reference: dict,
+    merged_alpha3: "list[str] | None" = None,
+) -> pd.DataFrame:
+    """Range, sum and coverage checks; returns warnings (may be empty).
+
+    Three checks per stratum:
+      1. every category value inside [0, 100];
+      2. categories alone, and categories + piped, inside 100 + tolerance;
+      3. when NEITHER a PipedEffective nor a WHO reference piped share exists,
+         the sum cannot be verified at all — that is reported explicitly rather
+         than passing silently (the old code only ran check 2 inside an
+         ``elif piped_value is not None`` branch, so a missing reference looked
+         like a clean row).
+
+    When ``merged_alpha3`` is given, every country the model ships must have a
+    row here; the ones that do not are reported so they cannot vanish into a
+    downstream ``fillna(0)``.
+    """
     problems = []
     for _, row in unified.iterrows():
         alpha3 = row["alpha3"]
@@ -177,8 +196,10 @@ def validate(unified: pd.DataFrame, piped_reference: dict) -> pd.DataFrame:
         piped = piped_reference.get(alpha3, {})
         for stratum in ("URBAN", "RURAL"):
             piped_value = row.get(f"{stratum}PipedEffective")
-            if pd.isna(piped_value):
+            if piped_value is None or pd.isna(piped_value):
                 piped_value = piped.get(f"{stratum}Piped")
+            if piped_value is not None and pd.isna(piped_value):
+                piped_value = None
             parts = [
                 row[f"{stratum}{cat}"]
                 for cat in ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
@@ -196,10 +217,16 @@ def validate(unified: pd.DataFrame, piped_reference: dict) -> pd.DataFrame:
                         "unpiped categories sum > 100",
                     )
                 )
-            elif (
-                piped_value is not None
-                and piped_value + unpiped_sum > 100 + SUM_TOLERANCE
-            ):
+            elif piped_value is None:
+                problems.append(
+                    (
+                        alpha3,
+                        stratum,
+                        round(unpiped_sum, 2),
+                        "no piped reference - sum unverifiable",
+                    )
+                )
+            elif piped_value + unpiped_sum > 100 + SUM_TOLERANCE:
                 problems.append(
                     (
                         alpha3,
@@ -208,6 +235,19 @@ def validate(unified: pd.DataFrame, piped_reference: dict) -> pd.DataFrame:
                         f"piped ({piped_value}) + unpiped categories > 100",
                     )
                 )
+
+    if merged_alpha3 is not None:
+        present = set(unified["alpha3"])
+        for alpha3 in sorted(set(merged_alpha3) - present):
+            problems.append(
+                (
+                    alpha3,
+                    "coverage",
+                    pd.NA,
+                    "in merged_data.csv but absent from unified breakdown; "
+                    "placeholder row (data_origin=none) added",
+                )
+            )
     return pd.DataFrame(problems, columns=["alpha3", "field", "value", "problem"])
 
 
@@ -335,7 +375,81 @@ def main() -> int:
                 unified.at[idx, f"{stratum}_budget_adjustment"] = note
                 adjustments.append((row["alpha3"], stratum, note))
 
-    validation = validate(unified, piped_reference)
+    # Coverage: every country the model ships must have a row here, even if it
+    # is an empty one. Countries silently absent from this CSV used to become
+    # all-zero categories via the downstream fillna(0) with no trace in the
+    # provenance columns.
+    merged_alpha3 = None
+    if MERGED_DATA_CSV.exists():
+        merged_alpha3 = sorted(
+            pd.read_csv(MERGED_DATA_CSV, usecols=["alpha3"])["alpha3"].dropna().unique()
+        )
+
+    validation = validate(unified, piped_reference, merged_alpha3=merged_alpha3)
+
+    # "JMP wins" can demote a curated research row to nothing when the JMP
+    # survey reports a category as an explicit zero. Report those, because a
+    # zero from a survey that never asked the question is not the same datum as
+    # a national census figure (BIH/ROU boreholes are the live example).
+    displaced = []
+    for alpha3 in skipped_jmp_present:
+        jmp_row = unified.loc[unified["alpha3"] == alpha3]
+        if jmp_row.empty:
+            continue
+        jmp_row = jmp_row.iloc[0]
+        r = research_by_alpha3.loc[alpha3]
+        lost = [
+            col
+            for col in VALUE_COLS
+            if pd.notna(r[col]) and r[col] > 0 and not (jmp_row[col] > 0)
+        ]
+        if lost:
+            displaced.append((alpha3, lost))
+            validation = pd.concat(
+                [
+                    validation,
+                    pd.DataFrame(
+                        [
+                            {
+                                "alpha3": alpha3,
+                                "field": ",".join(lost),
+                                "value": pd.NA,
+                                "problem": (
+                                    "research fill ignored (JMP wins) but the JMP "
+                                    "survey reports zero where research has a "
+                                    "measured value"
+                                ),
+                            }
+                        ]
+                    ),
+                ],
+                ignore_index=True,
+            )
+
+    coverage_gaps: list[str] = []
+    if merged_alpha3 is not None:
+        coverage_gaps = sorted(set(merged_alpha3) - set(unified["alpha3"]))
+        placeholders = []
+        for alpha3 in coverage_gaps:
+            placeholder = {col: pd.NA for col in unified.columns}
+            placeholder["alpha3"] = alpha3
+            placeholder["data_origin"] = "none"
+            placeholder["research_notes"] = (
+                "no JMP source data and no research fill; placeholder row so the "
+                "country is visible in provenance instead of silently missing"
+            )
+            placeholders.append(placeholder)
+        if placeholders:
+            # Grown by reindex rather than concat: an all-NA frame would change
+            # every column's dtype (and warn about it) on pandas 2.x.
+            start = len(unified)
+            unified = unified.reset_index(drop=True).reindex(
+                range(start + len(placeholders))
+            )
+            for offset, placeholder in enumerate(placeholders):
+                for col, value in placeholder.items():
+                    if value is not pd.NA:
+                        unified.at[start + offset, col] = value
 
     unified = unified.sort_values("alpha3").reset_index(drop=True)
     unified.to_csv(OUTPUT_CSV, index=False)
@@ -346,10 +460,20 @@ def main() -> int:
     for origin, count in origin_counts.items():
         print(f"  {origin}: {count}")
     print(f"research fills applied: {len(filled)} -> {sorted(set(filled))}")
+    if coverage_gaps:
+        print(
+            f"coverage: {len(coverage_gaps)} merged_data countries had no row "
+            f"(placeholders added): {coverage_gaps}"
+        )
     if skipped_jmp_present:
         print(
             "research rows ignored because JMP already has data "
             f"(JMP wins): {skipped_jmp_present}"
+        )
+    for alpha3, lost in displaced:
+        print(
+            f"  WARNING {alpha3}: JMP reports zero for {lost} where the research "
+            "row has a measured value"
         )
     if adjustments:
         print(f"piped-budget reconciliation applied to {len(adjustments)} strata:")

@@ -12,8 +12,25 @@ harness (its own run_monte_carlo.py) plus a shared sampling module,
 src/monte_carlo_constants.py (ADR-7). When merging, take the 30as versions
 and move the borehole lose-fraction sampling below into sample_parameters()
 in that module, so parameters stay defined in exactly one place.
+
+SCENARIO RUNS (deterministic, no sampling): set
+UNALLOCATED_VULNERABLE_FRACTION_FIXED below to hold the unallocated-allocation
+parameter g constant across every iteration.
+  * "prorata" — the recommended CENTRAL scenario: the unallocated population
+    mirrors each stratum's known source mix (≈ +2.5% affected).
+  * 0.0 — lower bracket, all unallocated people retain access (the pre-2026-08
+    behaviour).
+  * 1.0 — upper bracket, all unallocated people are grid-vulnerable
+    (≈ +5.8% affected).
+Leave it as None for the default uncertainty run, which samples
+g ~ Uniform(0, 1) per iteration. See UNALLOCATED_GAP_INVESTIGATION.md §6.
+
+Every sampled parameter is recorded per iteration in checkpoint.json and in
+sampled_parameters.csv (one row per iteration, written next to the parquet
+files); iteration k's inputs are row k.
 """
 
+import csv
 import multiprocessing
 import numpy as np
 from pathlib import Path
@@ -33,6 +50,7 @@ import src.gis_monte_carlo as mc  # noqa
 RESULTS_PATH = project_root / "water-access/results"
 PARQUET_PATH = RESULTS_PATH / "parquet_files"
 CHECKPOINT_FILE = PARQUET_PATH / "checkpoint.json"
+SAMPLED_PARAMETERS_FILE = PARQUET_PATH / "sampled_parameters.csv"
 
 # -------------------------------------------------------------------------------
 # DEFINE MONTE CARLO SIMULATION PARAMETERS
@@ -121,6 +139,19 @@ URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.80
 RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.23
 RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.35
 
+# Share of the population whose water source type is UNALLOCATED after
+# harmonisation (~348M people, 4.4% of world population) that is treated as
+# grid-vulnerable. Sampled uniformly over the full 0-1 bracket by default:
+# 0 = the pre-2026-08 assumption that all of them retain access,
+# 1 = all of them are grid-dependent. See UNALLOCATED_GAP_INVESTIGATION.md.
+UNALLOCATED_VULNERABLE_FRACTION_LOWER_ESTIMATE = 0.0
+UNALLOCATED_VULNERABLE_FRACTION_UPPER_ESTIMATE = 1.0
+
+# Set to a float in [0, 1] or the string "prorata" to pin g for a deterministic
+# scenario run instead of sampling it (central scenario = "prorata",
+# bracket = 0.0 and 1.0). None = sample, see the module docstring.
+UNALLOCATED_VULNERABLE_FRACTION_FIXED = None
+
 # -------------------------------------------------------------------------------
 
 # Global flag for graceful shutdown
@@ -134,6 +165,22 @@ def handle_preemption(signum, frame):
     shutdown_requested = True
 
 
+def save_sampled_parameters(parameters):
+    """Write the per-iteration sampled parameters to a CSV alongside the parquets.
+
+    checkpoint.json is the machine-readable record used for resume; this CSV is
+    the human/analysis-readable one. Row k holds the inputs of iteration k, so
+    it joins directly onto *_simulation_result_k.parquet.
+    """
+    names = list(parameters.keys())
+    n_rows = min(len(parameters[name]) for name in names)
+    with open(SAMPLED_PARAMETERS_FILE, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["iteration"] + names)
+        for i in range(n_rows):
+            writer.writerow([i] + [parameters[name][i] for name in names])
+
+
 def save_checkpoint(completed_iterations, parameters):
     """Save checkpoint with completed iterations and parameters"""
     checkpoint = {
@@ -144,6 +191,7 @@ def save_checkpoint(completed_iterations, parameters):
     }
     with open(CHECKPOINT_FILE, "w") as f:
         json.dump(checkpoint, f, indent=2)
+    save_sampled_parameters(parameters)
     print(f"✅ Checkpoint saved: {len(completed_iterations)} iterations completed")
 
 
@@ -220,6 +268,77 @@ def process_saved_results():
         print("⚠️  No results to process yet")
 
 
+def sample_parameters(num_iterations=NUM_ITERATIONS):
+    """Draw every Monte Carlo input, one value per iteration.
+
+    Returns a dict of plain Python lists (JSON- and CSV-serialisable), keyed by
+    parameter name; element k is the input of iteration k, matching the index in
+    the *_simulation_result_k.parquet filenames. The dict is written verbatim to
+    checkpoint.json and sampled_parameters.csv, so it is both the resume state
+    and the per-iteration parameter log.
+    """
+    unallocated_vulnerable_fractions = (
+        np.random.uniform(
+            UNALLOCATED_VULNERABLE_FRACTION_LOWER_ESTIMATE,
+            UNALLOCATED_VULNERABLE_FRACTION_UPPER_ESTIMATE,
+            size=num_iterations,
+        ).tolist()
+        if UNALLOCATED_VULNERABLE_FRACTION_FIXED is None
+        # Deterministic scenario run: the same g for every iteration.
+        else [UNALLOCATED_VULNERABLE_FRACTION_FIXED] * num_iterations
+    )
+
+    return {
+        "crr_adjustments": np.random.randint(
+            CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=num_iterations
+        ).tolist(),
+        "time_gatherings": mc.sample_lognormal(
+            TIME_GATHERING_LOWER_ESTIMATE,
+            TIME_GATHERING_UPPER_ESTIMATE,
+            num_iterations,
+        ).tolist(),
+        "practical_limits_bicycle": mc.sample_normal(
+            PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
+            PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
+            num_iterations,
+        ).tolist(),
+        "practical_limits_buckets": mc.sample_normal(
+            PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
+            PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
+            num_iterations,
+        ).tolist(),
+        "mets": mc.sample_normal(
+            METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, num_iterations
+        ).tolist(),
+        "watts_values": mc.sample_normal(
+            WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, num_iterations
+        ).tolist(),
+        "hill_polarities": np.random.choice(POLARITY_OPTIONS, num_iterations).tolist(),
+        "urban_adjustments": mc.sample_normal(
+            URBAN_ADJUSTMENT_LOWER_ESTIMATE,
+            URBAN_ADJUSTMENT_UPPER_ESTIMATE,
+            num_iterations,
+        ).tolist(),
+        "rural_adjustments": mc.sample_gpd(
+            RURAL_PDR_PARETO_SHAPE,
+            RURAL_PDR_PARETO_SCALE,
+            RURAL_PDR_PARETO_LOC,
+            num_iterations,
+        ).tolist(),
+        "urban_borehole_lose_fractions": np.random.uniform(
+            URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
+            URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
+            size=num_iterations,
+        ).tolist(),
+        "rural_borehole_lose_fractions": np.random.uniform(
+            RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
+            RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
+            size=num_iterations,
+        ).tolist(),
+        "unallocated_vulnerable_fractions": unallocated_vulnerable_fractions,
+    }
+
+
 def run_and_save_simulation(
     i,
     crr_adjustment,
@@ -233,6 +352,7 @@ def run_and_save_simulation(
     rural_adjustment,
     urban_borehole_lose_fraction,
     rural_borehole_lose_fraction,
+    unallocated_vulnerable_fraction,
 ):
     """Run one simulation in a worker process and write its results to disk.
 
@@ -254,6 +374,7 @@ def run_and_save_simulation(
         rural_adjustment,
         urban_borehole_lose_fraction=urban_borehole_lose_fraction,
         rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
         use_sample_data=False,
     )
 
@@ -309,6 +430,13 @@ if __name__ == "__main__":
                 "Delete the stale checkpoint (and the bucket copies "
                 "deploy-spot.sh restores) and start fresh."
             )
+        if "unallocated_vulnerable_fractions" not in params:
+            sys.exit(
+                "❌ checkpoint.json predates the unallocated-allocation "
+                "parameter — resuming it would run the wrong scenario. "
+                "Delete the stale checkpoint (and the bucket copies "
+                "deploy-spot.sh restores) and start fresh."
+            )
         if checkpoint.get("total_iterations") != NUM_ITERATIONS:
             sys.exit(
                 f"❌ checkpoint.json was written for "
@@ -316,21 +444,6 @@ if __name__ == "__main__":
                 f"NUM_ITERATIONS is {NUM_ITERATIONS}. Delete the stale "
                 "checkpoint (and bucket copies) and start fresh."
             )
-        crr_adjustments = np.array(params["crr_adjustments"])
-        time_gatherings = np.array(params["time_gatherings"])
-        practical_limits_bicycle = np.array(params["practical_limits_bicycle"])
-        practical_limits_buckets = np.array(params["practical_limits_buckets"])
-        mets = np.array(params["mets"])
-        watts_values = np.array(params["watts_values"])
-        hill_polarities = np.array(params["hill_polarities"])
-        urban_adjustments = np.array(params["urban_adjustments"])
-        rural_adjustments = np.array(params["rural_adjustments"])
-        urban_borehole_lose_fractions = np.array(
-            params["urban_borehole_lose_fractions"]
-        )
-        rural_borehole_lose_fractions = np.array(
-            params["rural_borehole_lose_fractions"]
-        )
         # Keep `parameters` bound so the periodic and final save_checkpoint
         # calls below still work on a resumed run. Without this it is only
         # defined in the else-branch, so any resume (i.e. every Spot VM
@@ -338,72 +451,23 @@ if __name__ == "__main__":
         parameters = params
         print("📂 Parameters restored from checkpoint")
     else:
-        # Generate new parameters
-        crr_adjustments = np.random.randint(
-            CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
-        )
-        time_gatherings = mc.sample_lognormal(
-            TIME_GATHERING_LOWER_ESTIMATE,
-            TIME_GATHERING_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        practical_limits_bicycle = mc.sample_normal(
-            PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        practical_limits_buckets = mc.sample_normal(
-            PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        mets = mc.sample_normal(
-            METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS
-        )
-        watts_values = mc.sample_normal(
-            WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
-        )
-        hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
-        urban_adjustments = mc.sample_normal(
-            URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-            URBAN_ADJUSTMENT_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        rural_adjustments = mc.sample_gpd(
-            RURAL_PDR_PARETO_SHAPE,
-            RURAL_PDR_PARETO_SCALE,
-            RURAL_PDR_PARETO_LOC,
-            NUM_ITERATIONS,
-        )
-        urban_borehole_lose_fractions = np.random.uniform(
-            URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
-            URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
-            size=NUM_ITERATIONS,
-        )
-        rural_borehole_lose_fractions = np.random.uniform(
-            RURAL_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE,
-            RURAL_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE,
-            size=NUM_ITERATIONS,
-        )
-
-        # Save parameters for potential resume. The checkpoint doubles as the
-        # per-iteration parameter log: parquet files are named by the same
-        # index that addresses these arrays, so iteration k's inputs are
-        # element k here.
-        parameters = {
-            "crr_adjustments": crr_adjustments.tolist(),
-            "time_gatherings": time_gatherings.tolist(),
-            "practical_limits_bicycle": practical_limits_bicycle.tolist(),
-            "practical_limits_buckets": practical_limits_buckets.tolist(),
-            "mets": mets.tolist(),
-            "watts_values": watts_values.tolist(),
-            "hill_polarities": hill_polarities.tolist(),
-            "urban_adjustments": urban_adjustments.tolist(),
-            "rural_adjustments": rural_adjustments.tolist(),
-            "urban_borehole_lose_fractions": urban_borehole_lose_fractions.tolist(),
-            "rural_borehole_lose_fractions": rural_borehole_lose_fractions.tolist(),
-        }
+        parameters = sample_parameters(NUM_ITERATIONS)
         save_checkpoint(completed_iterations, parameters)
+
+    # Element k of each list is the input of iteration k (the parquet files are
+    # named by the same index).
+    crr_adjustments = parameters["crr_adjustments"]
+    time_gatherings = parameters["time_gatherings"]
+    practical_limits_bicycle = parameters["practical_limits_bicycle"]
+    practical_limits_buckets = parameters["practical_limits_buckets"]
+    mets = parameters["mets"]
+    watts_values = parameters["watts_values"]
+    hill_polarities = parameters["hill_polarities"]
+    urban_adjustments = parameters["urban_adjustments"]
+    rural_adjustments = parameters["rural_adjustments"]
+    urban_borehole_lose_fractions = parameters["urban_borehole_lose_fractions"]
+    rural_borehole_lose_fractions = parameters["rural_borehole_lose_fractions"]
+    unallocated_vulnerable_fractions = parameters["unallocated_vulnerable_fractions"]
 
     # Determine which iterations to run
     iterations_to_run = [
@@ -449,6 +513,7 @@ if __name__ == "__main__":
                 rural_adjustments[idx],
                 urban_borehole_lose_fractions[idx],
                 rural_borehole_lose_fractions[idx],
+                unallocated_vulnerable_fractions[idx],
             ),
         )
         pending.append((idx, async_result))
