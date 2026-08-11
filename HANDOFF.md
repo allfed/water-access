@@ -1,11 +1,12 @@
-# HANDOFF — branch `kr/unpiped-breakdown`
+# HANDOFF — branch `kr/integration-30as-unpiped`
 
 Updated 2026-08-11. For the next agent, zero context assumed. The
 what/how is documented in the repo; this file covers only what isn't.
 
 ## Where we got to
 
-Three phases done on this branch:
+`kr/unpiped-breakdown` and `kr/30as-feasibility` are MERGED here (merge
+commit `1a4c660`); this branch is the integration line. Four phases:
 
 1. **Unified source breakdown** (53 of the 76 blank JMP rows filled, 23
    judged not fillable; model switched over, `merged_data.csv`
@@ -23,19 +24,55 @@ Three phases done on this branch:
    Data: `data/original_data/borehole_pump_type_estimates.csv` (+ raw research
    in `borehole_pump_type_research.json`); aggregation script:
    `scripts/Data_Manipulation_Scripts/aggregate_borehole_pump_estimates.py`.
-3. **Lose fractions wired into the Monte Carlo — DONE, single driver.**
-   `scripts/run_monte_carlo_gcp.py` (the script `gcp/deploy-spot.sh`
-   launches) samples `urban/rural_borehole_lose_fraction` uniformly over the
-   HEMP ranges above and threads them through `run_simulation()` into
-   `calculate_population_water_access()`. The old local driver
-   `scripts/run_monte_carlo.py` was RETIRED 2026-08-11 (Kevin's call: two
-   drivers had let parameter ranges drift apart — the local copy still had
-   the pre-review mobility ranges, and its retained-futures memory pattern
-   could not survive 1000 iterations anyway). Smoke-tested end-to-end with
+3. **Lose fractions wired into the Monte Carlo — DONE.**
+   `urban/rural_borehole_lose_fraction` are sampled uniformly over the HEMP
+   ranges above and threaded through `run_simulation()` into
+   `calculate_population_water_access()`. Smoke-tested end-to-end with
    3 iterations (commit `5811ddf`, `results/smoketest_3runs/` — pipeline
-   completes, sampled lose fractions vary per run; note the smoke ran on
-   the since-retired local script, so its *mobility* draws used the stale
-   ranges — treat it purely as evidence the wiring works, never as results).
+   completes, sampled lose fractions vary per run; that smoke predates the
+   canonical mobility ranges, so treat it purely as evidence the wiring
+   works, never as results).
+4. **30-arcsecond pipeline merged in — DONE 2026-08-11 (`1a4c660`).** See
+   §"State after the merge" below before touching anything.
+
+## State after the merge
+
+- **Parameters live in exactly one place**: `src/monte_carlo_constants.py`
+  (ADR-7). It owns the mobility distributions *and* the two borehole
+  lose-fraction ranges, the unallocated bounds, and the scenario switch
+  `UNALLOCATED_VULNERABLE_FRACTION_FIXED` (`None` = sample g ~ U(0,1);
+  `"prorata"` = central; `0.0`/`1.0` = brackets). `PARAMETER_NAMES` is
+  ordered to match `run_simulation`'s positional signature.
+- **Three drivers, one sampler.** `scripts/run_monte_carlo_gcp.py` is the
+  production/GCP driver (checkpointing, per-worker disk writes — this is
+  what `gcp/deploy-spot.sh` launches). `scripts/run_monte_carlo.py` is the
+  local/CLI harness that came back with the 30as work (`--resolution`,
+  `--chunk-rows`, `--seed`, `--input`). `scripts/run_monte_carlo_test.py`
+  is a 2-iteration smoke. All three import `sample_parameters`; a test
+  asserts the GCP driver holds no private copy of the constants.
+- **Chunked ≡ monolithic, re-proved with the new parameters.**
+  `scripts/validate_chunking.py` now runs at urban 0.72 / rural 0.29 /
+  `"prorata"` — deliberately off the code defaults. Country and district
+  rows bit-identical, GLOBAL and split-country rows within 1.8e-16
+  relative (`results/validation/chunking_report.md`). The chunk column
+  contract had to gain the twelve source-share columns: the model *defaults*
+  four of the six shares to zero when they are missing, so a chunked run
+  would otherwise have modelled packaged/delivered/borehole users as piped,
+  silently.
+- **The GLOBAL row is now exactly the sum of the country rows it is
+  published beside** (the outlier cut runs before it is built), in both
+  execution modes and at both resolutions.
+- **`results/regression_baseline/` was RE-FROZEN in the merge commit** — a
+  deliberate model change (new `merged_data.csv`, Unallocated accounting,
+  trim ordering), not a regression. Precedent: `be80d80`. Anything that
+  diffs against the old baseline will be comparing across a model change.
+- **Output columns renamed** `population_piped_*` → `population_affected_*`
+  (and `percent_piped_*` → `percent_affected_*`). Run directories written
+  before 2026-08-11 carry the old names and cannot be read by
+  `compare_smoke_runs.py`; rerun rather than renaming, since their numbers
+  predate the model change too.
+- Environment: python ≥ 3.11 / pandas 2.x (`requirements.txt`,
+  `environment.yml`). Full suite: **275 passed**.
 
 ## Single next action
 
@@ -49,22 +86,29 @@ script and deploy-spot.sh). Scenario logic lives in the
 `urban/rural_borehole_lose_fraction` AND `unallocated_vulnerable_fraction`
 parameters of `gis_global_module.calculate_population_water_access()`
 (HEMP vs CIL as different parameter ranges), NOT baked into the dataset —
-per Kevin's decision. Don't quote anything run on the old code-default
-fractions. Note a checkpoint that predates `unallocated_vulnerable_fractions`
-is rejected loudly — wipe and restart rather than resuming across it.
+per Kevin's decision; the ranges themselves are now edited in
+`src/monte_carlo_constants.py`. Don't quote anything run on the old
+code-default fractions. Note a checkpoint that predates
+`unallocated_vulnerable_fractions` is rejected loudly — wipe and restart
+rather than resuming across it.
 
-Merge note for `kr/30as-feasibility`: that branch reintroduces its own
-`run_monte_carlo.py` (the 30as CLI harness) plus a shared sampling module
-`src/monte_carlo_constants.py`. At merge, take the 30as versions and move
-the lose-fraction sampling from `run_monte_carlo_gcp.py` into
-`sample_parameters()` there, so parameters live in exactly one place.
+Open decision that gates the *resolution* of that run: whether to go to
+30 arc-seconds. The pipeline is merged and works, but the extraction inputs
+(`data/GIS/source_rasters/`, `data/GIS/extracted/`) are gitignored and are
+NOT in this checkout — they live in the `.claude/worktrees/30as-feasibility`
+worktree. Everything above was validated at 5 arc-minutes from
+repo-committed data. See `FEASIBILITY_30_ARCSEC.md`.
 
 ## In-flight / out of scope
 
-- **All Monte Carlo results in `results/` are stale twice over** (except the
-  explicitly-labelled `results/smoketest_3runs/`, which is a wiring test, not
-  results): they predate the new `merged_data.csv` AND the new lose-fraction
-  ranges. Rerun before quoting any numbers in the manuscript.
+- **All Monte Carlo results in `results/` are stale** (except the
+  explicitly-labelled `results/smoketest_3runs/`, a wiring test, and
+  `results/regression_baseline/` + `results/regression_new/`, which are
+  fixed-parameter regression references re-frozen in the merge commit, not
+  Monte Carlo output): they predate the new `merged_data.csv`, the new
+  lose-fraction ranges and the merge. Rerun before quoting any numbers in
+  the manuscript. `results/validation/smoke30*` and `twin5min*` also predate
+  the column rename.
 - Per-country lose fractions (rather than the two global scalars) are
   supported by the CSV but not implemented; a single global scalar
   misallocates *where* displaced people are (matters for spatial results) —
@@ -138,15 +182,25 @@ the lose-fraction sampling from `run_monte_carlo_gcp.py` into
 - Rerunning the MC with the new ranges + manuscript numbers: James. The
   wiring as committed samples uniform over the envelope ranges; the estimate
   doc says uniform or triangular are both defensible, so switching to
-  triangular is a two-line change in `run_monte_carlo_gcp.py` if preferred.
+  triangular is a two-line change in `src/monte_carlo_constants.py` if
+  preferred — and it changes every driver at once, which is the point.
 - India post-2018 handpump/tubewell split: unresolvable until the next NSS
   drinking-water round or census; the 70–80/25–38 ranges carry it.
-- 30-arcsec feasibility call: Kevin (branch `kr/30as-feasibility`).
+- 30-arcsec go/no-go for the production run: Kevin. The code is merged;
+  what is outstanding is the input data (see §Single next action) and the
+  compute call.
 - Manuscript edits from review comments + James's own branch push: James.
 
-## Environment gotcha
+## Environment
 
-`environment.yml` pins pandas 1.4.3; system python3.11 (pyenv, pandas 2.1.4)
-makes 8 pre-existing tests fail in `test_gis_global_module`/
-`test_gis_monte_carlo` (groupby/MultiIndex differences) — NOT from this
-branch. Parser, reconciliation and mobility tests pass on 3.11.
+`environment.yml` and `requirements.txt` now pin python >= 3.11 and
+pandas >= 2.1, < 3.0 (the 30as branch modernised them; the old 1.4.3 pin
+could not supply the rasterio/geopandas versions the extraction needs). The
+8 pandas-2 failures the unpiped branch carried in `test_gis_global_module`/
+`test_gis_monte_carlo` were fixed on the 30as side and are gone: the whole
+suite is green on system python3.11 / pandas 2.1.4.
+
+    python3.11 -m pytest tests/ -q                      # 275 passed
+    python3.11 scripts/validate_chunking.py             # chunked == monolithic
+    python3.11 scripts/capture_baseline.py --out results/regression_new
+    python3.11 scripts/validate_regression.py           # Gate 2
