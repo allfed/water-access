@@ -903,9 +903,15 @@ class model_results:
 
         self.model_name = mo.model_name
 
-        # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
-        self.v_avg_matrix3d = 2 / (
-            1 / self.v_load_matrix3d + 1 / self.v_unload_matrix3d
+        # Harmonic mean of leg velocities (same distance each way). Use 2ab/(a+b)
+        # rather than 2/(1/a+1/b) so a zero/unreachable leg yields 0 without
+        # divide-by-zero warnings.
+        denom = self.v_load_matrix3d + self.v_unload_matrix3d
+        self.v_avg_matrix3d = np.divide(
+            2.0 * self.v_load_matrix3d * self.v_unload_matrix3d,
+            denom,
+            out=np.zeros_like(denom, dtype=float),
+            where=denom != 0,
         )
 
         self.velocitykgs = self.v_avg_matrix3d * self.load_matrix3d

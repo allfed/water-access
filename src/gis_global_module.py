@@ -248,14 +248,19 @@ def merge_and_adjust_population(df_zones_input, df_input):
     # multiply population density by population on a per country basis
     df_zones["pop_zone"] = df_zones["pop_density_perc"] * df_zones["Population"]
 
-    # sum the population in each zone
+    # trim the dataframe to only include rows where there is a population
+    df_zones["any_pop"] = df_zones["pop_zone"].apply(lambda x: 1 if x > 10 else 0)
+    df_zones = df_zones[df_zones["any_pop"] == 1].copy()
+
+    # sum the population in each zone. Computed AFTER the tiny-zone trim so
+    # that country_pop_raw equals the population the model actually
+    # evaluates; computing it before the trim left percent_with_water +
+    # percent_without_water up to ~1.3 pp short of 100 in sparse countries
+    # (the districts denominator was already post-trim, so the two levels
+    # disagreed).
     df_zones["country_pop_raw"] = df_zones.groupby("ISOCODE")["pop_zone"].transform(
         "sum"
     )
-
-    # trim the dataframe to only include rows where there is a population
-    df_zones["any_pop"] = df_zones["pop_zone"].apply(lambda x: 1 if x > 10 else 0)
-    df_zones = df_zones[df_zones["any_pop"] == 1]
 
     return df_zones
 
@@ -576,8 +581,16 @@ def process_and_save_results(
     # Unpack results
     loaded_velocity_vec, unloaded_velocity_vec, max_load_vec = results.T
 
-    # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
-    average_velocity = 2 / (1 / loaded_velocity_vec + 1 / unloaded_velocity_vec)
+    # Harmonic mean of leg velocities (same distance each way). Use 2ab/(a+b)
+    # rather than 2/(1/a+1/b) so a zero/unreachable leg yields 0 without
+    # divide-by-zero warnings.
+    denom = loaded_velocity_vec + unloaded_velocity_vec
+    average_velocity = np.divide(
+        2.0 * loaded_velocity_vec * unloaded_velocity_vec,
+        denom,
+        out=np.zeros_like(denom, dtype=float),
+        where=denom != 0,
+    )
 
     # Customizing column names based on the type of velocity
     loaded_velocity_col = f"loaded_velocity_{velocity_type}"
@@ -847,30 +860,138 @@ def calculate_max_distances(df_zones, time_gathering_water):
     return df_zones
 
 
+# Tolerance on the per-stratum share sum. The regenerated dataset guarantees
+# the five source shares plus Unallocated sum to <= 100.5 (rounding slack);
+# anything above that means the frame predates the Unallocated columns.
+SHARE_SUM_TOLERANCE = 100.5
+
+REGENERATE_MESSAGE = (
+    "merged_data.csv predates the Unallocated columns — regenerate it "
+    "(scripts/Data_Manipulation_Scripts)."
+)
+
+
+def _validate_unallocated_vulnerable_fraction(unallocated_vulnerable_fraction):
+    """Validate the unallocated-allocation parameter.
+
+    Accepts a float in [0, 1]. Returns it as a float so callers can rely on a
+    normalised value.
+    """
+    if isinstance(unallocated_vulnerable_fraction, (bool, np.bool_)):
+        raise ValueError(
+            "unallocated_vulnerable_fraction must be a float in [0, 1], got "
+            f"{unallocated_vulnerable_fraction!r}"
+        )
+    if isinstance(
+        unallocated_vulnerable_fraction, (int, float, np.integer, np.floating)
+    ):
+        value = float(unallocated_vulnerable_fraction)
+        if not 0 <= value <= 1:
+            raise ValueError(
+                "unallocated_vulnerable_fraction must be between 0 and 1, got "
+                f"{unallocated_vulnerable_fraction!r}"
+            )
+        return value
+    raise ValueError(
+        "unallocated_vulnerable_fraction must be a float in [0, 1], got "
+        f"{unallocated_vulnerable_fraction!r}"
+    )
+
+
+def _check_share_sums(df_zones):
+    """Raise if any stratum's five source shares plus Unallocated exceed 100.5.
+
+    After the Unallocated columns exist, the six shares are a partition of the
+    stratum and must sum to (at most) 100 up to rounding. A violation means the
+    frame is stale — mixing new-style Unallocated with old-style unnormalised
+    source shares — and every downstream population figure would be wrong.
+    """
+    offenders = pd.Series(False, index=df_zones.index)
+    for stratum in ("URBAN", "RURAL"):
+        share_sum = (
+            df_zones[f"{stratum}Piped"].fillna(0)
+            + df_zones[f"{stratum}Packaged"]
+            + df_zones[f"{stratum}Delivered"]
+            + df_zones[f"{stratum}Borehole"]
+            + df_zones[f"{stratum}OtherUnpiped"]
+            + df_zones[f"{stratum}Unallocated"]
+        )
+        offenders = offenders | (share_sum > SHARE_SUM_TOLERANCE)
+
+    if offenders.any():
+        id_col = next(
+            (col for col in ("alpha3", "ISOCODE") if col in df_zones.columns), None
+        )
+        if id_col is None:
+            offending = sorted(str(i) for i in df_zones.index[offenders].unique())
+            label = "row"
+        else:
+            offending = sorted(df_zones.loc[offenders, id_col].astype(str).unique())
+            label = id_col
+        raise ValueError(
+            f"Source shares plus Unallocated exceed {SHARE_SUM_TOLERANCE} for "
+            f"{label}(s): {', '.join(offending)}. {REGENERATE_MESSAGE}"
+        )
+
+
 def calculate_population_water_access(
     df_zones,
     urban_borehole_lose_fraction=0.5,
     rural_borehole_lose_fraction=0.25,
+    unallocated_vulnerable_fraction=0.0,
 ):
     """
     Calculates the population with and without access to water for each zone.
 
     Piped, packaged, delivered, and (a configurable fraction of) borehole users
     lose their usual supply and must reach an alternative source by walking or
-    cycling. Residual unpiped users (total unpiped minus displaced categories)
-    retain access under the prior assumption.
+    cycling. Other-unpiped users, the surviving share of borehole users, and
+    the resilient share of the *unallocated* population retain access.
+
+    The accounting is explicit, not residual. Per stratum s (urban/rural), with
+    borehole lose fraction f_s and unallocated vulnerable fraction g:
+
+        affected_s   = Piped + Packaged + Delivered + f_s*Borehole + g*Unallocated
+        resilient_s  = OtherUnpiped + (1-f_s)*Borehole + (1-g)*Unallocated
+
+    The two strata are blended by ``urban_rural`` exactly as the individual
+    source categories are, so ``zone_pop_affected + zone_pop_unpiped_resilient``
+    equals ``pop_zone`` whenever the six shares sum to 100 in both strata.
+
+    ``Unallocated`` is the share of a stratum whose source type is unknown
+    after harmonisation (see UNALLOCATED_GAP_INVESTIGATION.md). Its allocation
+    is a model parameter rather than a silent assumption: the previous code
+    computed the resilient population as a clipped residual, which implicitly
+    treated 100% of the unallocated mass as resilient (g = 0).
 
     Args:
         df_zones (pandas.DataFrame): DataFrame containing zone information.
+            Must contain URBANUnallocated / RURALUnallocated.
         urban_borehole_lose_fraction (float): Share of urban borehole users
             displaced from their usual source.
         rural_borehole_lose_fraction (float): Share of rural borehole users
             displaced from their usual source.
+        unallocated_vulnerable_fraction (float): Share of the unallocated
+            population treated as grid-vulnerable (i.e. added to the affected
+            population). A float g in [0, 1] — 0.0 reproduces the historical
+            residual behaviour on clean data, 1.0 is the all-vulnerable
+            bracket. Defaults to 0.0.
 
     Returns:
         pandas.DataFrame: DataFrame with additional columns representing the population
         with and without access to water for each zone.
+
+    Raises:
+        KeyError: if URBANUnallocated / RURALUnallocated are missing (the input
+            predates the Unallocated columns and must be regenerated).
+        ValueError: if any row's five source shares plus Unallocated exceed
+            100.5 in either stratum, or if unallocated_vulnerable_fraction is
+            not a float in [0, 1].
     """
+    g = _validate_unallocated_vulnerable_fraction(
+        unallocated_vulnerable_fraction
+    )
+
     for col in (
         "URBANPackaged",
         "RURALPackaged",
@@ -885,6 +1006,23 @@ def calculate_population_water_access(
             df_zones[col] = 0
         else:
             df_zones[col] = df_zones[col].fillna(0)
+
+    # The Unallocated columns are NOT defaulted to zero: silently assuming
+    # zero would reinstate the residual behaviour on stale data and hide the
+    # ~348M-person share-sum gap the parameter exists to bracket.
+    missing_unallocated = [
+        col
+        for col in ("URBANUnallocated", "RURALUnallocated")
+        if col not in df_zones.columns
+    ]
+    if missing_unallocated:
+        raise KeyError(
+            f"Missing required column(s) {missing_unallocated}: {REGENERATE_MESSAGE}"
+        )
+    for col in ("URBANUnallocated", "RURALUnallocated"):
+        df_zones[col] = df_zones[col].fillna(0)
+
+    _check_share_sums(df_zones)
 
     df_zones["zone_pop_piped"] = 0
 
@@ -904,7 +1042,10 @@ def calculate_population_water_access(
         / 100
     )
     df_zones["zone_pop_delivered"] = (
-        df_zones["pop_zone"] * df_zones["urban_rural"] * df_zones["URBANDelivered"] / 100
+        df_zones["pop_zone"]
+        * df_zones["urban_rural"]
+        * df_zones["URBANDelivered"]
+        / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
         * df_zones["RURALDelivered"]
@@ -929,6 +1070,7 @@ def calculate_population_water_access(
         * rural_borehole_lose_fraction
         / 100
     )
+    # Now used in the resilient accounting below (it used to be dead code).
     df_zones["zone_pop_other_unpiped"] = (
         df_zones["pop_zone"]
         * df_zones["urban_rural"]
@@ -939,34 +1081,47 @@ def calculate_population_water_access(
         * df_zones["RURALOtherUnpiped"]
         / 100
     )
+
+    # Unallocated population, split into the vulnerable share g and the
+    # resilient share (1 - g). Blended by urban_rural like the other categories.
+    stratum_weights = {
+        "URBAN": df_zones["urban_rural"],
+        "RURAL": 1 - df_zones["urban_rural"],
+    }
+
+    unallocated_total = 0
+    unallocated_affected = 0
+    unallocated_resilient = 0
+    for stratum, weight in stratum_weights.items():
+        unallocated_share = df_zones[f"{stratum}Unallocated"]
+        stratum_pop = df_zones["pop_zone"] * weight * unallocated_share / 100
+        unallocated_total = unallocated_total + stratum_pop
+        unallocated_affected = unallocated_affected + stratum_pop * g
+        unallocated_resilient = unallocated_resilient + stratum_pop * (1 - g)
+
+    df_zones["zone_pop_unallocated"] = unallocated_total
+    df_zones["zone_pop_unallocated_affected"] = unallocated_affected
+    df_zones["zone_pop_unallocated_resilient"] = unallocated_resilient
+
     df_zones["zone_pop_affected"] = (
         df_zones["zone_pop_piped"]
         + df_zones["zone_pop_packaged"]
         + df_zones["zone_pop_delivered"]
         + df_zones["zone_pop_borehole_affected"]
+        + df_zones["zone_pop_unallocated_affected"]
+    )
+    # Explicit sum of the categories that retain access, not a residual: the
+    # surviving borehole users, everyone on other unpiped sources, and the
+    # resilient share of the unallocated population. No clip is needed because
+    # every term is non-negative by construction.
+    df_zones["zone_pop_borehole_resilient"] = (
+        df_zones["zone_pop_borehole"] - df_zones["zone_pop_borehole_affected"]
     )
     df_zones["zone_pop_unpiped_resilient"] = (
-        df_zones["pop_zone"]
-        * df_zones["urban_rural"]
-        * (
-            100
-            - df_zones["URBANPiped"]
-            - df_zones["URBANPackaged"]
-            - df_zones["URBANDelivered"]
-            - df_zones["URBANBorehole"] * urban_borehole_lose_fraction
-        )
-        / 100
-        + df_zones["pop_zone"]
-        * (1 - df_zones["urban_rural"])
-        * (
-            100
-            - df_zones["RURALPiped"]
-            - df_zones["RURALPackaged"]
-            - df_zones["RURALDelivered"]
-            - df_zones["RURALBorehole"] * rural_borehole_lose_fraction
-        )
-        / 100
-    ).clip(lower=0)
+        df_zones["zone_pop_other_unpiped"]
+        + df_zones["zone_pop_borehole_resilient"]
+        + df_zones["zone_pop_unallocated_resilient"]
+    )
 
     # Determine if it's possible to reach water with walking/cycling
     df_zones["zone_cycling_okay"] = (
@@ -1057,12 +1212,14 @@ def process_zones_for_water_access(
     time_gathering_water=16,
     urban_borehole_lose_fraction=1,
     rural_borehole_lose_fraction=1,
+    unallocated_vulnerable_fraction=0.0,
 ):
     df_zones = calculate_max_distances(df_zones, time_gathering_water)
     df_zones = calculate_population_water_access(
         df_zones,
         urban_borehole_lose_fraction=urban_borehole_lose_fraction,
         rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
     )
     df_zones = calculate_water_rations(df_zones)
     return df_zones
@@ -1191,7 +1348,9 @@ def aggregate_global(df_zones):
         "country_pop_raw": df_zones["pop_zone"].sum(),
         "zone_pop_with_water": df_zones["zone_pop_with_water"].sum(),
         "zone_pop_without_water": df_zones["zone_pop_without_water"].sum(),
-        "population_affected_with_access": df_zones["population_affected_with_access"].sum(),
+        "population_affected_with_access": df_zones[
+            "population_affected_with_access"
+        ].sum(),
         "population_affected_with_cycling_access": df_zones[
             "population_affected_with_cycling_access"
         ].sum(),
@@ -1311,17 +1470,8 @@ def process_country_data(df_zones):
         df_median_group, on="ISOCODE"
     )  # Merge weighted median
 
-    # Add global row
-    df_global = aggregate_global(df_zones)
-    # replace country_pop_raw with sum of countries
-    df_global["country_pop_raw"] = df_countries["country_pop_raw"].sum()
-
-    df_countries = pd.concat([df_countries, df_global], ignore_index=True)
-
-    # drop rows from the dataframe that have Nan in pop_zone and dtw_1
-    df_zones = df_zones.dropna(subset=["pop_zone", "dtw_1"])
-
-    # Rename and create percentage columns
+    # Rename population columns before clean-up so the GLOBAL row (added
+    # below) can share the same column names
     df_countries = df_countries.rename(
         columns={
             "zone_pop_with_water": "country_pop_with_water",
@@ -1336,6 +1486,36 @@ def process_country_data(df_zones):
                 df_countries.columns
             )
         )
+
+    df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
+        df_countries
+    )
+
+    # Log or print summary of removed countries
+    if not removed_further_than_libya.empty:
+        print(
+            "Countries removed from analysis due to being further than Libya's median:",
+            removed_further_than_libya["Entity"].tolist(),
+        )
+    print("Countries removed manually:", removed_countries_list)
+
+    # Add global row AFTER clean-up, aggregated over the retained countries'
+    # zones only, so GLOBAL is consistent with the country rows it sits
+    # alongside. (Previously it was built before outlier removal, leaving
+    # its totals ~2.1M people larger than the sum of the published rows.)
+    df_global = aggregate_global(
+        df_zones[df_zones["ISOCODE"].isin(df_countries["ISOCODE"])]
+    )
+    df_global = df_global.rename(
+        columns={
+            "zone_pop_with_water": "country_pop_with_water",
+            "zone_pop_without_water": "country_pop_without_water",
+        }
+    )
+    # replace country_pop_raw with sum of countries
+    df_global["country_pop_raw"] = df_countries["country_pop_raw"].sum()
+
+    df_countries = pd.concat([df_countries, df_global], ignore_index=True)
 
     df_countries["percent_with_water"] = (
         df_countries["country_pop_with_water"] / df_countries["country_pop_raw"] * 100
@@ -1370,18 +1550,6 @@ def process_country_data(df_zones):
         / df_countries["country_pop_raw"]
         * 100
     )
-
-    df_countries, removed_further_than_libya, removed_countries_list = clean_up_data(
-        df_countries
-    )
-
-    # Log or print summary of removed countries
-    if not removed_further_than_libya.empty:
-        print(
-            "Countries removed from analysis due to being further than Libya's median:",
-            removed_further_than_libya["Entity"].tolist(),
-        )
-    print("Countries removed manually:", removed_countries_list)
 
     return df_countries
 
@@ -1598,6 +1766,9 @@ def run_global_analysis(
     hill_polarity,
     urban_adjustment,
     rural_adjustment,
+    urban_borehole_lose_fraction=0.5,
+    rural_borehole_lose_fraction=0.25,
+    unallocated_vulnerable_fraction=0.0,
     calculate_distance=True,
     plot=False,
     human_mass=62,  # gets overridden by country specific weight
@@ -1613,6 +1784,13 @@ def run_global_analysis(
         practical_limit_buckets (float): The practical limit for distance traveled by carrying buckets in kilometers.
         met (str): metabolic equivalent of task (energy for walking).
         watts (float): The power output in watts (energy for cycling).
+        urban_borehole_lose_fraction (float): Share of urban borehole users who lose access
+            when electric pumping fails (scenario parameter, see ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md).
+        rural_borehole_lose_fraction (float): Share of rural borehole users who lose access
+            when electric pumping fails.
+        unallocated_vulnerable_fraction (float): Share of the population whose
+            source type is unallocated that is treated as grid-vulnerable.
+            Float in [0, 1]. See calculate_population_water_access.
         calculate_distance (bool, optional): Whether to calculate distance or not. Defaults to True, otherwise new results are not generated.
         human_mass (float): The mass of an average human carrying water in kilograms.
         plot (bool, optional): Whether to plot the chloropleth map or not. Defaults to False.
@@ -1646,7 +1824,11 @@ def run_global_analysis(
         hill_polarity=hill_polarity,
     )
     df_zones = process_zones_for_water_access(
-        df_zones, time_gathering_water=time_gathering_water
+        df_zones,
+        time_gathering_water=time_gathering_water,
+        urban_borehole_lose_fraction=urban_borehole_lose_fraction,
+        rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
     )
 
     # print("\n\n 1 \n\n")
@@ -1672,7 +1854,6 @@ def run_global_analysis(
 
 
 if __name__ == "__main__":
-
     df_countries, df_districts, zones_results = run_global_analysis(
         crr_adjustment=0,
         time_gathering_water=2.84,

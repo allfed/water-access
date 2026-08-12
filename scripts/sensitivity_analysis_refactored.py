@@ -272,8 +272,15 @@ class RefactoredSensitivityAnalyzer:
                 )
                 max_load = float(max_load) if not np.isnan(max_load) else np.nan
 
-                # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
-                avg_velocity = 2 / (1 / loaded_velocity + 1 / unloaded_velocity)
+                # Harmonic mean of leg velocities (same distance each way). Use
+                # 2ab/(a+b) rather than 2/(1/a+1/b) so a zero/unreachable leg
+                # yields 0 without divide-by-zero warnings.
+                denom = loaded_velocity + unloaded_velocity
+                avg_velocity = (
+                    2.0 * loaded_velocity * unloaded_velocity / denom
+                    if denom
+                    else 0.0
+                )
 
                 results.append(
                     {
