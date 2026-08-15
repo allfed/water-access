@@ -19,7 +19,7 @@ from jmp_source_parser import (  # noqa: E402
     diagnostic_columns,
     load_piped_reference_from_water_csv,
     map_country_names_to_alpha3,
-    normalize_unpiped_subcategories,
+    reconcile_categories_over_100_pct,
     other_improved_unclassified_pct,
     parse_country,
     resolve_borehole_urban_rural,
@@ -44,7 +44,7 @@ def test_parse_indonesia_has_packaged_and_borehole(raw_dir):
     latest = max(records, key=lambda r: r.get("year") or 0)
     has_source_data = any(
         latest.get(f"{indicator}_{suffix}_pct") is not None
-        for indicator in ("packaged", "delivered", "borehole", "piped", "other_unpiped")
+        for indicator in ("packaged", "delivered", "borehole", "piped", "unpiped_unaffected")
         for suffix in ("urban", "rural", "total")
     )
     assert has_source_data
@@ -58,13 +58,13 @@ def test_breakdown_to_model_columns_maps_names():
         "delivered_rural_pct": 4.0,
         "borehole_urban_pct": 5.0,
         "borehole_rural_pct": 6.0,
-        "other_unpiped_urban_pct": 7.0,
-        "other_unpiped_rural_pct": 8.0,
+        "unpiped_unaffected_urban_pct": 7.0,
+        "unpiped_unaffected_rural_pct": 8.0,
     }
     mapped = breakdown_to_model_columns(row)
     assert mapped["URBANPackaged"] == 1.0
     assert mapped["RURALBorehole"] == 6.0
-    assert mapped["URBANOtherUnpiped"] == 7.0
+    assert mapped["URBANUnpipedUnaffected"] == 7.0
 
 
 def test_borehole_total_fallback_when_urban_rural_missing():
@@ -92,33 +92,33 @@ def test_borehole_urban_rural_preserved_when_present():
     assert mapped["RURALBorehole"] == 20.0
 
 
-def test_normalize_unpiped_subcategories_scales_to_budget():
-    pkg, delivered, borehole, other = normalize_unpiped_subcategories(
-        piped_pct=100.0,
-        non_piped_pct=0.0,
+def test_reconcile_categories_over_100_pct_scales_to_budget():
+    pkg, delivered, borehole, unaffected, unknown, _, _ = reconcile_categories_over_100_pct(
+        piped_pct=90.0,
         packaged_pct=80.0,
         delivered_pct=10.0,
         borehole_pct=5.0,
-        other_unpiped_pct=5.0,
+        unpiped_unaffected_pct=5.0,
     )
-    assert pkg == 0.0
-    assert delivered == 0.0
-    assert borehole == 0.0
-    assert other == 0.0
+    assert pkg == 8.0
+    assert delivered == 1.0
+    assert borehole == 0.5
+    assert unaffected == 0.5
+    assert unknown is None
 
 
-def test_normalize_unpiped_subcategories_scales_proportionally():
-    pkg, delivered, borehole, other = normalize_unpiped_subcategories(
+def test_reconcile_categories_over_100_pct_scales_proportionally():
+    pkg, delivered, borehole, unaffected, unknown, _, _ = reconcile_categories_over_100_pct(
         piped_pct=90.0,
-        non_piped_pct=10.0,
         packaged_pct=8.0,
         delivered_pct=4.0,
         borehole_pct=4.0,
-        other_unpiped_pct=4.0,
+        unpiped_unaffected_pct=4.0,
     )
-    assert pytest.approx(pkg + delivered + borehole + other) == 10.0
+    known = [v for v in (pkg, delivered, borehole, unaffected, unknown) if v is not None]
+    assert pytest.approx(sum(known)) == 10.0
     assert pytest.approx(pkg) == 4.0
-    assert pytest.approx(other) == 2.0
+    assert pytest.approx(unaffected) == 2.0
 
 
 def test_select_survey_for_country_respects_year_gap():
@@ -134,7 +134,7 @@ def test_select_survey_for_country_respects_year_gap():
     assert none_within_gap is None
 
 
-def test_apply_piped_reference_and_normalize_preserves_other_unpiped():
+def test_apply_piped_reference_and_normalize_preserves_unpiped_unaffected():
     survey = {
         "packaged_urban_pct": 80.0,
         "packaged_rural_pct": 40.0,
@@ -142,22 +142,47 @@ def test_apply_piped_reference_and_normalize_preserves_other_unpiped():
         "delivered_rural_pct": None,
         "borehole_urban_pct": None,
         "borehole_rural_pct": None,
-        "other_unpiped_urban_pct": 5.0,
-        "other_unpiped_rural_pct": 20.0,
-        "non_piped_urban_pct": 10.0,
-        "non_piped_rural_pct": 30.0,
+        "unpiped_unaffected_urban_pct": 5.0,
+        "unpiped_unaffected_rural_pct": 20.0,
     }
     normalized = apply_piped_reference_and_normalize(
         survey, urban_piped=95.0, rural_piped=70.0
     )
     mapped = breakdown_to_model_columns(normalized)
     assert mapped["URBANPackaged"] < 80.0
-    assert mapped["URBANOtherUnpiped"] > 0.0
+    assert mapped["URBANUnpipedUnaffected"] > 0.0
     assert (
         mapped["URBANPackaged"]
-        + mapped["URBANOtherUnpiped"]
+        + mapped["URBANUnpipedUnaffected"]
         <= 5.0 + 1e-6
     )
+
+
+def test_apply_piped_reference_uses_country_piped_when_global_missing():
+    """When WHO has no stratum piped, budget from country row 6 (100 - piped)."""
+    survey = {
+        "piped_urban_pct": 99.0,
+        "piped_rural_pct": 97.0,
+        "packaged_urban_pct": 50.0,
+        "packaged_rural_pct": 20.0,
+        "delivered_urban_pct": None,
+        "delivered_rural_pct": None,
+        "borehole_urban_pct": None,
+        "borehole_rural_pct": None,
+        "unpiped_unaffected_urban_pct": 5.0,
+        "unpiped_unaffected_rural_pct": 10.0,
+    }
+    normalized = apply_piped_reference_and_normalize(
+        survey, urban_piped=None, rural_piped=None
+    )
+    mapped = breakdown_to_model_columns(normalized)
+    # Urban budget = 100 - 99 = 1% from country row 6 piped
+    assert mapped["URBANPackaged"] == pytest.approx(50 / 55, abs=0.001)
+    assert pytest.approx(mapped["URBANPackaged"] + mapped["URBANUnpipedUnaffected"]) == 1.0
+    # Rural budget = 100 - 97 = 3%
+    assert mapped["RURALPackaged"] == pytest.approx(2.0, abs=0.001)
+    assert mapped["RURALUnpipedUnaffected"] == pytest.approx(1.0, abs=0.001)
+
 
 class TestTotalOnlySurveyFallback:
     """Surveys reporting only country totals must not ship zeros.
@@ -175,14 +200,14 @@ class TestTotalOnlySurveyFallback:
             "delivered_urban_pct": None,
             "delivered_rural_pct": None,
             "delivered_total_pct": 6.0,
-            "other_unpiped_urban_pct": None,
-            "other_unpiped_rural_pct": None,
-            "other_unpiped_total_pct": 19.4,
+            "unpiped_unaffected_urban_pct": None,
+            "unpiped_unaffected_rural_pct": None,
+            "unpiped_unaffected_total_pct": 19.4,
         }
         for category, expected in (
             ("packaged", 22.7),
             ("delivered", 6.0),
-            ("other_unpiped", 19.4),
+            ("unpiped_unaffected", 19.4),
         ):
             urban, rural = resolve_urban_rural_with_total_fallback(row, category)
             assert urban == expected
@@ -192,7 +217,7 @@ class TestTotalOnlySurveyFallback:
         assert mapped["URBANPackaged"] == 22.7
         assert mapped["RURALPackaged"] == 22.7
         assert mapped["URBANDelivered"] == 6.0
-        assert mapped["URBANOtherUnpiped"] == 19.4
+        assert mapped["URBANUnpipedUnaffected"] == 19.4
 
     def test_fallback_does_not_override_a_measured_split(self):
         row = {
@@ -215,9 +240,9 @@ class TestTotalOnlySurveyFallback:
             "borehole_urban_pct": None,
             "borehole_rural_pct": None,
             "borehole_total_pct": 30.0,
-            "other_unpiped_urban_pct": None,
-            "other_unpiped_rural_pct": None,
-            "other_unpiped_total_pct": 19.4,
+            "unpiped_unaffected_urban_pct": None,
+            "unpiped_unaffected_rural_pct": None,
+            "unpiped_unaffected_total_pct": 19.4,
         }
         normalized = apply_piped_reference_and_normalize(
             survey, urban_piped=40.0, rural_piped=20.0
@@ -230,7 +255,7 @@ class TestTotalOnlySurveyFallback:
             mapped["URBANPackaged"]
             + mapped["URBANDelivered"]
             + mapped["URBANBorehole"]
-            + mapped["URBANOtherUnpiped"]
+            + mapped["URBANUnpipedUnaffected"]
         )
         assert urban_sum == pytest.approx(60.0, abs=1e-3)
 
@@ -247,9 +272,9 @@ class TestTotalOnlySurveyFallback:
             "borehole_urban_pct": None,
             "borehole_rural_pct": None,
             "borehole_total_pct": 60.0,
-            "other_unpiped_urban_pct": None,
-            "other_unpiped_rural_pct": None,
-            "other_unpiped_total_pct": 24.0,
+            "unpiped_unaffected_urban_pct": None,
+            "unpiped_unaffected_rural_pct": None,
+            "unpiped_unaffected_total_pct": 24.0,
         }
         normalized = apply_piped_reference_and_normalize(
             survey, urban_piped=93.0, rural_piped=70.0
@@ -258,7 +283,7 @@ class TestTotalOnlySurveyFallback:
         for stratum, piped in (("URBAN", 93.0), ("RURAL", 70.0)):
             total = sum(
                 mapped[f"{stratum}{cat}"]
-                for cat in ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
+                for cat in ("Packaged", "Delivered", "Borehole", "UnpipedUnaffected")
             )
             assert total <= (100.0 - piped) + 1e-6
             assert mapped[f"{stratum}Packaged"] > 0
@@ -331,7 +356,7 @@ class TestOtherImprovedUnclassifiedDiagnostic:
                 "URBANPackaged",
                 "URBANDelivered",
                 "URBANBorehole",
-                "URBANOtherUnpiped",
+                "URBANUnpipedUnaffected",
             )
         )
 
@@ -353,12 +378,12 @@ class TestOtherImprovedUnclassifiedDiagnostic:
             45.46, abs=0.05
         )
         # and none of it leaked into a model category: Delivered is still just
-        # cart + tanker, OtherUnpiped still just wells/springs/rain/surface.
+        # cart + tanker, UnpipedUnaffected still just wells/springs/rain/surface.
         mapped = breakdown_to_model_columns(record)
         assert mapped["URBANDelivered"] == pytest.approx(0.28, abs=0.05)
-        assert mapped["URBANOtherUnpiped"] == pytest.approx(3.64, abs=0.05)
+        assert mapped["URBANUnpipedUnaffected"] == pytest.approx(3.4008, abs=0.05)
         assert (
-            mapped["URBANOtherUnpiped"]
+            mapped["URBANUnpipedUnaffected"]
             < record["other_improved_unclassified_urban_pct"]
         )
 

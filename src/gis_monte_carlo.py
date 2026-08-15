@@ -132,7 +132,7 @@ def run_simulation(
                                             whose source type is unallocated
                                             that is treated as grid-vulnerable.
                                             A float in [0, 1] (0 = all
-                                            resilient, 1 = all vulnerable).
+                                            unaffected, 1 = all vulnerable).
     - calculate_distance (bool, optional): Whether to calculate the distance
                                            during the simulation.
     - use_sample_data (bool, optional): Whether to use sample data. Defaults

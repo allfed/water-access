@@ -913,7 +913,8 @@ def _check_share_sums(df_zones):
             + df_zones[f"{stratum}Packaged"]
             + df_zones[f"{stratum}Delivered"]
             + df_zones[f"{stratum}Borehole"]
-            + df_zones[f"{stratum}OtherUnpiped"]
+            + df_zones[f"{stratum}UnpipedUnaffected"]
+            + df_zones[f"{stratum}UnpipedUnknown"]
             + df_zones[f"{stratum}Unallocated"]
         )
         offenders = offenders | (share_sum > SHARE_SUM_TOLERANCE)
@@ -946,23 +947,23 @@ def calculate_population_water_access(
     Piped, packaged, delivered, and (a configurable fraction of) borehole users
     lose their usual supply and must reach an alternative source by walking or
     cycling. Other-unpiped users, the surviving share of borehole users, and
-    the resilient share of the *unallocated* population retain access.
+    the unaffected share of the *unallocated* population retain access.
 
     The accounting is explicit, not residual. Per stratum s (urban/rural), with
     borehole lose fraction f_s and unallocated vulnerable fraction g:
 
-        affected_s   = Piped + Packaged + Delivered + f_s*Borehole + g*Unallocated
-        resilient_s  = OtherUnpiped + (1-f_s)*Borehole + (1-g)*Unallocated
+        affected_s   = Piped + Packaged + Delivered + f_s*Borehole + g*(Unallocated + UnpipedUnknown)
+        unaffected_s  = UnpipedUnaffected + (1-f_s)*Borehole + (1-g)*(Unallocated + UnpipedUnknown)
 
     The two strata are blended by ``urban_rural`` exactly as the individual
-    source categories are, so ``zone_pop_affected + zone_pop_unpiped_resilient``
+    source categories are, so ``zone_pop_affected + zone_pop_unaffected``
     equals ``pop_zone`` whenever the six shares sum to 100 in both strata.
 
     ``Unallocated`` is the share of a stratum whose source type is unknown
     after harmonisation (see UNALLOCATED_GAP_INVESTIGATION.md). Its allocation
     is a model parameter rather than a silent assumption: the previous code
-    computed the resilient population as a clipped residual, which implicitly
-    treated 100% of the unallocated mass as resilient (g = 0).
+    computed the unaffected population as a clipped residual, which implicitly
+    treated 100% of the unallocated mass as unaffected (g = 0).
 
     Args:
         df_zones (pandas.DataFrame): DataFrame containing zone information.
@@ -999,8 +1000,10 @@ def calculate_population_water_access(
         "RURALDelivered",
         "URBANBorehole",
         "RURALBorehole",
-        "URBANOtherUnpiped",
-        "RURALOtherUnpiped",
+        "URBANUnpipedUnaffected",
+        "RURALUnpipedUnaffected",
+        "URBANUnpipedUnknown",
+        "RURALUnpipedUnknown",
     ):
         if col not in df_zones.columns:
             df_zones[col] = 0
@@ -1070,20 +1073,29 @@ def calculate_population_water_access(
         * rural_borehole_lose_fraction
         / 100
     )
-    # Now used in the resilient accounting below (it used to be dead code).
-    df_zones["zone_pop_other_unpiped"] = (
+    # Now used in the unaffected accounting below (it used to be dead code).
+    df_zones["zone_pop_unpiped_unaffected"] = (
         df_zones["pop_zone"]
         * df_zones["urban_rural"]
-        * df_zones["URBANOtherUnpiped"]
+        * df_zones["URBANUnpipedUnaffected"]
         / 100
         + df_zones["pop_zone"]
         * (1 - df_zones["urban_rural"])
-        * df_zones["RURALOtherUnpiped"]
+        * df_zones["RURALUnpipedUnaffected"]
+        / 100
+    )
+    df_zones["zone_pop_unpiped_unknown"] = (
+        df_zones["pop_zone"]
+        * df_zones["urban_rural"]
+        * df_zones["URBANUnpipedUnknown"]
+        / 100
+        + df_zones["pop_zone"]
+        * (1 - df_zones["urban_rural"])
+        * df_zones["RURALUnpipedUnknown"]
         / 100
     )
 
-    # Unallocated population, split into the vulnerable share g and the
-    # resilient share (1 - g). Blended by urban_rural like the other categories.
+    # Unallocated and UnpipedUnknown: split by g (vulnerable) vs (1-g) (unaffected).
     stratum_weights = {
         "URBAN": df_zones["urban_rural"],
         "RURAL": 1 - df_zones["urban_rural"],
@@ -1091,17 +1103,31 @@ def calculate_population_water_access(
 
     unallocated_total = 0
     unallocated_affected = 0
-    unallocated_resilient = 0
+    unallocated_unaffected = 0
+    unpiped_unknown_affected = 0
+    unpiped_unknown_unaffected = 0
     for stratum, weight in stratum_weights.items():
         unallocated_share = df_zones[f"{stratum}Unallocated"]
-        stratum_pop = df_zones["pop_zone"] * weight * unallocated_share / 100
-        unallocated_total = unallocated_total + stratum_pop
-        unallocated_affected = unallocated_affected + stratum_pop * g
-        unallocated_resilient = unallocated_resilient + stratum_pop * (1 - g)
+        unknown_share = df_zones[f"{stratum}UnpipedUnknown"]
+        stratum_pop_unallocated = (
+            df_zones["pop_zone"] * weight * unallocated_share / 100
+        )
+        stratum_pop_unknown = df_zones["pop_zone"] * weight * unknown_share / 100
+        unallocated_total = unallocated_total + stratum_pop_unallocated
+        unallocated_affected = unallocated_affected + stratum_pop_unallocated * g
+        unallocated_unaffected = (
+            unallocated_unaffected + stratum_pop_unallocated * (1 - g)
+        )
+        unpiped_unknown_affected = unpiped_unknown_affected + stratum_pop_unknown * g
+        unpiped_unknown_unaffected = (
+            unpiped_unknown_unaffected + stratum_pop_unknown * (1 - g)
+        )
 
     df_zones["zone_pop_unallocated"] = unallocated_total
     df_zones["zone_pop_unallocated_affected"] = unallocated_affected
-    df_zones["zone_pop_unallocated_resilient"] = unallocated_resilient
+    df_zones["zone_pop_unallocated_unaffected"] = unallocated_unaffected
+    df_zones["zone_pop_unpiped_unknown_affected"] = unpiped_unknown_affected
+    df_zones["zone_pop_unpiped_unknown_unaffected"] = unpiped_unknown_unaffected
 
     df_zones["zone_pop_affected"] = (
         df_zones["zone_pop_piped"]
@@ -1109,18 +1135,20 @@ def calculate_population_water_access(
         + df_zones["zone_pop_delivered"]
         + df_zones["zone_pop_borehole_affected"]
         + df_zones["zone_pop_unallocated_affected"]
+        + df_zones["zone_pop_unpiped_unknown_affected"]
     )
     # Explicit sum of the categories that retain access, not a residual: the
     # surviving borehole users, everyone on other unpiped sources, and the
-    # resilient share of the unallocated population. No clip is needed because
+    # unaffected share of the unallocated population. No clip is needed because
     # every term is non-negative by construction.
-    df_zones["zone_pop_borehole_resilient"] = (
+    df_zones["zone_pop_borehole_unaffected"] = (
         df_zones["zone_pop_borehole"] - df_zones["zone_pop_borehole_affected"]
     )
-    df_zones["zone_pop_unpiped_resilient"] = (
-        df_zones["zone_pop_other_unpiped"]
-        + df_zones["zone_pop_borehole_resilient"]
-        + df_zones["zone_pop_unallocated_resilient"]
+    df_zones["zone_pop_unaffected"] = (
+        df_zones["zone_pop_unpiped_unaffected"]
+        + df_zones["zone_pop_borehole_unaffected"]
+        + df_zones["zone_pop_unallocated_unaffected"]
+        + df_zones["zone_pop_unpiped_unknown_unaffected"]
     )
 
     # Determine if it's possible to reach water with walking/cycling
@@ -1161,7 +1189,7 @@ def calculate_population_water_access(
     # Calculate zone population with and without water access
     df_zones["zone_pop_with_water"] = (
         df_zones["population_affected_with_access"]
-        + df_zones["zone_pop_unpiped_resilient"]
+        + df_zones["zone_pop_unaffected"]
     )
     df_zones["zone_pop_without_water"] = (
         df_zones["pop_zone"] - df_zones["zone_pop_with_water"]

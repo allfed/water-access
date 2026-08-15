@@ -52,10 +52,16 @@ DEFAULT_MANUAL_ALPHA3_MAPPING = {
 BOREHOLE_ROWS = [57]
 PACKAGED_ROWS = [88]
 DELIVERED_ROWS = [100, 101]
-OTHER_UNPIPED_ROWS = [61, 73, 85, 91, 104]
+UNPIPED_UNAFFECTED_ROWS = [61, 73, 85, 91]
+# Rows 102-103 (unlabelled "Other" under row 99) and 104 (other non-improved):
+# source type unknown or ambiguous impact — scaled with other unpiped categories,
+# then treated like Unallocated in the impact model (g vulnerable / 1-g unaffected).
+UNPIPED_UNKNOWN_ROWS = [102, 103, 104]
 
+# Row 6 "All piped" drives the unpiped budget (100 - piped) when the WHO global
+# CSV has no urban/rural piped for that stratum. Row 7 "Non-piped improved
+# total" is not extracted — it is a different concept from our source-type shares.
 ROW_PIPED = 6
-ROW_NON_PIPED = 7
 # Parent row of the "Other improved sources" block. Its children are cart (100),
 # tanker (101) and one or two unlabelled "Other" rows (102-103) that no model
 # category can absorb without guessing (see UNALLOCATED_GAP_INVESTIGATION.md
@@ -73,7 +79,7 @@ ROW_OTHER_IMPROVED = 99
 # and admin-source service-ladder blocks populate it with a harmonized "100"
 # while measuring no source type at all (ISR_2018_PWH does exactly that).
 SUBCATEGORY_ROWS = sorted(
-    set(BOREHOLE_ROWS + PACKAGED_ROWS + DELIVERED_ROWS + OTHER_UNPIPED_ROWS)
+    set(BOREHOLE_ROWS + PACKAGED_ROWS + DELIVERED_ROWS + UNPIPED_UNAFFECTED_ROWS)
 )
 
 VARIANT_SERVICE_LADDER_ONLY_ERROR = (
@@ -146,12 +152,14 @@ def _extract_block_pcts(rows: list[tuple], col: int) -> dict[str, float | None]:
     out: dict[str, float | None] = {}
     for suffix, offset in (("urban", 3), ("rural", 4), ("total", 5)):
         out[f"piped_{suffix}_pct"] = _pct_value(rows, ROW_PIPED, col, offset)
-        out[f"non_piped_{suffix}_pct"] = _pct_value(rows, ROW_NON_PIPED, col, offset)
         out[f"borehole_{suffix}_pct"] = _sum_pct(rows, BOREHOLE_ROWS, col, offset)
         out[f"packaged_{suffix}_pct"] = _sum_pct(rows, PACKAGED_ROWS, col, offset)
         out[f"delivered_{suffix}_pct"] = _sum_pct(rows, DELIVERED_ROWS, col, offset)
-        out[f"other_unpiped_{suffix}_pct"] = _sum_pct(
-            rows, OTHER_UNPIPED_ROWS, col, offset
+        out[f"unpiped_unaffected_{suffix}_pct"] = _sum_pct(
+            rows, UNPIPED_UNAFFECTED_ROWS, col, offset
+        )
+        out[f"unpiped_unknown_{suffix}_pct"] = _sum_pct(
+            rows, UNPIPED_UNKNOWN_ROWS, col, offset
         )
         other_improved = _pct_value(rows, ROW_OTHER_IMPROVED, col, offset)
         out[f"other_improved_{suffix}_pct"] = other_improved
@@ -171,8 +179,10 @@ def _survey_has_subcategory_data(record: dict[str, Any]) -> bool:
         "borehole_urban_pct",
         "borehole_rural_pct",
         "borehole_total_pct",
-        "other_unpiped_urban_pct",
-        "other_unpiped_rural_pct",
+        "unpiped_unaffected_urban_pct",
+        "unpiped_unaffected_rural_pct",
+        "unpiped_unknown_urban_pct",
+        "unpiped_unknown_rural_pct",
     )
     return any(record.get(key) is not None for key in keys)
 
@@ -245,7 +255,13 @@ def parse_country(path: Path) -> tuple[str, list[dict[str, Any]], str | None]:
         pcts = _extract_block_pcts(rows, col)
         has_data = any(
             pcts.get(f"{key}_total_pct") is not None
-            for key in ("packaged", "delivered", "borehole", "piped", "other_unpiped")
+            for key in (
+                "packaged",
+                "delivered",
+                "borehole",
+                "piped",
+                "unpiped_unaffected",
+            )
         )
         if not has_data:
             continue
@@ -283,44 +299,103 @@ def parse_country(path: Path) -> tuple[str, list[dict[str, Any]], str | None]:
     return iso3, records, None
 
 
-def _unpiped_budget(
-    piped_pct: float | None, non_piped_pct: float | None
-) -> float | None:
+def _unpiped_budget(piped_pct: float | None) -> float | None:
     if piped_pct is not None:
         return max(0.0, 100.0 - piped_pct)
-    if non_piped_pct is not None:
-        return max(0.0, non_piped_pct)
     return None
 
 
-def normalize_unpiped_subcategories(
-    *,
-    piped_pct: float | None,
-    non_piped_pct: float | None,
-    packaged_pct: float | None,
-    delivered_pct: float | None,
-    borehole_pct: float | None,
-    other_unpiped_pct: float | None,
-) -> tuple[float, float, float, float]:
-    """Scale tracked + other unpiped shares to fit the unpiped budget."""
-    budget = _unpiped_budget(piped_pct, non_piped_pct)
-    packaged = packaged_pct or 0.0
-    delivered = delivered_pct or 0.0
-    borehole = borehole_pct or 0.0
-    other = other_unpiped_pct or 0.0
-    total = packaged + delivered + borehole + other
+def _resolve_piped_for_budget(
+    global_piped: float | None, survey: dict[str, Any], stratum: str
+) -> float | None:
+    """WHO global piped for a stratum; country workbook row 6 if global is missing."""
+    if global_piped is not None:
+        return global_piped
+    urban, rural = resolve_urban_rural_with_total_fallback(survey, "piped")
+    return urban if stratum == "urban" else rural
 
+
+def reconcile_categories_over_100_pct(
+    *,
+    piped_pct: float | None = None,
+    packaged_pct: float | None = None,
+    delivered_pct: float | None = None,
+    borehole_pct: float | None = None,
+    unpiped_unaffected_pct: float | None = None,
+    unpiped_unknown_pct: float | None = None,
+    trust_categories_over_piped: bool = False,
+) -> tuple[
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+    str | None,
+]:
+    """Fit five unpiped category shares to the unpiped budget (100 - piped).
+
+    Default: if known categories sum past 100 - piped, scale them all down
+    proportionally. Unknown categories (None / NaN) are left untouched.
+
+    When trust_categories_over_piped is set (imputed piped on research rows),
+    keep the categories and lower piped to 100 - sum(known categories) when
+    they conflict instead of scaling categories down.
+
+    Returns (packaged, delivered, borehole, unpiped_unaffected, unpiped_unknown,
+    effective_piped, note). effective_piped and note are None when piped is
+    left unchanged.
+    """
+    import pandas as pd
+
+    packaged = packaged_pct
+    delivered = delivered_pct
+    borehole = borehole_pct
+    unaffected = unpiped_unaffected_pct
+    unknown = unpiped_unknown_pct
+    values = (packaged, delivered, borehole, unaffected, unknown)
+    known_indexes = [
+        index
+        for index, value in enumerate(values)
+        if value is not None and not pd.isna(value)
+    ]
+    total = sum(values[index] for index in known_indexes)
+
+    if not known_indexes:
+        return packaged, delivered, borehole, unaffected, unknown, None, None
+
+    if trust_categories_over_piped and piped_pct is not None:
+        if piped_pct + total > 100.0:
+            effective_piped = round(max(0.0, 100.0 - total), 4)
+            return (
+                packaged,
+                delivered,
+                borehole,
+                unaffected,
+                unknown,
+                effective_piped,
+                "piped_lowered",
+            )
+        return packaged, delivered, borehole, unaffected, unknown, None, None
+
+    budget = _unpiped_budget(piped_pct)
     if budget is None:
-        return packaged, delivered, borehole, other
+        return packaged, delivered, borehole, unaffected, unknown, None, None
     if total <= budget or total == 0:
-        return packaged, delivered, borehole, other
+        return packaged, delivered, borehole, unaffected, unknown, None, None
 
     scale = budget / total
+    scaled = list(values)
+    for index in known_indexes:
+        scaled[index] = round(values[index] * scale, 4)
     return (
-        round(packaged * scale, 4),
-        round(delivered * scale, 4),
-        round(borehole * scale, 4),
-        round(other * scale, 4),
+        scaled[0],
+        scaled[1],
+        scaled[2],
+        scaled[3],
+        scaled[4],
+        None,
+        f"scaled_to_unpiped_budget(scale={round(scale, 4)})",
     )
 
 
@@ -386,31 +461,38 @@ def apply_piped_reference_and_normalize(
     """Normalize unpiped subcategories against piped reference shares from merged data."""
     resolved = {
         category: resolve_urban_rural_with_total_fallback(survey, category)
-        for category in ("packaged", "delivered", "borehole", "other_unpiped")
+        for category in (
+            "packaged",
+            "delivered",
+            "borehole",
+            "unpiped_unaffected",
+            "unpiped_unknown",
+        )
     }
 
-    pkg_u, del_u, bh_u, other_u = normalize_unpiped_subcategories(
-        piped_pct=urban_piped,
-        non_piped_pct=survey.get("non_piped_urban_pct"),
+    pkg_u, del_u, bh_u, aff_u, unk_u, _, _ = reconcile_categories_over_100_pct(
+        piped_pct=_resolve_piped_for_budget(urban_piped, survey, "urban"),
         packaged_pct=resolved["packaged"][0],
         delivered_pct=resolved["delivered"][0],
         borehole_pct=resolved["borehole"][0],
-        other_unpiped_pct=resolved["other_unpiped"][0],
+        unpiped_unaffected_pct=resolved["unpiped_unaffected"][0],
+        unpiped_unknown_pct=resolved["unpiped_unknown"][0],
     )
-    pkg_r, del_r, bh_r, other_r = normalize_unpiped_subcategories(
-        piped_pct=rural_piped,
-        non_piped_pct=survey.get("non_piped_rural_pct"),
+    pkg_r, del_r, bh_r, aff_r, unk_r, _, _ = reconcile_categories_over_100_pct(
+        piped_pct=_resolve_piped_for_budget(rural_piped, survey, "rural"),
         packaged_pct=resolved["packaged"][1],
         delivered_pct=resolved["delivered"][1],
         borehole_pct=resolved["borehole"][1],
-        other_unpiped_pct=resolved["other_unpiped"][1],
+        unpiped_unaffected_pct=resolved["unpiped_unaffected"][1],
+        unpiped_unknown_pct=resolved["unpiped_unknown"][1],
     )
 
     normalized = {
         "packaged": (pkg_u, pkg_r),
         "delivered": (del_u, del_r),
         "borehole": (bh_u, bh_r),
-        "other_unpiped": (other_u, other_r),
+        "unpiped_unaffected": (aff_u, aff_r),
+        "unpiped_unknown": (unk_u, unk_r),
     }
     out = dict(survey)
     for category, (value_u, value_r) in normalized.items():
@@ -473,8 +555,11 @@ def breakdown_to_model_columns(row: dict[str, Any]) -> dict[str, float | None]:
     borehole_urban, borehole_rural = resolve_urban_rural_with_total_fallback(
         row, "borehole"
     )
-    other_urban, other_rural = resolve_urban_rural_with_total_fallback(
-        row, "other_unpiped"
+    unaffected_urban, unaffected_rural = resolve_urban_rural_with_total_fallback(
+        row, "unpiped_unaffected"
+    )
+    unknown_urban, unknown_rural = resolve_urban_rural_with_total_fallback(
+        row, "unpiped_unknown"
     )
     return {
         "URBANPackaged": packaged_urban,
@@ -483,8 +568,10 @@ def breakdown_to_model_columns(row: dict[str, Any]) -> dict[str, float | None]:
         "RURALDelivered": delivered_rural,
         "URBANBorehole": borehole_urban,
         "RURALBorehole": borehole_rural,
-        "URBANOtherUnpiped": other_urban,
-        "RURALOtherUnpiped": other_rural,
+        "URBANUnpipedUnaffected": unaffected_urban,
+        "RURALUnpipedUnaffected": unaffected_rural,
+        "URBANUnpipedUnknown": unknown_urban,
+        "RURALUnpipedUnknown": unknown_rural,
     }
 
 
@@ -498,12 +585,9 @@ def diagnostic_columns(row: dict[str, Any]) -> dict[str, float | None]:
     """Diagnostic (non-model) columns for the per-country breakdown.
 
     ``OtherImprovedUnclassified_*`` is the part of JMP's "Other improved
-    sources" row that cart + tanker do not explain (rows 102-103): 45.5pp rural
-    / 61.3pp urban for the Philippines, where it is the FIES "community water
-    system" category. It is deliberately NOT folded into any of the five model
-    categories — its composition is ambiguous, so the mass belongs in the
-    sampled Unallocated bucket, which is exactly where it already lands. The
-    column exists so that fact is visible instead of invisible.
+    sources" row that cart + tanker do not explain (rows 102-103). It should
+    approximate ``UnpipedUnknown`` when rows 102-103 are populated; the column
+    is kept as a cross-check, not a model input.
 
     None stays None (unknown), and the same total -> urban/rural fallback the
     model columns use applies, so total-only surveys report the diagnostic too.

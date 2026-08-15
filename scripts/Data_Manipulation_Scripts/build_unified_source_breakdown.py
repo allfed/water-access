@@ -9,7 +9,7 @@ source-type data).
 Priority: the best source wins. JMP-parsed values beat research fills wherever
 the JMP row is *informative* — i.e. it carries a positive value in at least one
 of packaged / delivered / borehole, the categories a real household survey
-measures. A JMP row whose only content is the OtherUnpiped catch-all (or
+measures. A JMP row whose only content is the UnpipedUnaffected catch-all (or
 nothing at all) is not informative: sparse EU-SILC/HBS blocks like
 ROU_2012_EUSILC and BIH_2015_HBS say nothing about boreholes, and letting them
 demote a national census fill deleted ROU's 37% rural borehole share. Those
@@ -17,18 +17,11 @@ rows fall back to research (data_origin="research", with the demotion recorded
 in research_notes and a WARNING printed). Research otherwise only fills rows
 where the JMP extract is entirely blank. Provenance is carried per row.
 
-Research-filled rows are then reconciled against the WHO/JMP piped share using
-the same "unpiped budget" rule the JMP parser applies to survey rows
-(normalize_unpiped_subcategories: if the four categories sum to more than
-100 - piped, scale them down proportionally), with one carve-out agreed on
-2026-08-08: when WHO piped is >= 99.5 (i.e. a rounded ">99") the budget is
-effectively zero and proportional scaling would delete measured regulator or
-census values (e.g. Denmark's 4% private boreholes). In that case the
-categories are kept (capped at a 100 total) and an effective piped share
-(100 - categories) is emitted instead, in URBANPipedEffective /
-RURALPipedEffective. Downstream consumers that adopt the source breakdown
-should also adopt PipedEffective where it is set; otherwise piped + packaged
-users double-count. See researched_source_breakdown_README.md.
+Research-filled rows are then reconciled against the WHO/JMP piped share at
+build time (trust_categories_over_piped=False): known categories scale down to
+the unpiped budget when they exceed 100 - piped; unknown categories stay null.
+Imputation reruns the same scale-down rule, then lowers piped on research rows
+whose piped share was spatially imputed. See researched_source_breakdown_README.md.
 
 Run from repo root:
   python scripts/Data_Manipulation_Scripts/build_unified_source_breakdown.py
@@ -54,6 +47,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from jmp_source_parser import (  # noqa: E402
     DEFAULT_MANUAL_ALPHA3_MAPPING,
     load_piped_reference_from_water_csv,
+    reconcile_categories_over_100_pct,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -75,8 +69,10 @@ VALUE_COLS = [
     "RURALDelivered",
     "URBANBorehole",
     "RURALBorehole",
-    "URBANOtherUnpiped",
-    "RURALOtherUnpiped",
+    "URBANUnpipedUnaffected",
+    "RURALUnpipedUnaffected",
+    "URBANUnpipedUnknown",
+    "RURALUnpipedUnknown",
 ]
 PROVENANCE_COLS = [
     "data_origin",
@@ -101,7 +97,7 @@ SUM_TOLERANCE = 2.0
 UNCLASSIFIED_REMAINDER_TOLERANCE = 2.0
 
 # Columns that make a JMP row "informative": the ones only a household survey
-# that actually asked about source type can fill. OtherUnpiped is excluded on
+# that actually asked about source type can fill. UnpipedUnaffected is excluded on
 # purpose — it is the catch-all every ladder-style block can populate without
 # measuring anything the model cares about.
 INFORMATIVE_COLS = [
@@ -113,65 +109,18 @@ INFORMATIVE_COLS = [
     "RURALBorehole",
 ]
 
-# WHO piped shares at or above this are treated as rounded ">99" values whose
-# unpiped budget (100 - piped) is an artifact of rounding, not a measurement.
-ROUNDED_PIPED_THRESHOLD = 99.5
+CATEGORIES = (
+    "Packaged",
+    "Delivered",
+    "Borehole",
+    "UnpipedUnaffected",
+    "UnpipedUnknown",
+)
 
-CATEGORIES = ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
 
-
-def reconcile_stratum_with_piped_budget(
-    values: dict[str, float | None], piped: float | None
-) -> tuple[dict[str, float | None], float | None, str | None]:
-    """Reconcile one stratum's four category values with the WHO piped share.
-
-    Implements the call-agreed rule (James Mulhall / Kevin Rassool,
-    2026-08-06 call; carve-out added 2026-08-08):
-
-    - Default (piped < ROUNDED_PIPED_THRESHOLD): James's unpiped-budget rule,
-      identical to normalize_unpiped_subcategories in jmp_source_parser.py —
-      if the categories sum past 100 - piped, scale them all down
-      proportionally to fit. Piped wins because category surveys are often
-      multi-response and overlap sits mostly with piped users, who are
-      already counted as losing access.
-    - Carve-out (piped >= ROUNDED_PIPED_THRESHOLD): the budget is a rounding
-      artifact ("piped >99" -> 100), so scaling would zero out measured
-      regulator/census values. Keep the categories (proportionally capped at
-      a 100 total if they exceed it) and return an effective piped share of
-      100 - sum(categories) for downstream use instead.
-
-    ``values`` maps category name -> value or None (None = unknown, never
-    scaled into a number). Returns (adjusted values, effective piped or None,
-    adjustment note or None).
-    """
-    known = {k: v for k, v in values.items() if v is not None and pd.notna(v)}
-    total = sum(known.values())
-    if not known or piped is None or pd.isna(piped):
-        return dict(values), None, None
-
-    if piped >= ROUNDED_PIPED_THRESHOLD:
-        if total > 100.0:
-            scale = 100.0 / total
-            adjusted = {
-                k: (round(v * scale, 4) if k in known else None)
-                for k, v in values.items()
-            }
-            note = f"piped_capped(scale={round(scale, 4)})"
-            total = 100.0
-        else:
-            adjusted = dict(values)
-            note = "piped_capped"
-        return adjusted, round(100.0 - total, 4), note
-
-    budget = max(0.0, 100.0 - piped)
-    if total <= budget or total == 0:
-        return dict(values), None, None
-
-    scale = budget / total
-    adjusted = {
-        k: (round(v * scale, 4) if k in known else None) for k, v in values.items()
-    }
-    return adjusted, None, f"scaled_to_unpiped_budget(scale={round(scale, 4)})"
+def _category_pct(row, stratum: str, category: str) -> float | None:
+    value = row[f"{stratum}{category}"]
+    return None if pd.isna(value) else value
 
 
 def jmp_row_is_informative(row) -> bool:
@@ -180,7 +129,7 @@ def jmp_row_is_informative(row) -> bool:
     "Best source wins" (Kevin, 2026-08-11): a JMP row only outranks a curated
     research row if it is informative, meaning it carries a positive value in
     at least one of packaged / delivered / borehole. A row whose entire content
-    is the OtherUnpiped catch-all — the shape sparse EU-SILC / HBS blocks
+    is the UnpipedUnaffected catch-all — the shape sparse EU-SILC / HBS blocks
     produce — measured none of the model's source types and must not demote a
     census-grade fill.
 
@@ -200,6 +149,8 @@ def jmp_row_is_informative(row) -> bool:
 def load_research(path: Path, exclude_low_confidence: bool) -> pd.DataFrame:
     research = pd.read_csv(path)
     for col in VALUE_COLS:
+        if col not in research.columns:
+            research[col] = pd.NA
         research[col] = pd.to_numeric(research[col], errors="coerce")
 
     has_values = research[VALUE_COLS].notna().any(axis=1)
@@ -260,7 +211,13 @@ def validate(
                 piped_value = None
             parts = [
                 row[f"{stratum}{cat}"]
-                for cat in ("Packaged", "Delivered", "Borehole", "OtherUnpiped")
+                for cat in (
+                    "Packaged",
+                    "Delivered",
+                    "Borehole",
+                    "UnpipedUnaffected",
+                    "UnpipedUnknown",
+                )
             ]
             known = [p for p in parts if pd.notna(p)]
             if not known:
@@ -391,7 +348,7 @@ def main() -> int:
         jmp_survey = str(jmp_survey) if pd.notna(jmp_survey) else "unnamed survey"
         note = (
             f"JMP row demoted: {jmp_survey} reported no packaged, delivered or "
-            "borehole value (at most a catch-all OtherUnpiped), so the research "
+            "borehole value (at most a catch-all UnpipedUnaffected), so the research "
             "fill is the better source"
         )
         r = research_by_alpha3.loc[alpha3]
@@ -459,9 +416,8 @@ def main() -> int:
             WATER_CSV, manual_alpha3_mapping=DEFAULT_MANUAL_ALPHA3_MAPPING
         )
 
-    # Reconcile research-origin rows with the WHO piped share. JMP-origin rows
-    # were already fitted to the unpiped budget by the parser
-    # (normalize_unpiped_subcategories), so only research fills are touched.
+    # Reconcile research-origin rows with the WHO piped share (scale-down rule).
+    # Imputation passes re-reconcile research with trust_categories_over_piped.
     for col in (
         "URBANPipedEffective",
         "RURALPipedEffective",
@@ -475,12 +431,24 @@ def main() -> int:
             continue
         piped = piped_reference.get(row["alpha3"], {})
         for stratum in ("URBAN", "RURAL"):
-            values = {cat: row[f"{stratum}{cat}"] for cat in CATEGORIES}
-            adjusted, piped_effective, note = reconcile_stratum_with_piped_budget(
-                values, piped.get(f"{stratum}Piped")
+            packaged, delivered, borehole, unaffected, unknown, piped_effective, note = (
+                reconcile_categories_over_100_pct(
+                    piped_pct=piped.get(f"{stratum}Piped"),
+                    packaged_pct=_category_pct(row, stratum, "Packaged"),
+                    delivered_pct=_category_pct(row, stratum, "Delivered"),
+                    borehole_pct=_category_pct(row, stratum, "Borehole"),
+                    unpiped_unaffected_pct=_category_pct(
+                        row, stratum, "UnpipedUnaffected"
+                    ),
+                    unpiped_unknown_pct=_category_pct(row, stratum, "UnpipedUnknown"),
+                    trust_categories_over_piped=False,
+                )
             )
-            for cat, value in adjusted.items():
-                unified.at[idx, f"{stratum}{cat}"] = value
+            for cat, value in zip(
+                CATEGORIES, (packaged, delivered, borehole, unaffected, unknown)
+            ):
+                if value is not None:
+                    unified.at[idx, f"{stratum}{cat}"] = value
             if piped_effective is not None:
                 unified.at[idx, f"{stratum}PipedEffective"] = piped_effective
             if note:
@@ -622,7 +590,7 @@ def main() -> int:
     for alpha3, jmp_survey, research_source in demoted:
         print(
             f"  WARNING {alpha3}: JMP row demoted, data_origin jmp -> research. "
-            f"JMP source: {jmp_survey} (catch-all OtherUnpiped only, no "
+            f"JMP source: {jmp_survey} (catch-all UnpipedUnaffected only, no "
             f"packaged/delivered/borehole). Research source: {research_source}."
         )
     for alpha3, lost in displaced:

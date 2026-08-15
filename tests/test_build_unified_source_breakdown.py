@@ -1,10 +1,9 @@
 """Tests for the research-fill piped-budget reconciliation rule.
 
-The rule (agreed on the 2026-08-06 Kevin/James call, carve-out added
-2026-08-08): research-filled source-breakdown rows are fitted to the WHO/JMP
-unpiped budget (100 - piped) exactly like the JMP parser does for survey rows,
-EXCEPT when WHO piped is a rounded ">99" (>= 99.5) — there the measured
-category values win and an effective piped share is emitted instead.
+Research rows trust their category values over the WHO piped headline
+(trust_categories_over_piped=True): when piped + categories exceed 100,
+piped is lowered to 100 - sum(categories). JMP survey rows use the default
+scale-down rule (trust=False).
 """
 
 import sys
@@ -19,111 +18,150 @@ import pytest  # noqa: E402
 
 from build_unified_source_breakdown import (  # noqa: E402
     jmp_row_is_informative,
-    reconcile_stratum_with_piped_budget,
 )
-
-
-def make_values(packaged=None, delivered=None, borehole=None, other=None):
-    return {
-        "Packaged": packaged,
-        "Delivered": delivered,
-        "Borehole": borehole,
-        "OtherUnpiped": other,
-    }
+from jmp_source_parser import reconcile_categories_over_100_pct  # noqa: E402
 
 
 class TestDefaultBudgetRule:
-    """piped < 99.5: James's proportional downscale, identical in spirit to
-    normalize_unpiped_subcategories."""
+    """trust=False: proportional downscale to the unpiped budget."""
 
     def test_scales_down_when_over_budget(self):
-        values = make_values(packaged=10.0, borehole=10.0)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 90.0)
-        assert adjusted["Packaged"] == 5.0
-        assert adjusted["Borehole"] == 5.0
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=90.0,
+                packaged_pct=10.0,
+                borehole_pct=10.0,
+            )
+        )
+        assert packaged == 5.0
+        assert borehole == 5.0
         assert piped_eff is None
         assert note == "scaled_to_unpiped_budget(scale=0.5)"
 
     def test_no_change_when_within_budget(self):
-        values = make_values(packaged=3.0, borehole=4.0)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 90.0)
-        assert adjusted == values
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=90.0,
+                packaged_pct=3.0,
+                borehole_pct=4.0,
+            )
+        )
+        assert packaged == 3.0
+        assert borehole == 4.0
         assert piped_eff is None
         assert note is None
 
-    def test_none_values_stay_none_when_scaling(self):
-        values = make_values(borehole=20.0)  # Packaged/Delivered/Other unknown
-        adjusted, _, note = reconcile_stratum_with_piped_budget(values, 90.0)
-        assert adjusted["Borehole"] == 10.0
-        assert adjusted["Packaged"] is None
-        assert adjusted["Delivered"] is None
-        assert adjusted["OtherUnpiped"] is None
+    def test_unknown_categories_stay_none_when_scaling(self):
+        packaged, delivered, borehole, unaffected, unknown, _, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=90.0,
+                borehole_pct=20.0,
+            )
+        )
+        assert borehole == 10.0
+        assert packaged is None
+        assert delivered is None
+        assert unaffected is None
+        assert unknown is None
         assert note is not None
 
     def test_year_drift_small_overshoot(self):
         # COG-rural-like: piped 11, categories sum 92.3 -> budget 89
-        values = make_values(packaged=0.2, borehole=11.9, other=80.2)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 11.0)
-        total = sum(v for v in adjusted.values() if v is not None)
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=11.0,
+                packaged_pct=0.2,
+                borehole_pct=11.9,
+                unpiped_unaffected_pct=80.2,
+            )
+        )
+        total = sum(v for v in (packaged, delivered, borehole, unaffected, unknown) if v is not None)
         assert abs(total - 89.0) < 0.01
         assert piped_eff is None
         assert "scaled_to_unpiped_budget" in note
 
 
-class TestRoundedPipedCarveOut:
-    """piped >= 99.5: measured categories win; effective piped is emitted."""
+class TestTrustCategoriesOverPiped:
+    """trust=True: researched categories win; piped is lowered when they conflict."""
 
     def test_denmark_case_keeps_measured_boreholes(self):
-        values = make_values(delivered=0.0, borehole=4.0, other=0.0)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 100.0)
-        assert adjusted["Borehole"] == 4.0
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=100.0,
+                delivered_pct=0.0,
+                borehole_pct=4.0,
+                unpiped_unaffected_pct=0.0,
+                trust_categories_over_piped=True,
+            )
+        )
+        assert borehole == 4.0
         assert piped_eff == 96.0
-        assert note == "piped_capped"
+        assert note == "piped_lowered"
 
     def test_anguilla_case_effective_piped_near_zero(self):
-        values = make_values(packaged=60.7, delivered=0.0, borehole=1.0, other=35.9)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 100.0)
-        assert adjusted == values
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=100.0,
+                packaged_pct=60.7,
+                delivered_pct=0.0,
+                borehole_pct=1.0,
+                unpiped_unaffected_pct=35.9,
+                trust_categories_over_piped=True,
+            )
+        )
+        assert packaged == 60.7
         assert abs(piped_eff - 2.4) < 0.01
-        assert note == "piped_capped"
+        assert note == "piped_lowered"
 
-    def test_categories_over_100_are_capped_proportionally(self):
-        values = make_values(packaged=60.0, other=60.0)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 100.0)
-        assert adjusted["Packaged"] == 50.0
-        assert adjusted["OtherUnpiped"] == 50.0
-        assert piped_eff == 0.0
-        assert "piped_capped(scale=" in note
-
-    def test_threshold_is_99_5(self):
-        values = make_values(borehole=4.0)
-        _, piped_eff, note = reconcile_stratum_with_piped_budget(values, 99.5)
-        assert piped_eff == 96.0 and note == "piped_capped"
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 99.4)
-        # below threshold: budget rule applies, budget 0.6 < 4 -> scaled down
+    def test_high_piped_with_zero_categories_unchanged(self):
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=100.0,
+                packaged_pct=0.0,
+                delivered_pct=0.0,
+                borehole_pct=0.0,
+                unpiped_unaffected_pct=0.0,
+                trust_categories_over_piped=True,
+            )
+        )
+        assert packaged == 0.0
         assert piped_eff is None
-        assert adjusted["Borehole"] == 0.6
+        assert note is None
 
-    def test_evidence_based_zeros_keep_full_piped(self):
-        values = make_values(packaged=0.0, delivered=0.0, borehole=0.0, other=0.0)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 100.0)
-        assert adjusted == values
-        assert piped_eff == 100.0
-        assert note == "piped_capped"
+    def test_rounded_piped_below_100_still_scales_without_trust(self):
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                piped_pct=99.4,
+                borehole_pct=4.0,
+            )
+        )
+        assert piped_eff is None
+        assert borehole == 0.6
 
 
 class TestNoReference:
     def test_no_piped_reference_leaves_row_untouched(self):
-        values = make_values(packaged=60.7, other=35.9)
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, None)
-        assert adjusted == values
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(
+                packaged_pct=60.7,
+                unpiped_unaffected_pct=35.9,
+            )
+        )
+        assert packaged == 60.7
+        assert unaffected == 35.9
+        assert unknown is None
         assert piped_eff is None
         assert note is None
 
     def test_all_unknown_values_untouched(self):
-        values = make_values()
-        adjusted, piped_eff, note = reconcile_stratum_with_piped_budget(values, 100.0)
-        assert adjusted == values
+        packaged, delivered, borehole, unaffected, unknown, piped_eff, note = (
+            reconcile_categories_over_100_pct(piped_pct=100.0)
+        )
+        assert packaged is None
+        assert delivered is None
+        assert borehole is None
+        assert unaffected is None
+        assert unknown is None
         assert piped_eff is None
         assert note is None
 
@@ -139,7 +177,7 @@ class TestValidator:
         rural = rural or {}
         row = {"alpha3": alpha3}
         for stratum, values in (("URBAN", urban), ("RURAL", rural)):
-            for cat in ("Packaged", "Delivered", "Borehole", "OtherUnpiped"):
+            for cat in ("Packaged", "Delivered", "Borehole", "UnpipedUnaffected", "UnpipedUnknown"):
                 row[f"{stratum}{cat}"] = values.get(cat, pd.NA)
             row[f"{stratum}PipedEffective"] = (piped_effective or {}).get(stratum, pd.NA)
         return row
@@ -160,7 +198,7 @@ class TestValidator:
 
         from build_unified_source_breakdown import validate
 
-        unified = pd.DataFrame([self._row("USA", rural={"OtherUnpiped": 43.7})])
+        unified = pd.DataFrame([self._row("USA", rural={"UnpipedUnaffected": 43.7})])
         reference = {"USA": {"URBANPiped": 100.0, "RURALPiped": 95.0}}
         problems = validate(unified, piped_reference=reference)
         rural_problems = problems[problems["field"] == "RURAL"]
@@ -178,8 +216,8 @@ class TestValidator:
             [
                 self._row(
                     "KEN",
-                    urban={"Borehole": 10.0, "OtherUnpiped": 5.0},
-                    rural={"Borehole": 20.0, "OtherUnpiped": 10.0},
+                    urban={"Borehole": 10.0, "UnpipedUnaffected": 5.0},
+                    rural={"Borehole": 20.0, "UnpipedUnaffected": 10.0},
                 )
             ]
         )
@@ -270,7 +308,7 @@ class TestValidator:
 class TestBestSourceWins:
     """A JMP row only outranks a research fill when it measured something.
 
-    ROU_2012_EUSILC / BIH_2015_HBS carry nothing but the OtherUnpiped catch-all;
+    ROU_2012_EUSILC / BIH_2015_HBS carry nothing but the UnpipedUnaffected catch-all;
     letting them win deleted Romania's 37% rural borehole share (census) — the
     wrong direction for the very review comment this branch answers.
     """
@@ -288,17 +326,17 @@ class TestBestSourceWins:
                 "RURALDelivered",
                 "URBANBorehole",
                 "RURALBorehole",
-                "URBANOtherUnpiped",
-                "RURALOtherUnpiped",
+                "URBANUnpipedUnaffected",
+                "RURALUnpipedUnaffected",
             )
         }
         row.update({k: v for k, v in kwargs.items() if k not in row})
         return pd.Series(row)
 
     def test_catch_all_only_row_is_not_informative(self):
-        # ROU_2012_EUSILC as shipped: 10 urban / 65 rural OtherUnpiped, nothing else
+        # ROU_2012_EUSILC as shipped: 10 urban / 65 rural UnpipedUnaffected, nothing else
         assert not jmp_row_is_informative(
-            self._row(URBANOtherUnpiped=10.0, RURALOtherUnpiped=65.0)
+            self._row(URBANUnpipedUnaffected=10.0, RURALUnpipedUnaffected=65.0)
         )
 
     def test_all_zero_row_is_not_informative(self):
@@ -318,14 +356,14 @@ class TestBestSourceWins:
                 {
                     "URBANPackaged": pd.NA,
                     "RURALBorehole": None,
-                    "RURALOtherUnpiped": 65.0,
+                    "RURALUnpipedUnaffected": 65.0,
                 }
             )
         )
 
     def test_plain_dict_row_works_too(self):
         assert jmp_row_is_informative({"URBANBorehole": 5.0})
-        assert not jmp_row_is_informative({"URBANOtherUnpiped": 5.0})
+        assert not jmp_row_is_informative({"URBANUnpipedUnaffected": 5.0})
 
 
 class TestUnifiedCsvBestSourceOutcome:

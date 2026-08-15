@@ -51,8 +51,10 @@ def main() -> int:
             "RURALDelivered": row.get("RURALDelivered"),
             "URBANBorehole": row.get("URBANBorehole"),
             "RURALBorehole": row.get("RURALBorehole"),
-            "URBANOtherUnpiped": row.get("URBANOtherUnpiped"),
-            "RURALOtherUnpiped": row.get("RURALOtherUnpiped"),
+            "URBANUnpipedUnaffected": row.get("URBANUnpipedUnaffected"),
+            "RURALUnpipedUnaffected": row.get("RURALUnpipedUnaffected"),
+            "URBANUnpipedUnknown": row.get("URBANUnpipedUnknown"),
+            "RURALUnpipedUnknown": row.get("RURALUnpipedUnknown"),
             "survey": row.get("survey"),
             "survey_year": row.get("survey_year"),
             "piped_reference_year": row.get("piped_reference_year"),
@@ -78,8 +80,10 @@ def main() -> int:
         "RURALDelivered",
         "URBANBorehole",
         "RURALBorehole",
-        "URBANOtherUnpiped",
-        "RURALOtherUnpiped",
+        "URBANUnpipedUnaffected",
+        "RURALUnpipedUnaffected",
+        "URBANUnpipedUnknown",
+        "RURALUnpipedUnknown",
     ):
         if col in df.columns:
             n = df[col].notna().sum()

@@ -217,8 +217,8 @@ class TestMergeAndAdjustPopulation:
                 "Population": [1000000, 2000000],
                 "pop_density_perc": [1.0, 1.0],
                 "pop_zone": [1000000.0, 2000000.0],
-                "country_pop_raw": [1000000.0, 2000000.0],
                 "any_pop": [1, 1],
+                "country_pop_raw": [1000000.0, 2000000.0],
             }
         )
         pd.testing.assert_frame_equal(result, expected_result)
@@ -753,39 +753,40 @@ class TestCalculateMaxDistances:
 
 
 class TestCalculatePopulationWaterAccess:
+    @staticmethod
+    def _water_access_fixture(**overrides):
+        base = {
+            "pop_zone": [1000, 2000, 3000],
+            "urban_rural": [0, 1, 1],
+            "URBANPiped": [50, 60, 70],
+            "RURALPiped": [30, 40, 50],
+            "URBANPackaged": [0, 0, 0],
+            "RURALPackaged": [0, 0, 0],
+            "URBANDelivered": [0, 0, 0],
+            "RURALDelivered": [0, 0, 0],
+            "URBANBorehole": [0, 0, 0],
+            "RURALBorehole": [0, 0, 0],
+            "URBANUnpipedUnaffected": [50, 40, 30],
+            "RURALUnpipedUnaffected": [70, 0, 0],
+            "URBANUnpipedUnknown": [0, 0, 0],
+            "RURALUnpipedUnknown": [0, 0, 0],
+            "URBANUnallocated": [0, 0, 0],
+            "RURALUnallocated": [0, 0, 0],
+            "dtw_1": [100, 200, 300],
+            "max distance cycling": [500, 600, 700],
+            "max distance walking": [200, 300, 400],
+            "PBO": [80, 90, 100],
+        }
+        base.update(overrides)
+        return pd.DataFrame(base)
+
     def test_calculate_population_water_access_returns_dataframe(self):
-        df_zones = pd.DataFrame(
-            {
-                "pop_zone": [1000, 2000, 3000],
-                "urban_rural": [0, 1, 1],
-                "URBANPiped": [50, 60, 70],
-                "RURALPiped": [30, 40, 50],
-                "URBANNon-piped": [20, 30, 40],
-                "RURALNon-piped": [10, 20, 30],
-                "dtw_1": [100, 200, 300],
-                "max distance cycling": [500, 600, 700],
-                "max distance walking": [200, 300, 400],
-                "PBO": [80, 90, 100],
-            }
-        )
+        df_zones = self._water_access_fixture()
         result = calculate_population_water_access(df_zones)
         assert isinstance(result, pd.DataFrame)
 
     def test_calculate_population_water_access_returns_expected_result(self):
-        df_zones = pd.DataFrame(
-            {
-                "pop_zone": [1000, 2000, 3000],
-                "urban_rural": [0, 1, 1],
-                "URBANPiped": [50, 60, 70],
-                "RURALPiped": [30, 40, 50],
-                "URBANNon-piped": [20, 30, 40],
-                "RURALNon-piped": [10, 20, 30],
-                "dtw_1": [100, 200, 500],
-                "max distance cycling": [500, 600, 700],
-                "max distance walking": [200, 300, 400],
-                "PBO": [80, 90, 100],
-            }
-        )
+        df_zones = self._water_access_fixture(dtw_1=[100, 200, 500])
         result = calculate_population_water_access(df_zones)
         expected_result = pd.DataFrame(
             {
@@ -793,8 +794,18 @@ class TestCalculatePopulationWaterAccess:
                 "urban_rural": [0, 1, 1],
                 "URBANPiped": [50, 60, 70],
                 "RURALPiped": [30, 40, 50],
-                "URBANNon-piped": [20, 30, 40],
-                "RURALNon-piped": [10, 20, 30],
+                "URBANPackaged": [0, 0, 0],
+                "RURALPackaged": [0, 0, 0],
+                "URBANDelivered": [0, 0, 0],
+                "RURALDelivered": [0, 0, 0],
+                "URBANBorehole": [0, 0, 0],
+                "RURALBorehole": [0, 0, 0],
+                "URBANUnpipedUnaffected": [50, 40, 30],
+                "RURALUnpipedUnaffected": [70, 0, 0],
+                "URBANUnpipedUnknown": [0, 0, 0],
+                "RURALUnpipedUnknown": [0, 0, 0],
+                "URBANUnallocated": [0, 0, 0],
+                "RURALUnallocated": [0, 0, 0],
                 "dtw_1": [100, 200, 500],
                 "max distance cycling": [500, 600, 700],
                 "max distance walking": [200, 300, 400],
@@ -804,8 +815,8 @@ class TestCalculatePopulationWaterAccess:
                 "zone_pop_delivered": [0.0, 0.0, 0.0],
                 "zone_pop_borehole": [0.0, 0.0, 0.0],
                 "zone_pop_borehole_affected": [0.0, 0.0, 0.0],
-                "zone_pop_other_unpiped": [0.0, 0.0, 0.0],
-                "zone_pop_unpiped_resilient": [700.0, 800.0, 900.0],
+                "zone_pop_unpiped_unaffected": [700.0, 800.0, 900.0],
+                "zone_pop_unaffected": [700.0, 800.0, 900.0],
                 "zone_pop_affected": [300.0, 1200.0, 2100.0],
                 "zone_cycling_okay": [1, 1, 1],
                 "zone_walking_okay": [1, 1, 0],
@@ -845,6 +856,12 @@ class TestCalculatePopulationWaterAccess:
                 "RURALDelivered": [5.0],
                 "URBANBorehole": [5.0],
                 "RURALBorehole": [20.0],
+                "URBANUnpipedUnaffected": [0.0],
+                "RURALUnpipedUnaffected": [0.0],
+                "URBANUnpipedUnknown": [0.0],
+                "RURALUnpipedUnknown": [0.0],
+                "URBANUnallocated": [15.0],
+                "RURALUnallocated": [45.0],
                 "dtw_1": [500],
                 "max distance cycling": [100],
                 "max distance walking": [50],
@@ -872,6 +889,12 @@ class TestCalculatePopulationWaterAccess:
                 "RURALDelivered": [0.0],
                 "URBANBorehole": [0.0],
                 "RURALBorehole": [0.0],
+                "URBANUnpipedUnaffected": [0.0],
+                "RURALUnpipedUnaffected": [0.0],
+                "URBANUnpipedUnknown": [0.0],
+                "RURALUnpipedUnknown": [0.0],
+                "URBANUnallocated": [0.0],
+                "RURALUnallocated": [0.0],
                 "dtw_1": [10],
                 "max distance cycling": [100],
                 "max distance walking": [50],
