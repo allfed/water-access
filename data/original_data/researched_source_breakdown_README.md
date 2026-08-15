@@ -31,7 +31,7 @@ To point the model at the unified file, change `jmp_source_breakdown_path` in
 ## Columns
 
 - `alpha3`, `Entity` — ISO 3166-1 alpha-3 and English name.
-- `URBAN…`/`RURAL…` × `Packaged`, `Delivered`, `Borehole`, `OtherUnpiped` —
+- `URBAN…`/`RURAL…` × `Packaged`, `Delivered`, `Borehole`, `UnpipedUnaffected` —
   percent (0–100) of the urban (resp. rural) population whose **main
   drinking-water source** is that category. Null = unknown; 0 = evidence
   supports ≈0 (an intentional, citable zero).
@@ -60,7 +60,7 @@ To point the model at the unified file, change `jmp_source_breakdown_path` in
 ## Mapping rubric (summary)
 
 - Categories follow JMP conventions: Borehole = drilled tubewell/borehole
-  (incl. own drilled well with electric pump/hydrophore); OtherUnpiped =
+  (incl. own drilled well with electric pump/hydrophore); UnpipedUnaffected =
   dug wells + springs + rainwater/cisterns + surface + other; Packaged =
   bottled/sachet; Delivered = tanker/cart/vendor. Public taps, standpipes and
   taphouses count as **piped** and are excluded.

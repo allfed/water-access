@@ -5,23 +5,22 @@ ASM,URBAN,1.61,no piped reference - sum unverifiable
 ASM,RURAL,1.61,no piped reference - sum unverifiable
 AUT,URBAN,7.0,no piped reference - sum unverifiable
 AUT,RURAL,7.0,no piped reference - sum unverifiable
-BHS,URBAN,0.0,no piped reference - sum unverifiable
-BHS,RURAL,0.0,no piped reference - sum unverifiable
+AZE,URBANOtherImprovedUnclassified,5.5,5.5pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
+AZE,RURALOtherImprovedUnclassified,63.9,63.9pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
+BHS,URBAN,4.17,no piped reference - sum unverifiable
+BHS,RURAL,7.94,no piped reference - sum unverifiable
 BLM,RURAL,0.0,no piped reference - sum unverifiable
-BLZ,URBANOtherImprovedUnclassified,98.7,98.7pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-BLZ,RURALOtherImprovedUnclassified,88.67,88.7pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 BRB,URBAN,0.1,no piped reference - sum unverifiable
 BRB,RURAL,0.1,no piped reference - sum unverifiable
-COK,URBAN,0.2,no piped reference - sum unverifiable
-COK,RURAL,2.88,no piped reference - sum unverifiable
+COK,URBAN,0.87,no piped reference - sum unverifiable
+COK,RURAL,3.21,no piped reference - sum unverifiable
 COK,URBANOtherImprovedUnclassified,3.75,3.7pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 COK,RURALOtherImprovedUnclassified,54.37,54.4pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-CUB,URBANOtherImprovedUnclassified,99.5,99.5pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-CUB,RURALOtherImprovedUnclassified,91.2,91.2pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
+CUB,URBANOtherImprovedUnclassified,3.23,3.2pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 CYM,RURAL,0.0,no piped reference - sum unverifiable
 CYM,URBANOtherImprovedUnclassified,3.4,3.4pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-DMA,URBAN,2.13,no piped reference - sum unverifiable
-DMA,RURAL,5.53,no piped reference - sum unverifiable
+DMA,URBAN,5.12,no piped reference - sum unverifiable
+DMA,RURAL,9.04,no piped reference - sum unverifiable
 DOM,URBANOtherImprovedUnclassified,3.57,3.6pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 DOM,RURALOtherImprovedUnclassified,2.26,2.3pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 FSM,URBAN,69.0,no piped reference - sum unverifiable
@@ -40,6 +39,8 @@ HRV,URBAN,7.0,no piped reference - sum unverifiable
 HRV,RURAL,7.0,no piped reference - sum unverifiable
 HTI,URBANOtherImprovedUnclassified,24.93,24.9pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 HTI,RURALOtherImprovedUnclassified,13.54,13.5pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
+IDN,URBANOtherImprovedUnclassified,96.02,96.0pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
+IDN,RURALOtherImprovedUnclassified,85.7,85.7pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 IRL,RURALOtherImprovedUnclassified,36.4,36.4pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 IRQ,URBANOtherImprovedUnclassified,15.8,15.8pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 IRQ,RURALOtherImprovedUnclassified,20.3,20.3pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
@@ -55,12 +56,12 @@ KNA,URBAN,2.7,no piped reference - sum unverifiable
 KNA,RURAL,2.7,no piped reference - sum unverifiable
 KOR,URBAN,0.0,no piped reference - sum unverifiable
 KOR,RURAL,3.9,no piped reference - sum unverifiable
-LBN,URBAN,50.45,no piped reference - sum unverifiable
-LBN,RURAL,50.45,no piped reference - sum unverifiable
+LBN,URBAN,31.28,no piped reference - sum unverifiable
+LBN,RURAL,31.28,no piped reference - sum unverifiable
 LBN,URBANOtherImprovedUnclassified,17.41,17.4pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 LBN,RURALOtherImprovedUnclassified,17.41,17.4pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-LBY,URBAN,65.05,no piped reference - sum unverifiable
-LBY,RURAL,65.05,no piped reference - sum unverifiable
+LBY,URBAN,7.56,no piped reference - sum unverifiable
+LBY,RURAL,7.56,no piped reference - sum unverifiable
 LKA,RURALOtherImprovedUnclassified,5.95,6.0pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 MAC,RURAL,0.0,no piped reference - sum unverifiable
 MAF,RURAL,11.0,no piped reference - sum unverifiable
@@ -110,11 +111,10 @@ TKM,RURALOtherImprovedUnclassified,62.42,62.4pp of JMP 'other improved sources' 
 TLS,URBANOtherImprovedUnclassified,5.72,5.7pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 TON,URBANOtherImprovedUnclassified,11.75,11.7pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 TON,RURALOtherImprovedUnclassified,16.07,16.1pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-TTO,URBAN,1.77,no piped reference - sum unverifiable
-TTO,RURAL,11.21,no piped reference - sum unverifiable
+TTO,URBAN,2.19,no piped reference - sum unverifiable
+TTO,RURAL,11.83,no piped reference - sum unverifiable
 TUN,URBANOtherImprovedUnclassified,2.44,2.4pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-TUV,URBANOtherImprovedUnclassified,98.0,98.0pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
-TUV,RURALOtherImprovedUnclassified,100.0,100.0pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
+TUV,URBANOtherImprovedUnclassified,3.98,4.0pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 UKR,URBANOtherImprovedUnclassified,18.0,18.0pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 UKR,RURALOtherImprovedUnclassified,18.0,18.0pp of JMP 'other improved sources' is not cart or tanker and matches no model category; left unallocated by design (diagnostic)
 VGB,URBAN,96.7,no piped reference - sum unverifiable
