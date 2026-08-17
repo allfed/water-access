@@ -1443,7 +1443,9 @@ class plotting_hpv:
             new_df = mr.create_dataframe_single_scenario(
                 hpv, mv, mo.load_scene, mo.slope_scene
             )
-            df = df.append(new_df)
+            # DataFrame.append was removed in pandas 2.0; pd.concat is the
+            # documented drop-in replacement (same rows, same index handling).
+            df = pd.concat([df, new_df])
 
         # Truncate the Viridis colormap to remove the last 20% of colors
         truncated_viridis = px.colors.sequential.Viridis[

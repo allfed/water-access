@@ -101,8 +101,12 @@ mkdir -p results/parquet_files
 # Check for existing checkpoint
 gsutil -m cp gs://water-access-data/checkpoints/* results/parquet_files/ 2>/dev/null || true
 
-# Run simulation with checkpointing
-nohup python scripts/run_monte_carlo_gcp.py > simulation.log 2>&1 &
+# Run simulation with checkpointing (30as production profile)
+nohup python scripts/run_monte_carlo_gcp.py \
+    --resolution 30as \
+    --input data/GIS/extracted/master_30as.parquet \
+    --workers 1 \
+    > simulation.log 2>&1 &
 
 # Setup periodic checkpoint upload (every hour)
 (crontab -l 2>/dev/null; echo "0 * * * * gsutil -m rsync -r $HOME/water-access/results/ gs://water-access-data/results/") | crontab -
@@ -221,6 +225,35 @@ gcloud alpha billing accounts budgets list --billing-account=YOUR_BILLING_ACCOUN
 6. **Use Standard storage**: Cheaper than SSD for this use case
 7. **Monitor actively**: Check progress regularly to avoid waste
 
+## 30as vs 5min smoke validation
+
+Before a full 1000-draw production run, validate resolution with a seeded twin
+comparison (same `--seed`, `--workers 1`, ~10 draws):
+
+```bash
+# 30as smoke
+python scripts/run_monte_carlo.py --resolution 30as \
+    --input data/GIS/extracted/master_30as.parquet \
+    --iterations 10 --workers 1 --seed 20260808 \
+    --output-dir results/validation/smoke30 2>&1 | tee results/validation/smoke30_run.log
+
+# 5min twin (same seed)
+python scripts/run_monte_carlo.py --resolution 5min \
+    --iterations 10 --workers 1 --seed 20260808 \
+    --output-dir results/validation/twin5min 2>&1 | tee results/validation/twin5min_run.log
+
+python scripts/compare_smoke_runs.py \
+    --run-30as results/validation/smoke30 \
+    --run-5min results/validation/twin5min \
+    --log-30as results/validation/smoke30_run.log \
+    --log-5min results/validation/twin5min_run.log \
+    --out results/validation/smoke_comparison.md
+```
+
+The comparison script checks that `PARAM_DRAW` lines match and reports global
+population-weighted medians. Pass criteria: `percent_with_water` within ±2 pp and
+30as walking access ≥ 5min.
+
 ## Troubleshooting
 
 ### If simulation doesn't start:
@@ -233,7 +266,10 @@ gcloud compute ssh water-access-compute-spot --zone=us-central1-a
 cd ~/water-access
 source ~/miniconda3/bin/activate
 mamba activate water-access
-python scripts/run_monte_carlo_gcp.py
+python scripts/run_monte_carlo_gcp.py \
+    --resolution 30as \
+    --input data/GIS/extracted/master_30as.parquet \
+    --workers 1
 ```
 
 ### If preempted frequently:

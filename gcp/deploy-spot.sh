@@ -14,6 +14,13 @@ BUCKET_NAME="water-access-james-data"
 MAX_RUN_DURATION="96h" # 4 days
 BOOT_DISK_SIZE="100GB"
 
+# 30as production profile (override for 5min legacy runs)
+MC_RESOLUTION="30as"
+MC_INPUT="data/GIS/extracted/master_30as.parquet"
+MC_WORKERS="1"
+MC_ITERATIONS="1000"
+MC_SEED=""  # e.g. 20260808 for fixed draws; leave empty for unseeded
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -85,7 +92,7 @@ upload_data() {
     
     # Upload code (always update)
     print_status "Uploading code files..."
-    gsutil -m -q cp -r src scripts environment.yml setup.py gs://$BUCKET_NAME/code/
+    gsutil -m -q cp -r src scripts environment.yml requirements.txt setup.py gs://$BUCKET_NAME/code/
     
     # Check if data already uploaded
     if gsutil ls gs://$BUCKET_NAME/input/data/ &> /dev/null; then
@@ -166,16 +173,26 @@ log "Found $EXISTING_COUNT existing simulation results"
 # Setup automatic result sync every 30 minutes
 (crontab -l 2>/dev/null || true; echo "*/30 * * * * cd $WORK_DIR && gsutil -m -q rsync -r results/ gs://__BUCKET_NAME__/results/") | crontab -
 
-# Run simulation
+# Run simulation (30as profile; see deploy-spot.sh MC_* variables)
 log "Starting Monte Carlo simulation at $(date)"
 cd "$WORK_DIR"
-nohup python scripts/run_monte_carlo_gcp.py > /root/simulation.log 2>&1 &
+MC_ARGS="--resolution __MC_RESOLUTION__ --input __MC_INPUT__ --workers __MC_WORKERS__ --iterations __MC_ITERATIONS__"
+if [ -n "__MC_SEED__" ]; then
+    MC_ARGS="$MC_ARGS --seed __MC_SEED__"
+fi
+nohup python scripts/run_monte_carlo_gcp.py $MC_ARGS > /root/simulation.log 2>&1 &
 
 log "Simulation started. PID: $(pgrep -f run_monte_carlo_gcp.py)"
 log "Setup completed at $(date)"
 EOF
 
-    sed "s/__BUCKET_NAME__/${BUCKET_NAME}/g" /tmp/startup-script.sh > /tmp/startup-script.sh.tmp
+    sed -e "s/__BUCKET_NAME__/${BUCKET_NAME}/g" \
+        -e "s/__MC_RESOLUTION__/${MC_RESOLUTION}/g" \
+        -e "s|__MC_INPUT__|${MC_INPUT}|g" \
+        -e "s/__MC_WORKERS__/${MC_WORKERS}/g" \
+        -e "s/__MC_ITERATIONS__/${MC_ITERATIONS}/g" \
+        -e "s/__MC_SEED__/${MC_SEED}/g" \
+        /tmp/startup-script.sh > /tmp/startup-script.sh.tmp
     mv /tmp/startup-script.sh.tmp /tmp/startup-script.sh
     
     print_status "Startup script created"
