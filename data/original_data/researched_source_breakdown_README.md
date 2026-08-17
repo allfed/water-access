@@ -67,8 +67,8 @@ To point the model at the unified file, change `jmp_source_breakdown_path` in
 - Where a census asks both "main household supply" and "main drinking source",
   the drinking table wins (Anguilla, BVI).
 - Multi-response and attitudinal statistics are never inserted as values —
-  they live in `bounds_notes` (this is why Venezuela and Australia are
-  `not_fillable` despite rich research).
+  they live in `bounds_notes` (HumVenezuela multi-response figures for Venezuela
+  remain bounds-only; see the VEN row's `partial_fill` from ENCOVI 2024 p.4).
 - Connection-rate residuals are allocated only where the source names the
   residual's composition; otherwise flagged.
 
