@@ -12,6 +12,7 @@ import os
 project_root = Path().resolve().parent
 sys.path.append(str(project_root))
 import src.gis_monte_carlo as mc  # noqa
+from src.monte_carlo_parameters import sample_parameters  # noqa
 
 # Results path
 RESULTS_PATH = project_root / "water-access/results"
@@ -38,62 +39,8 @@ MAX_WORKERS = 24
 # kernel OOM killer). A normal iteration takes ~15-30 minutes.
 ITERATION_TIMEOUT = 2 * 60 * 60
 
-# -------------------------------------------------------------------------------
-
-
-# -------------------------------------------------------------------------------
-# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
-# -------------------------------------------------------------------------------
-
-# CRR adjustments.
-# 1 means one road type better, -1 means one road type worse
-CRR_LOWER_ESTIMATE = -1
-CRR_UPPER_ESTIMATE = 1
-
-# Time gathering water in hours
-TIME_GATHERING_LOWER_ESTIMATE = 2
-TIME_GATHERING_UPPER_ESTIMATE = 4
-
-# Practical load limits for cycling in kg
-PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
-PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
-
-# Practical load limits for walking with buckets in kg
-PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
-PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
-
-# Average METS available for walking with buckets to and from water source
-METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 5
-
-# Average watts available for cycling to and from water source
-WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 60
-
-# Polarity options (randomly chosen from list each simulation run)
-# The first word defines the trip to the water source
-# The second word defines the trip from the water source
-# Options to include: "uphill_downhill", "downhill_uphill", "uphill_flat",
-# "flat_uphill", "downhill_flat", "flat_downhill", "flat_flat"
-
-POLARITY_OPTIONS = [
-    "uphill_downhill",
-    "uphill_flat",
-    "flat_uphill",
-    "downhill_uphill",
-]
-
-# Adjustments for euclidean distance to account for paths taken to water
-# not being straight lines
-URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
-URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-
-# Set the parameters for the GPD distribution for rural adjustments.
-# Shape, scale, and loc
-# These values were obtained from the scripts/create_pareto_distribution.py
-RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
-RURAL_PDR_PARETO_SCALE = 0.19953125000000005
-RURAL_PDR_PARETO_LOC = 1.0
+# Walking/cycling and water-source parameter ranges live in
+# src/monte_carlo_parameters.py
 
 # -------------------------------------------------------------------------------
 
@@ -193,6 +140,9 @@ def run_and_save_simulation(
     hill_polarity,
     urban_adjustment,
     rural_adjustment,
+    urban_borehole_lose_fraction,
+    rural_borehole_lose_fraction,
+    unallocated_vulnerable_fraction,
 ):
     """Run one simulation in a worker process and write its results to disk.
 
@@ -212,6 +162,9 @@ def run_and_save_simulation(
         hill_polarity,
         urban_adjustment,
         rural_adjustment,
+        urban_borehole_lose_fraction=urban_borehole_lose_fraction,
+        rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
         use_sample_data=False,
     )
 
@@ -268,58 +221,46 @@ if __name__ == "__main__":
         hill_polarities = np.array(params["hill_polarities"])
         urban_adjustments = np.array(params["urban_adjustments"])
         rural_adjustments = np.array(params["rural_adjustments"])
+        if "urban_borehole_lose_fractions" not in params:
+            raise RuntimeError(
+                "checkpoint.json predates the borehole lose-fraction parameters; "
+                "delete the checkpoint and restart"
+            )
+        urban_borehole_lose_fractions = np.array(
+            params["urban_borehole_lose_fractions"]
+        )
+        rural_borehole_lose_fractions = np.array(
+            params["rural_borehole_lose_fractions"]
+        )
+        if "unallocated_vulnerable_fractions" not in params:
+            raise RuntimeError(
+                "checkpoint.json predates the unallocated-allocation parameter; "
+                "delete the checkpoint and restart"
+            )
+        unallocated_vulnerable_fractions = np.array(
+            params["unallocated_vulnerable_fractions"]
+        )
+        parameters = params
         print("📂 Parameters restored from checkpoint")
     else:
-        # Generate new parameters
-        crr_adjustments = np.random.randint(
-            CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
-        )
-        time_gatherings = mc.sample_lognormal(
-            TIME_GATHERING_LOWER_ESTIMATE,
-            TIME_GATHERING_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        practical_limits_bicycle = mc.sample_normal(
-            PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        practical_limits_buckets = mc.sample_normal(
-            PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        mets = mc.sample_normal(
-            METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS
-        )
-        watts_values = mc.sample_normal(
-            WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
-        )
-        hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
-        urban_adjustments = mc.sample_normal(
-            URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-            URBAN_ADJUSTMENT_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        rural_adjustments = mc.sample_gpd(
-            RURAL_PDR_PARETO_SHAPE,
-            RURAL_PDR_PARETO_SCALE,
-            RURAL_PDR_PARETO_LOC,
-            NUM_ITERATIONS,
-        )
+        parameters = sample_parameters(NUM_ITERATIONS)
+        crr_adjustments = parameters["crr_adjustments"]
+        time_gatherings = parameters["time_gatherings"]
+        practical_limits_bicycle = parameters["practical_limits_bicycle"]
+        practical_limits_buckets = parameters["practical_limits_buckets"]
+        mets = parameters["mets"]
+        watts_values = parameters["watts_values"]
+        hill_polarities = parameters["hill_polarities"]
+        urban_adjustments = parameters["urban_adjustments"]
+        rural_adjustments = parameters["rural_adjustments"]
+        urban_borehole_lose_fractions = parameters["urban_borehole_lose_fractions"]
+        rural_borehole_lose_fractions = parameters["rural_borehole_lose_fractions"]
+        unallocated_vulnerable_fractions = parameters[
+            "unallocated_vulnerable_fractions"
+        ]
 
         # Save parameters for potential resume
-        parameters = {
-            "crr_adjustments": crr_adjustments.tolist(),
-            "time_gatherings": time_gatherings.tolist(),
-            "practical_limits_bicycle": practical_limits_bicycle.tolist(),
-            "practical_limits_buckets": practical_limits_buckets.tolist(),
-            "mets": mets.tolist(),
-            "watts_values": watts_values.tolist(),
-            "hill_polarities": hill_polarities.tolist(),
-            "urban_adjustments": urban_adjustments.tolist(),
-            "rural_adjustments": rural_adjustments.tolist(),
-        }
+        parameters = {key: value.tolist() for key, value in parameters.items()}
         save_checkpoint(completed_iterations, parameters)
 
     # Determine which iterations to run
@@ -364,6 +305,9 @@ if __name__ == "__main__":
                 hill_polarities[idx],
                 urban_adjustments[idx],
                 rural_adjustments[idx],
+                urban_borehole_lose_fractions[idx],
+                rural_borehole_lose_fractions[idx],
+                unallocated_vulnerable_fractions[idx],
             ),
         )
         pending.append((idx, async_result))

@@ -15,6 +15,7 @@ import time
 project_root = Path().resolve().parent
 sys.path.append(str(project_root))
 import src.gis_monte_carlo as mc  # noqa
+from src.monte_carlo_parameters import sample_parameters  # noqa
 
 # Results path
 RESULTS_PATH = project_root / "water-access/results"
@@ -24,51 +25,11 @@ PARQUET_PATH = RESULTS_PATH / "parquet_files_test"  # Different folder for test
 # TEST CONFIGURATION - ONLY 2 ITERATIONS!
 # -------------------------------------------------------------------------------
 
-# Define the number of simulations to run
 NUM_ITERATIONS = 2  # ONLY 2 FOR TESTING!
-
-# Define maximum simultaneous processes
 MAX_WORKERS = 2  # Only 2 for testing
 
-# -------------------------------------------------------------------------------
-
-
-# -------------------------------------------------------------------------------
-# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
-# -------------------------------------------------------------------------------
-
-# Using same parameters as production for realistic test
-CRR_LOWER_ESTIMATE = -1
-CRR_UPPER_ESTIMATE = 1
-
-TIME_GATHERING_LOWER_ESTIMATE = 4
-TIME_GATHERING_UPPER_ESTIMATE = 7
-
-PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
-PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
-
-PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
-PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
-
-METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 6
-
-WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 80
-
-POLARITY_OPTIONS = [
-    "uphill_downhill",
-    "uphill_flat",
-    "flat_uphill",
-    "downhill_uphill",
-]
-
-URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
-URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-
-RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
-RURAL_PDR_PARETO_SCALE = 0.19953125000000005
-RURAL_PDR_PARETO_LOC = 1.0
+# Walking/cycling and water-source sampling ranges live in
+# src/monte_carlo_parameters.py (ADR-7).
 
 # -------------------------------------------------------------------------------
 
@@ -83,43 +44,19 @@ if __name__ == "__main__":
     # Create test results directory
     PARQUET_PATH.mkdir(parents=True, exist_ok=True)
 
-    # Monte Carlo parameters
-    crr_adjustments = np.random.randint(
-        CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
-    )
-    time_gatherings = mc.sample_normal(
-        TIME_GATHERING_LOWER_ESTIMATE,
-        TIME_GATHERING_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    practical_limits_bicycle = mc.sample_normal(
-        PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-        PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    practical_limits_buckets = mc.sample_normal(
-        PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-        PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    mets = mc.sample_normal(METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS)
-    watts_values = mc.sample_normal(
-        WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
-    )
-
-    hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
-
-    urban_adjustments = mc.sample_normal(
-        URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-        URBAN_ADJUSTMENT_UPPER_ESTIMATE,
-        NUM_ITERATIONS,
-    )
-    rural_adjustments = mc.sample_gpd(
-        RURAL_PDR_PARETO_SHAPE,
-        RURAL_PDR_PARETO_SCALE,
-        RURAL_PDR_PARETO_LOC,
-        NUM_ITERATIONS,
-    )
+    parameters = sample_parameters(NUM_ITERATIONS)
+    crr_adjustments = parameters["crr_adjustments"]
+    time_gatherings = parameters["time_gatherings"]
+    practical_limits_bicycle = parameters["practical_limits_bicycle"]
+    practical_limits_buckets = parameters["practical_limits_buckets"]
+    mets = parameters["mets"]
+    watts_values = parameters["watts_values"]
+    hill_polarities = parameters["hill_polarities"]
+    urban_adjustments = parameters["urban_adjustments"]
+    rural_adjustments = parameters["rural_adjustments"]
+    urban_borehole_lose_fractions = parameters["urban_borehole_lose_fractions"]
+    rural_borehole_lose_fractions = parameters["rural_borehole_lose_fractions"]
+    unallocated_vulnerable_fractions = parameters["unallocated_vulnerable_fractions"]
 
     print("Parameters generated:")
     print(f"  CRR adjustments: {crr_adjustments}")
@@ -160,6 +97,9 @@ if __name__ == "__main__":
                 hill_polarity,
                 urban_adjustment,
                 rural_adjustment,
+                urban_borehole_lose_fraction,
+                rural_borehole_lose_fraction,
+                unallocated_vulnerable_fraction,
                 use_sample_data=False,
             )
             for (
@@ -172,6 +112,9 @@ if __name__ == "__main__":
                 hill_polarity,
                 urban_adjustment,
                 rural_adjustment,
+                urban_borehole_lose_fraction,
+                rural_borehole_lose_fraction,
+                unallocated_vulnerable_fraction,
             ) in zip(
                 crr_adjustments,
                 time_gatherings,
@@ -182,6 +125,9 @@ if __name__ == "__main__":
                 hill_polarities,
                 urban_adjustments,
                 rural_adjustments,
+                urban_borehole_lose_fractions,
+                rural_borehole_lose_fractions,
+                unallocated_vulnerable_fractions,
             )
         ]
 
