@@ -29,7 +29,7 @@ NUM_ITERATIONS = 2  # ONLY 2 FOR TESTING!
 MAX_WORKERS = 2  # Only 2 for testing
 
 # Walking/cycling and water-source sampling ranges live in
-# src/monte_carlo_parameters.py (ADR-7).
+# src/monte_carlo_parameters.py.
 
 # -------------------------------------------------------------------------------
 

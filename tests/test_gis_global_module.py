@@ -32,6 +32,8 @@ from src.gis_global_module import (
     map_hill_polarity,
     adjust_euclidean,
     run_global_analysis,
+    cell_centre_latitude,
+    population_split_weights,
 )
 
 
@@ -191,6 +193,15 @@ class TestManageSlope:
 
 
 class TestMergeAndAdjustPopulation:
+    """Legacy density-only split.
+
+    These two pin the pre-2026-08-09 behaviour, so they pass
+    ``area_weighted_population=False`` explicitly now that the area-weighted
+    split is the default. Their stub frames carry no ``top``/``bottom``, which
+    the default path requires; the pinned values are unchanged either way (one
+    cell per country means the share is 1.0 under any weighting).
+    """
+
     def test_merge_and_adjust_population_returns_dataframe(self):
         df_zones_input = pd.DataFrame(
             {"ISOCODE": ["USA", "CAN"], "pop_density": [1000, 2000]}
@@ -198,7 +209,9 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
         )
-        result = merge_and_adjust_population(df_zones_input, df_input)
+        result = merge_and_adjust_population(
+            df_zones_input, df_input, area_weighted_population=False
+        )
         assert isinstance(result, pd.DataFrame)
 
     def test_merge_and_adjust_population_returns_expected_result(self):
@@ -208,7 +221,9 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame(
             {"alpha3": ["USA", "CAN"], "Population": [1000000, 2000000]}
         )
-        result = merge_and_adjust_population(df_zones_input, df_input)
+        result = merge_and_adjust_population(
+            df_zones_input, df_input, area_weighted_population=False
+        )
         expected_result = pd.DataFrame(
             {
                 "ISOCODE": ["USA", "CAN"],
@@ -217,8 +232,8 @@ class TestMergeAndAdjustPopulation:
                 "Population": [1000000, 2000000],
                 "pop_density_perc": [1.0, 1.0],
                 "pop_zone": [1000000.0, 2000000.0],
-                "any_pop": [1, 1],
                 "country_pop_raw": [1000000.0, 2000000.0],
+                "any_pop": [1, 1],
             }
         )
         pd.testing.assert_frame_equal(result, expected_result)
@@ -228,6 +243,103 @@ class TestMergeAndAdjustPopulation:
         df_input = pd.DataFrame()
         with pytest.raises(AssertionError):
             merge_and_adjust_population(df_zones_input, df_input)
+
+
+class TestAreaWeightedPopulation:
+    """cos-latitude weighting of the within-country population split.
+
+    On a lat/long grid a cell's ground area shrinks as cos(latitude), so people
+    per cell is density x area, not density. Area weighting is ON by default as
+    of 2026-08-09; ``area_weighted_population=False`` must still reproduce the
+    historical density-only split bit for bit.
+    """
+
+    @staticmethod
+    def _frame():
+        # One country, two cells of equal density: one on the equator, one at
+        # 60 N where a cell is exactly half as wide on the ground.
+        return pd.DataFrame(
+            {
+                "ISOCODE": ["RUS", "RUS"],
+                "pop_density": np.float32([100.0, 100.0]),
+                "top": np.float32([0.5, 60.5]),
+                "bottom": np.float32([-0.5, 59.5]),
+            }
+        )
+
+    @staticmethod
+    def _countries():
+        return pd.DataFrame({"alpha3": ["RUS"], "Population": [1_000_000]})
+
+    def test_cell_centre_latitude_is_the_bound_midpoint(self):
+        latitude = cell_centre_latitude(self._frame())
+        assert latitude.tolist() == [0.0, 60.0]
+
+    def test_cell_centre_latitude_requires_the_bound_columns(self):
+        with pytest.raises(ValueError, match="top"):
+            cell_centre_latitude(pd.DataFrame({"pop_density": [1.0]}))
+
+    def test_population_split_weights_explicit_off_is_density_itself(self):
+        frame = self._frame()
+        weights = population_split_weights(frame, area_weighted_population=False)
+        pd.testing.assert_series_equal(weights, frame["pop_density"])
+
+    def test_population_split_weights_default_applies_cosine_of_latitude(self):
+        # No kwarg: the default must be the corrected, area-weighted form.
+        weights = population_split_weights(self._frame())
+        assert weights.dtype == np.float32
+        np.testing.assert_allclose(weights.to_numpy(), [100.0, 50.0], rtol=1e-6)
+
+    def test_population_split_weights_apply_cosine_of_latitude(self):
+        weights = population_split_weights(self._frame(), area_weighted_population=True)
+        assert weights.dtype == np.float32
+        np.testing.assert_allclose(weights.to_numpy(), [100.0, 50.0], rtol=1e-6)
+
+    def test_flag_off_splits_population_by_density_alone(self):
+        result = merge_and_adjust_population(
+            self._frame(), self._countries(), area_weighted_population=False
+        )
+        np.testing.assert_allclose(result["pop_zone"].to_numpy(), [500_000, 500_000])
+
+    def test_default_shifts_population_equatorward(self):
+        # No kwarg -- this is what the model now does out of the box.
+        result = merge_and_adjust_population(self._frame(), self._countries())
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [666_666.7, 333_333.3], rtol=1e-5
+        )
+
+    def test_flag_on_shifts_population_equatorward(self):
+        result = merge_and_adjust_population(
+            self._frame(), self._countries(), area_weighted_population=True
+        )
+        # cos(0) : cos(60) = 1 : 0.5, so 2/3 of the country lands on the equator.
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [666_666.7, 333_333.3], rtol=1e-5
+        )
+        # The national total is untouched -- only the placement moves.
+        assert result["pop_zone"].sum() == pytest.approx(1_000_000)
+
+    def test_flag_on_requires_the_bound_columns(self):
+        frame = self._frame().drop(columns=["top", "bottom"])
+        with pytest.raises(ValueError, match="area-weighted population"):
+            merge_and_adjust_population(
+                frame, self._countries(), area_weighted_population=True
+            )
+
+    def test_supplied_density_totals_are_used_when_area_weighted(self):
+        # A chunked run hands in the whole country's weight total. Doubling it
+        # must halve every share -- proof the divisor is really the supplied one.
+        frame = self._frame()
+        weights = population_split_weights(frame, area_weighted_population=True)
+        result = merge_and_adjust_population(
+            frame,
+            self._countries(),
+            density_totals={"RUS": weights.sum() * 2},
+            area_weighted_population=True,
+        )
+        np.testing.assert_allclose(
+            result["pop_zone"].to_numpy(), [333_333.3, 166_666.7], rtol=1e-5
+        )
 
 
 class TestCrrAddUncertainty:
@@ -1188,7 +1300,9 @@ class TestProcessCountryData:
                 ],
                 "percent_with_only_cycling_access": [0.0, 0.0, 0.0, 0.0],
             },
-            index=pd.Int64Index([0, 1, 2, 3], dtype="int64"),
+            # pd.Int64Index was removed in pandas 2.0; pd.Index(..., dtype="int64")
+            # is the drop-in replacement and compares equal to the pandas 1.x index.
+            index=pd.Index([0, 1, 2, 3], dtype="int64"),
         )
         # find all differences between result and expected result
         diff = result.compare(expected_result)
@@ -1404,9 +1518,9 @@ class TestAdjustEuclidean:
 # Add test cases for run_global_analysis
 class TestRunGlobalAnalysis:
     def test_run_global_analysis_null_run(self):
-        # If time gathering water is 0, no piped user can reach an alternative
-        # source. Grid-vulnerable unpiped users (packaged, delivered, and a
-        # fraction of borehole) also lose access.
+        # With zero travel time, no affected user (piped, packaged, delivered,
+        # vulnerable borehole/unallocated, etc.) can reach an alternative source,
+        # so population_affected_with_access should be zero everywhere.
         df_countries, df_districts, df_zones = run_global_analysis(
             crr_adjustment=0,
             time_gathering_water=0,
@@ -1421,17 +1535,22 @@ class TestRunGlobalAnalysis:
             plot=False,
             human_mass=62,  # gets overridden by country specific weight
             use_sample_data=True,
+            area_weighted_population=False,
         )
 
         # drop global row
         df_countries = df_countries[df_countries["ISOCODE"] != "GLOBAL"]
 
-        df_countries["pop_unpiped"] = (
+        # Unaffected population: people who retain their usual source.
+        # country_pop_with_water = population_affected_with_access + pop_unaffected
+        df_countries["pop_unaffected"] = (
             df_countries["country_pop_with_water"]
             - df_countries["population_affected_with_access"]
         )
+        # When affected_with_access is zero, (raw - unaffected)/raw equals
+        # percent_without_water — an accounting consistency check.
         y_calc = (
-            (df_countries["country_pop_raw"] - df_countries["pop_unpiped"])
+            (df_countries["country_pop_raw"] - df_countries["pop_unaffected"])
             / df_countries["country_pop_raw"]
             * 100
         )
@@ -1439,7 +1558,6 @@ class TestRunGlobalAnalysis:
         y_pred = df_countries["percent_without_water"]
         mae_calc = np.mean(np.abs(y_calc - y_pred))
 
-        # This should be approx 0 (no areas modelled as piped should get water)
         assert mae_calc < 0.01
 
 

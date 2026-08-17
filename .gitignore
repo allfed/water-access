@@ -139,8 +139,10 @@ results/*
 .DS_Store?
 data/.DS_Store
 
-# JMP country xlsx files (~1.5 GB); copy from well-coverage or run download_jmp_country_files.py
-data/original_data/jmp_country_files/
-
 # GCP deploy state (active zone after fallback create)
 gcp/.instance-zone
+data/GIS/source_rasters/
+.venv-phase0/
+
+# scripted extraction outputs (large parquet/csv, never committed)
+data/GIS/extracted/
