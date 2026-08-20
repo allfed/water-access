@@ -1,8 +1,9 @@
 """Local Monte Carlo driver.
 
 Defaults reproduce the historical *harness*: 1000 iterations against the
-5 arc-minute CSV, per-iteration zone/district/country Parquet dumps, and the two
-pickles the notebooks read. The one deliberate model change since is the
+5 arc-minute CSV, per-iteration zone/district/country Parquet dumps, and
+optional legacy pickles (notebooks read per-draw country parquets instead).
+The one deliberate model change since is the
 cos-latitude population split, on by default since 2026-08-09 --
 ``--no-area-weighted-population`` restores the pre-correction placement.
 
@@ -233,8 +234,8 @@ def main(argv=None):
     save_zone_parquet = (
         args.save_zone_parquet if args.save_zone_parquet is not None else not is_30as
     )
-    # The pickles are read by two notebooks only. Keep them at
-    # 5 arc-minutes, skip them at 30 arc-seconds.
+    # Legacy pickles are optional; notebooks load per-draw country parquets.
+    # Keep pickles at 5 arc-minutes only, skip at 30 arc-seconds.
     write_pickle = not is_30as
     plot = args.plot if args.plot is not None else not is_30as
 
@@ -296,8 +297,7 @@ def main(argv=None):
     if args.seed is not None:
         # sample_parameters draws through the legacy global RNG (numpy's, which
         # is also what scipy's ``.rvs`` uses by default), so seeding it here
-        # fixes every one of the nine parameters. Same trick as
-        # scripts/validate_lut.py.
+        # fixes every one of the nine parameters.
         np.random.seed(args.seed)
         print(f"Parameter seed: {args.seed}")
     else:

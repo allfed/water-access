@@ -126,6 +126,10 @@ Run from the repository root.
 
 .venv/bin/python scripts/extraction/check_consistency.py \
     --table data/GIS/extracted/master_30as.parquet --resolution 30as
+
+# Model impact: one deterministic run, legacy CSV vs extracted 5min table
+.venv/bin/python scripts/compare_grid_inputs.py \
+    --report results/validation/grid_input_comparison.md
 ```
 
 All four commands exit 0 on success. `data/GIS/extracted/` is gitignored —

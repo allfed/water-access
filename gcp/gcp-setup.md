@@ -54,14 +54,44 @@ gsutil -m mkdir gs://water-access-data/checkpoints/
 
 ## Step 3: Upload Data to Cloud Storage
 
+Monte Carlo reads **`data/processed/merged_data.csv`** (country-level piped/unpiped
+breakdown, population, etc.) and the zone grid input. It does **not** read JMP
+country xlsx files at runtime — those are only for rebuilding `merged_data.csv`
+locally (`download_jmp_country_files.py` → `imputation_script.py`).
+
 ```bash
-# Upload data folder (3.5GB) - do this once
+# Upload data folder (~3.5GB) - do this once, or refresh merged_data after pipeline changes:
 cd /path/to/water-access
 gsutil -m -o GSUtil:parallel_composite_upload_threshold=150M cp -r data gs://water-access-data/input/
+
+# After changing merged_data.csv only (e.g. Venezuela ENCOVI fill):
+gsutil cp data/processed/merged_data.csv gs://water-access-data/input/data/processed/
 
 # Upload code
 gsutil -m cp -r src scripts environment.yml gs://water-access-data/code/
 ```
+
+### 30 arc-second input (required for `--resolution 30as`)
+
+`master_30as.parquet` (~3.4 GB) is **not in git** (see `.gitignore`). Build it
+locally before a 30as cloud run:
+
+```bash
+# Follow scripts/extraction/README.md (source rasters + extract_grid.py)
+python scripts/extraction/extract_grid.py \
+    --resolution 30as \
+    --out data/GIS/extracted/master_30as.parquet
+```
+
+Upload the parquet to GCS (always, even if bulk `data/` was uploaded earlier):
+
+```bash
+gsutil -m cp data/GIS/extracted/master_30as.parquet \
+    gs://water-access-data/input/data/GIS/extracted/
+```
+
+Or use `./gcp/deploy-spot.sh upload`, which checks for the local parquet when
+`MC_RESOLUTION=30as` in `deploy-spot.sh` and uploads it automatically.
 
 ## Step 4: Create Spot VM Instance
 

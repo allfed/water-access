@@ -18,8 +18,8 @@ BOOT_DISK_SIZE="100GB"
 MC_RESOLUTION="30as"
 MC_INPUT="data/GIS/extracted/master_30as.parquet"
 MC_WORKERS="1"
-MC_ITERATIONS="1000"
-MC_SEED=""  # e.g. 20260808 for fixed draws; leave empty for unseeded
+MC_ITERATIONS="20"
+MC_SEED="20260808"  # e.g. 20260808 for fixed draws; leave empty for unseeded
 
 # Colors for output
 RED='\033[0;31m'
@@ -96,14 +96,34 @@ upload_data() {
     
     # Check if data already uploaded
     if gsutil ls gs://$BUCKET_NAME/input/data/ &> /dev/null; then
-        print_warning "Data already uploaded. Skipping data upload (3.5GB)..."
-        print_warning "To re-upload data, run: gsutil -m rm -r gs://$BUCKET_NAME/input/data"
+        print_warning "Data already uploaded. Skipping bulk data upload (3.5GB)..."
+        print_warning "To refresh country inputs (e.g. merged_data.csv), run:"
+        print_warning "  gsutil cp data/processed/merged_data.csv gs://$BUCKET_NAME/input/data/processed/"
+        print_warning "To re-upload all data, run: gsutil -m rm -r gs://$BUCKET_NAME/input/data"
     else
         print_status "Uploading data (3.5GB) - this will take a while..."
         gsutil -m -o GSUtil:parallel_composite_upload_threshold=150M cp -r data gs://$BUCKET_NAME/input/
     fi
+
+    upload_30as_input
     
     print_status "Upload completed"
+}
+
+upload_30as_input() {
+    if [ "$MC_RESOLUTION" != "30as" ]; then
+        return 0
+    fi
+
+    local parquet_path="data/GIS/extracted/master_30as.parquet"
+    if [ ! -f "$parquet_path" ]; then
+        print_error "30as profile requires $parquet_path on this machine."
+        print_error "Build it locally first (scripts/extraction/README.md), then re-run upload/deploy."
+        exit 1
+    fi
+
+    print_status "Uploading 30as zone input (~3.4GB) to GCS..."
+    gsutil -m cp "$parquet_path" "gs://${BUCKET_NAME}/input/data/GIS/extracted/"
 }
 
 create_startup_script() {

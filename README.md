@@ -53,7 +53,7 @@ If imports fail in the notebook kernel, rerun `pip install -e .` from the reposi
 
 ### Explore existing results
 
-Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](scripts/distribution_plots.ipynb) to generate key tables and plots from the summary CSVs in `results/`.
+Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](scripts/distribution_plots.ipynb) to generate key tables and plots from the summary CSVs and per-draw country parquets in `results/`.
 
 ### Re-run the model with new assumptions
 
@@ -80,6 +80,12 @@ python scripts/Data_Manipulation_Scripts/imputation_script.py
 ```
 
 Default borehole displacement scenarios: 50% urban, 25% rural (JMP does not distinguish handpump vs motorized). Displaced users — piped, packaged, delivered, and the displaced borehole share — all regain access only if walking or cycling range allows. Unaffected unpiped users are the residual share after subtracting those displaced categories from total unpiped (`100% − piped`). Parsed `UnpipedUnaffected` columns are used only when scaling survey breakdowns to the unpiped budget. Override via `urban_borehole_lose_fraction` and `rural_borehole_lose_fraction` in `calculate_population_water_access()`.
+
+Countries without JMP household breakdowns can be filled manually in [`data/original_data/researched_source_breakdown.csv`](data/original_data/researched_source_breakdown.csv) (see the README there for provenance rules). Venezuela uses ENCOVI 2024 published shares.
+
+### 30 arc-second resolution
+
+Build the extracted grid with [`scripts/extraction/`](scripts/extraction/), then run Monte Carlo with `--resolution 30as`. At 30 arc-seconds the driver writes aggregate parquets and summary CSVs only (no per-cell zone parquets or simulation pickles). See [`docs/README.md`](docs/README.md) and [`gcp/gcp-setup.md`](gcp/gcp-setup.md) for local and cloud workflows.
 
 ## Full reproduction
 

@@ -28,7 +28,9 @@ python scripts/run_monte_carlo.py
 ./gcp/monitor.sh
 ```
 
-Parameters at the top of the Monte Carlo script define the uncertainty ranges used in the publication; adjust as needed. Outputs are written to `results/parquet_files/` (one parquet per iteration for zones, districts, and countries). Summary CSVs and pickles are written to `results/` when aggregation completes.
+Parameters at the top of the Monte Carlo script define the uncertainty ranges used in the publication; adjust as needed. Outputs are written to `results/parquet_files/` (one parquet per iteration for zones, districts, and countries). Summary CSVs are written to `results/` when aggregation completes. The analysis notebooks read per-draw country parquets from `results/parquet_files/`; legacy simulation pickles are optional at 5 arc-minutes only.
+
+For 30 arc-second runs, pass `--resolution 30as --input data/GIS/extracted/master_30as.parquet` after building the extracted grid (see [`scripts/extraction/README.md`](../scripts/extraction/README.md)). Compare 5 arc-minute vs 30 arc-second smoke outputs with [`scripts/compare_smoke_runs.py`](../scripts/compare_smoke_runs.py).
 
 ## 3. Generate key results
 

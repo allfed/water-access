@@ -321,8 +321,8 @@ def process_mc_results(
         os.path.join(output_dir, "country_5th_percentile_results.csv")
     )
 
-    # Step 4: pickle the simulation results. Only two notebooks read these; at
-    # 30 arc-seconds they are enormous, so the 30as driver turns them off.
+    # Step 4: optional legacy pickle of per-draw country frames. Notebooks read
+    # per-draw country parquets instead; at 30 arc-seconds pickles are off.
     if write_pickle:
         with open(
             os.path.join(output_dir, "countries_simulation_results.pkl"), "wb"

@@ -146,3 +146,6 @@ data/GIS/source_rasters/
 
 # scripted extraction outputs (large parquet/csv, never committed)
 data/GIS/extracted/
+
+# JMP country xlsx downloads (regenerate via download_jmp_country_files.py)
+data/original_data/jmp_country_files/
