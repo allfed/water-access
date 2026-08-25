@@ -91,11 +91,16 @@ LATITUDE_COLUMNS = tuple(gis.LATITUDE_COLUMNS)
 #: they are harmless passengers that get handed back to the caller; a chunked
 #: run throws the per-cell frame away, so carrying them is pure cost.
 #:
+#: Must include the URBAN*/RURAL* source-share columns used by
+#: ``calculate_population_water_access`` (Packaged through Unallocated).
+#: Dropping those made 30as fail with a misleading "stale merged_data" error.
+#:
 #: Dropping unread columns cannot change a number -- ``validate_chunking.py``
 #: is what proves that, since it compares against the monolithic path which
 #: keeps them.
 CHUNK_KEEP_COLUMNS = (
     # identifiers and grouping keys
+    "fid",
     "ISOCODE",
     "shapeID",
     "shapeName",
@@ -116,6 +121,20 @@ CHUNK_KEEP_COLUMNS = (
     "RURALPiped",
     "PBO",
     "Household_Size",
+    # source-breakdown shares (needed by calculate_population_water_access;
+    # dropping them made 30as look like a stale merged_data.csv)
+    "URBANPackaged",
+    "RURALPackaged",
+    "URBANDelivered",
+    "RURALDelivered",
+    "URBANBorehole",
+    "RURALBorehole",
+    "URBANUnpipedUnaffected",
+    "RURALUnpipedUnaffected",
+    "URBANUnpipedUnknown",
+    "RURALUnpipedUnknown",
+    "URBANUnallocated",
+    "RURALUnallocated",
 )
 
 
@@ -487,6 +506,8 @@ def run_chunked_global_analysis(
     progress=True,
     spill_dir=None,
     area_weighted_population=True,
+    zone_output_path=None,
+    zone_output_columns=None,
 ):
     """Run the global analysis one country-group at a time.
 
@@ -516,6 +537,10 @@ def run_chunked_global_analysis(
         area_weighted_population (bool): see
             :func:`gis_global_module.merge_and_adjust_population`. A supplied
             ``plan`` must agree with it.
+        zone_output_path (optional): if set with ``zone_output_columns``, append
+            per-cell zone results to this Parquet file as each chunk completes.
+        zone_output_columns (optional): columns to write (e.g. fid and the two
+            zone_pop_* fields). Only used when ``zone_output_path`` is set.
 
     Returns:
         tuple: ``(df_countries, df_districts)``.
@@ -558,6 +583,13 @@ def run_chunked_global_analysis(
     else:
         spill = tempfile.TemporaryDirectory(prefix="water-access-chunks-")
 
+    zone_output_columns = list(zone_output_columns or [])
+    if bool(zone_output_path) != bool(zone_output_columns):
+        raise ValueError(
+            "zone_output_path and zone_output_columns must both be set or both omitted"
+        )
+
+    zone_writer = None
     started = time.perf_counter()
     with spill as spill_root, solver_lut.pinned_grid_ranges(
         slope_range=plan.slope_range, mass_range=plan.mass_range
@@ -618,6 +650,17 @@ def run_chunked_global_analysis(
                 )
             )
             country_parts.append(gis.country_partials(df_zones))
+
+            if zone_output_columns:
+                import pyarrow as pa
+                import pyarrow.parquet as pq
+
+                zone_chunk = df_zones[zone_output_columns].reset_index(drop=True)
+                table = pa.Table.from_pandas(zone_chunk, preserve_index=False)
+                if zone_writer is None:
+                    Path(zone_output_path).parent.mkdir(parents=True, exist_ok=True)
+                    zone_writer = pq.ParquetWriter(str(zone_output_path), table.schema)
+                zone_writer.write_table(table)
 
             for key, column in gis.GLOBAL_SUM_COLUMNS.items():
                 global_sums[key] += float(df_zones[column].sum())
@@ -692,6 +735,9 @@ def run_chunked_global_analysis(
     )
     del district_parts
     df_districts = df_districts[df_districts["ISOCODE"].isin(df_countries["ISOCODE"])]
+
+    if zone_writer is not None:
+        zone_writer.close()
 
     if progress:
         print(

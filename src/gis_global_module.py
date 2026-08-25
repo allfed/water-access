@@ -2330,6 +2330,7 @@ def run_global_analysis(
     chunk_rows=None,  # Memory optimization: run country-group by country-group
     chunk_plan=None,  # reuse a plan across draws
     area_weighted_population=True,  # cos-latitude cell-area weighting; False = legacy
+    zone_output_path=None,  # chunked mode: stream per-cell columns here
 ):
     """
     Runs one run of the global analysis for water access.
@@ -2377,6 +2378,8 @@ def run_global_analysis(
             historical, bit-identical behaviour. A supplied ``chunk_plan`` must
             have been built with the same setting -- the planner's pre-pass
             normalises with the same weight.
+        zone_output_path (str or Path, optional): in chunked mode, stream
+            ``zone_columns`` to this Parquet file instead of returning them.
 
     Returns:
         pandas.DataFrame: The processed data for each country.
@@ -2403,6 +2406,8 @@ def run_global_analysis(
             chunk_rows=chunk_rows or chunked.DEFAULT_CHUNK_ROWS,
             plan=chunk_plan,
             area_weighted_population=area_weighted_population,
+            zone_output_path=zone_output_path,
+            zone_output_columns=list(zone_columns) if zone_columns else None,
         )
         if plot:
             plot_chloropleth(df_countries)

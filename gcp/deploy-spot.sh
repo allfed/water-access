@@ -97,9 +97,10 @@ upload_data() {
     # Check if data already uploaded
     if gsutil ls gs://$BUCKET_NAME/input/data/ &> /dev/null; then
         print_warning "Data already uploaded. Skipping bulk data upload (3.5GB)..."
-        print_warning "To refresh country inputs (e.g. merged_data.csv), run:"
-        print_warning "  gsutil cp data/processed/merged_data.csv gs://$BUCKET_NAME/input/data/processed/"
         print_warning "To re-upload all data, run: gsutil -m rm -r gs://$BUCKET_NAME/input/data"
+        # Always refresh country inputs — they change often and are tiny.
+        print_status "Refreshing merged_data.csv on GCS..."
+        gsutil -q cp data/processed/merged_data.csv gs://$BUCKET_NAME/input/data/processed/
     else
         print_status "Uploading data (3.5GB) - this will take a while..."
         gsutil -m -o GSUtil:parallel_composite_upload_threshold=150M cp -r data gs://$BUCKET_NAME/input/
@@ -181,26 +182,33 @@ pip install -e .
 # Create results directory
 mkdir -p results/parquet_files
 
-# Check for existing checkpoint and results
-log "Checking for existing checkpoints..."
-gsutil -m cp -r gs://__BUCKET_NAME__/checkpoints/* results/parquet_files/ 2>/dev/null || true
-gsutil -m cp -r gs://__BUCKET_NAME__/results/parquet_files/*.parquet results/parquet_files/ 2>/dev/null || true
+# GCS sync target (used by cron and run_monte_carlo_gcp.py)
+export BUCKET_NAME="__BUCKET_NAME__"
+export WORK_DIR="$WORK_DIR"
+export GCS_RESULTS_URI="gs://__BUCKET_NAME__/results"
 
-# Count existing results
-EXISTING_COUNT=$(ls results/parquet_files/*_simulation_result_*.parquet 2>/dev/null | wc -l)
-log "Found $EXISTING_COUNT existing simulation results"
+# Restore prior results + checkpoint from GCS (same prefix cron writes to)
+log "Restoring results from GCS (if any)..."
+gsutil -m rsync -r "$GCS_RESULTS_URI/" results/ 2>/dev/null || true
 
-# Setup automatic result sync every 30 minutes
-(crontab -l 2>/dev/null || true; echo "*/30 * * * * cd $WORK_DIR && gsutil -m -q rsync -r results/ gs://__BUCKET_NAME__/results/") | crontab -
+EXISTING_COUNT=$(ls results/parquet_files/countries_simulation_result_*.parquet 2>/dev/null | wc -l | tr -d ' ')
+log "Found $EXISTING_COUNT existing country simulation results on disk"
+
+# Cron PATH is minimal and often omits /snap/bin (where GCE gsutil lives),
+# which silently broke the old one-liner. Export a usable PATH and log errors.
+(crontab -l 2>/dev/null | grep -v 'rsync -r results/' || true
+ echo "*/30 * * * * cd $WORK_DIR && PATH=/snap/bin:/usr/bin:/bin:\$PATH GCS_RESULTS_URI=gs://__BUCKET_NAME__/results gsutil -m rsync -r results/ gs://__BUCKET_NAME__/results/ >> /root/gcs_sync.log 2>&1"
+) | crontab -
 
 # Run simulation (30as profile; see deploy-spot.sh MC_* variables)
 log "Starting Monte Carlo simulation at $(date)"
 cd "$WORK_DIR"
+export GCS_RESULTS_URI="gs://__BUCKET_NAME__/results"
 MC_ARGS="--resolution __MC_RESOLUTION__ --input __MC_INPUT__ --workers __MC_WORKERS__ --iterations __MC_ITERATIONS__"
 if [ -n "__MC_SEED__" ]; then
     MC_ARGS="$MC_ARGS --seed __MC_SEED__"
 fi
-nohup python scripts/run_monte_carlo_gcp.py $MC_ARGS > /root/simulation.log 2>&1 &
+nohup env GCS_RESULTS_URI="$GCS_RESULTS_URI" python scripts/run_monte_carlo_gcp.py $MC_ARGS > /root/simulation.log 2>&1 &
 
 log "Simulation started. PID: $(pgrep -f run_monte_carlo_gcp.py)"
 log "Setup completed at $(date)"
@@ -277,43 +285,44 @@ monitor_instance() {
     echo "=========================================="
     echo "To monitor progress, SSH into the instance:"
     echo "  gcloud compute ssh $INSTANCE_NAME --zone=$ZONE"
+    echo "  sudo -i"
     echo ""
     echo "Then run:"
-    echo "  tail -f ~/simulation.log"
-    echo "  ls ~/water-access/results/parquet_files/*.parquet | wc -l"
+    echo "  tail -f /root/simulation.log"
+    echo "  ls /root/water-access/results/parquet_files/countries_simulation_result_*.parquet | wc -l"
+    echo "  tail -f /root/gcs_sync.log"
+    echo ""
+    echo "From your laptop (no SSH):"
+    echo "  ./gcp/monitor.sh"
+    echo "  ./gcp/deploy-spot.sh progress"
     echo "=========================================="
 }
 
 check_progress() {
     print_status "Checking simulation progress..."
-    
-    # Check if instance exists
-    if ! gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE &> /dev/null; then
-        print_error "Instance $INSTANCE_NAME not found"
-        return
-    fi
-    
-    # Get progress from GCS
-    TOTAL_ITERATIONS=1000
-    COMPLETED=$(gsutil ls gs://$BUCKET_NAME/results/parquet_files/zone_simulation_result_*.parquet 2>/dev/null | wc -l)
-    
-    if [ $COMPLETED -gt 0 ]; then
-        PERCENTAGE=$((COMPLETED * 100 / TOTAL_ITERATIONS))
-        print_status "Progress: $COMPLETED/$TOTAL_ITERATIONS iterations ($PERCENTAGE%)"
-        
-        # Estimate time remaining (rough estimate)
-        if [ $COMPLETED -gt 10 ]; then
-            INSTANCE_START=$(gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --format="value(creationTimestamp)")
-            START_EPOCH=$(date -d "$INSTANCE_START" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$INSTANCE_START" +%s)
-            NOW_EPOCH=$(date +%s)
-            ELAPSED=$((NOW_EPOCH - START_EPOCH))
-            RATE=$(echo "scale=2; $ELAPSED / $COMPLETED" | bc)
-            REMAINING=$((TOTAL_ITERATIONS - COMPLETED))
-            ETA=$(echo "scale=0; $RATE * $REMAINING / 3600" | bc)
-            print_status "Estimated time remaining: ${ETA} hours"
+
+    # Prefer checkpoint total_iterations when present; else deploy profile.
+    TOTAL_ITERATIONS=$MC_ITERATIONS
+    TEMP_CHECKPOINT="/tmp/wa_checkpoint_progress.json"
+    if gsutil -q cp "gs://$BUCKET_NAME/results/parquet_files/checkpoint.json" "$TEMP_CHECKPOINT" 2>/dev/null; then
+        CKPT_TOTAL=$(python3 -c "import json; print(json.load(open('$TEMP_CHECKPOINT')).get('total_iterations', ''))" 2>/dev/null || true)
+        if [[ -n "$CKPT_TOTAL" ]]; then
+            TOTAL_ITERATIONS=$CKPT_TOTAL
         fi
+        rm -f "$TEMP_CHECKPOINT"
+    fi
+
+    # 30as writes country+district only (no zone parquet). Count countries.
+    COMPLETED=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/countries_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
+    DISTRICT=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/district_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
+    ZONE_N=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/zone_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
+
+    if [ "${COMPLETED:-0}" -gt 0 ]; then
+        PERCENTAGE=$((COMPLETED * 100 / TOTAL_ITERATIONS))
+        print_status "Progress: $COMPLETED/$TOTAL_ITERATIONS country iterations (${PERCENTAGE}%)"
+        print_status "Files on GCS — countries: $COMPLETED  districts: $DISTRICT  zones: $ZONE_N"
     else
-        print_warning "No results found yet. Simulation may still be starting..."
+        print_warning "No country results on GCS yet. Check the VM log or /root/gcs_sync.log if the job is running."
     fi
 }
 

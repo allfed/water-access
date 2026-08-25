@@ -112,6 +112,7 @@ def run_simulation(
     chunk_rows=None,
     chunk_plan=None,
     area_weighted_population=True,
+    zone_output_path=None,
 ):
     """Run a simulation to analyze global water access from walking or cycling
     based on sensitivity parameters.
@@ -154,6 +155,8 @@ def run_simulation(
                              True as of 2026-08-09; pass False for the
                              historical behaviour. A supplied ``chunk_plan``
                              must have been built with the same setting.
+    - zone_output_path (optional): in chunked mode, stream ``zone_columns`` to
+                             this Parquet file per chunk.
 
     Returns:
     - result: The result of the global analysis.
@@ -223,6 +226,7 @@ def run_simulation(
         chunk_rows=chunk_rows,
         chunk_plan=chunk_plan,
         area_weighted_population=area_weighted_population,
+        zone_output_path=zone_output_path,
     )
     return df_countries, df_districts, df_zones
 

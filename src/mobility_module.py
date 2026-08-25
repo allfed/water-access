@@ -236,6 +236,12 @@ class mobility_models:
         V_load = fsolve(model, V_guess, args=data_loaded, full_output=True)
         loaded_velocity = V_load[0][0] if V_load[2] == 1 else np.nan
 
+        # Limit velocity to a maximum of 7 km/h (~1.94 m/s)
+        if V_un[2] == 1:
+            unloaded_velocity = min(unloaded_velocity, 7 / 3.6)
+        if V_load[2] == 1:
+            loaded_velocity = min(loaded_velocity, 7 / 3.6)
+
         return loaded_velocity, unloaded_velocity, max_load_HPV
 
     def single_bike_run(mv, mo, hpv, slope, load_attempted):

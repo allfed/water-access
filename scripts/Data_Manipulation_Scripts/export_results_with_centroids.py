@@ -1,100 +1,128 @@
+"""Merge a percentile zone Parquet with cell centroids for map rasterisation.
+
+At 30 arc-seconds centroids come from ``master_30as.parquet`` (``left/top/
+right/bottom``). The merged table is written as Parquet (CSV is impractical
+at this cell count).
+
+Default input is the median zone map; pass ``--label 5th_percentile`` or
+``95th_percentile`` for the other draws.
+"""
+
+from __future__ import annotations
+
+import argparse
 from pathlib import Path
+
 import pandas as pd
 
-"""
-This script processes and merges simulation results with geographical data,
-adding centroid coordinates.
-
-The script performs the following steps:
-1. Reads simulation results from a Parquet file.
-2. Reads original geographical data from a CSV file.
-3. Calculates longitude and latitude centroids for each geographical area.
-4. Merges the simulation results with the centroid data.
-5. Exports the merged data to a new CSV file.
-
-The resulting file contains the original simulation results enhanced with
-centroid coordinates, allowing for easier geographical visualization and
-analysis of the simulation outcomes.
-
-Input files:
-- Parquet file: 'zone_simulation_result_0.parquet' in the
-'results/parquet_files' directory
-- CSV file: 'updated_GIS_output.csv' in the 'data/GIS' directory
-
-Output file:
-- CSV file: 'GIS_merged_output_processed_with_centroids.csv' in the 'results'
-directory
-
-Note: This script assumes a specific directory structure and file naming
-convention. Adjust paths and filenames if necessary.
-"""
-
-
-# Define the root of the repository by going up one level from the script
-# directory
 data_script_dir = Path(__file__).resolve().parent
-script_dir = data_script_dir.parent
-repo_root = script_dir.parent
+repo_root = data_script_dir.parent.parent
 
-# Define the data directories relative to the repo root
 parquet_data_dir = repo_root / "results" / "parquet_files"
 results_dir = repo_root / "results"
-csv_data_dir = repo_root / "data" / "GIS"
-
-# Define the paths to the Parquet file and the original CSV file
-parquet_file_path = parquet_data_dir / "zone_simulation_result_median.parquet"
-original_csv_file_path = csv_data_dir / "GIS_country_points_fid.csv"
-output_file_path = results_dir / "GIS_merged_output_processed_with_centroids_right.csv"
-
-# Step 1: Read the Parquet file into a DataFrame
-processed_df = pd.read_parquet(parquet_file_path)
-
-# Step 2: Read the original CSV file
-original_df = pd.read_csv(original_csv_file_path)
-
-# Step 3: Calculate the longitude and latitude centroids
-original_df["longitude_centroid"] = (original_df["left"] + original_df["right"]) / 2
-original_df["latitude_centroid"] = (original_df["top"] + original_df["bottom"]) / 2
-
-# Step 4: Keep only the fid and centroid columns
-original_df = original_df[["fid", "longitude_centroid", "latitude_centroid"]]
+master_30as = repo_root / "data" / "GIS" / "extracted" / "master_30as.parquet"
+# Legacy 5-arc-minute centroid table (only used if --resolution 5min).
+fid_csv_5min = repo_root / "data" / "GIS" / "GIS_country_points_fid.csv"
 
 
-# OPTION LEFT OR RIGHT
-# left treats non analsyies areas and ocean as the same (missing data)
-# end result is minimum dataframe with just the analysis areas and centroid
-# data right treats non analsyses areas and ocean as different
-# end result is a dataframe with all land mass areas and centroid data
-# difference is due to dropping of non populated areas within the python model.
-# Step 5: Merge the processed DataFrame with the centroid data on the
-# 'fid' column
-merged_df = pd.merge(
-    processed_df, original_df, left_on="fid", right_on="fid", how="right"
-)
-
-# Step 6: Save the merged DataFrame to a new CSV file
-merged_df.to_csv(output_file_path, index=False)
-
-# count the number of nan values in the merged_df
-nan_count = merged_df.isna().sum()
-print(f"Number of NaN values in the merged DataFrame:\n{nan_count}")
+def parse_args():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--label",
+        default="median",
+        choices=("median", "5th_percentile", "95th_percentile"),
+        help="which zone_simulation_result_<label>.parquet to export",
+    )
+    p.add_argument(
+        "--resolution",
+        choices=("30as", "5min"),
+        default="30as",
+        help="grid used for centroids (default 30as)",
+    )
+    return p.parse_args()
 
 
-# alteanrive csv created with NaNs as zeros
-merged_df_no_nans = merged_df.fillna(0)
+def centroids_from_master(master_path: Path, fids: pd.Series) -> pd.DataFrame:
+    """Load cell bounds for the fids present in the zone result only."""
+    import pyarrow.parquet as pq
 
-# fix any negative values in the merged_df_no_nans in zone_pop_with_water
-# and zone_pop_without_water
-merged_df_no_nans["zone_pop_with_water"] = merged_df_no_nans[
-    "zone_pop_with_water"
-].apply(lambda x: 0 if x < 0 else x)
-merged_df_no_nans["zone_pop_without_water"] = merged_df_no_nans[
-    "zone_pop_without_water"
-].apply(lambda x: 0 if x < 0 else x)
+    wanted = pd.DataFrame({"fid": fids.unique()})
+    pieces = []
+    pf = pq.ParquetFile(master_path)
+    for i in range(pf.num_row_groups):
+        chunk = pf.read_row_group(
+            i, columns=["fid", "left", "top", "right", "bottom"]
+        ).to_pandas()
+        chunk = chunk.merge(wanted, on="fid", how="inner")
+        if not chunk.empty:
+            pieces.append(chunk)
+    if not pieces:
+        raise SystemExit(f"No centroid matches in {master_path}")
+    bounds = pd.concat(pieces, ignore_index=True)
+    bounds["longitude_centroid"] = (bounds["left"] + bounds["right"]) / 2
+    bounds["latitude_centroid"] = (bounds["top"] + bounds["bottom"]) / 2
+    return bounds[["fid", "longitude_centroid", "latitude_centroid"]]
 
 
-output_file_path_no_nans = (
-    results_dir / "GIS_merged_output_processed_with_centroids_no_nans.csv"
-)
-# save the merged_df_no_nans to a new CSV file
-merged_df_no_nans.to_csv(output_file_path_no_nans, index=False)
+def centroids_from_fid_csv(csv_path: Path) -> pd.DataFrame:
+    original_df = pd.read_csv(csv_path)
+    original_df["longitude_centroid"] = (
+        original_df["left"] + original_df["right"]
+    ) / 2
+    original_df["latitude_centroid"] = (
+        original_df["top"] + original_df["bottom"]
+    ) / 2
+    return original_df[["fid", "longitude_centroid", "latitude_centroid"]]
+
+
+def main() -> None:
+    args = parse_args()
+    zone_path = parquet_data_dir / f"zone_simulation_result_{args.label}.parquet"
+    if not zone_path.exists():
+        raise SystemExit(
+            f"Missing {zone_path}. Run parquet_process.py first so the "
+            "percentile zone files exist."
+        )
+
+    processed_df = pd.read_parquet(zone_path)
+    if args.resolution == "30as":
+        if not master_30as.exists():
+            raise SystemExit(f"Missing {master_30as}")
+        print(f"Loading centroids from {master_30as} ...")
+        centroids = centroids_from_master(master_30as, processed_df["fid"])
+        # Analysis cells only (left join). A full right-join to every master
+        # cell is ~220M rows and is not needed for the GeoTIFF burn.
+        how = "left"
+    else:
+        if not fid_csv_5min.exists():
+            raise SystemExit(f"Missing {fid_csv_5min}")
+        print(f"Loading centroids from {fid_csv_5min} ...")
+        centroids = centroids_from_fid_csv(fid_csv_5min)
+        how = "right"
+
+    merged_df = processed_df.merge(centroids, on="fid", how=how)
+    print(f"Merged shape: {merged_df.shape} (how={how})")
+    print(f"NaN counts:\n{merged_df.isna().sum()}")
+
+    results_dir.mkdir(parents=True, exist_ok=True)
+    out_parquet = (
+        results_dir / f"GIS_merged_output_processed_with_centroids_{args.label}.parquet"
+    )
+    merged_df.to_parquet(out_parquet, index=False)
+    print(f"Wrote {out_parquet}")
+
+    # Zero-filled copy for raster scripts that treat missing land as 0.
+    filled = merged_df.fillna(0)
+    for col in ("zone_pop_with_water", "zone_pop_without_water"):
+        if col in filled.columns:
+            filled[col] = filled[col].clip(lower=0)
+    out_filled = (
+        results_dir
+        / f"GIS_merged_output_processed_with_centroids_{args.label}_no_nans.parquet"
+    )
+    filled.to_parquet(out_filled, index=False)
+    print(f"Wrote {out_filled}")
+
+
+if __name__ == "__main__":
+    main()

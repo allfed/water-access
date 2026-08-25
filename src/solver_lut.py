@@ -195,6 +195,9 @@ MAX_CRR_CLASSES = 32
 #: Velocity ceiling applied by ``single_bike_run`` after solving.
 BIKE_MAX_VELOCITY = 7.0
 
+#: Walking velocity ceiling (7 km/h), applied after LUT interpolation.
+WALK_MAX_VELOCITY = 7.0 / 3.6
+
 #: Gradient percentages at which ``Lankford_solution`` clips ``G``. The model is
 #: only validated over -18%..+40% grade.
 LANKFORD_CLIP_GRADES = (-18.0, 40.0)
@@ -775,7 +778,10 @@ def evaluate_walking_lut(lut, slope, mass, chunk_size=EVAL_CHUNK_SIZE):
             unloaded_table, slope_idx, slope_frac, mass_idx, mass_frac
         )
 
-    return loaded, unloaded
+    return (
+        np.minimum(loaded, WALK_MAX_VELOCITY),
+        np.minimum(unloaded, WALK_MAX_VELOCITY),
+    )
 
 
 def walking_results_via_lut(

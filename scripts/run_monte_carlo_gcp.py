@@ -22,7 +22,9 @@ import argparse
 import json
 import multiprocessing
 import os
+import shutil
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -131,6 +133,48 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
+def _find_gsutil():
+    found = shutil.which("gsutil")
+    if found:
+        return found
+    for candidate in (
+        "/snap/bin/gsutil",
+        "/usr/lib/google-cloud-sdk/bin/gsutil",
+        "/root/google-cloud-sdk/bin/gsutil",
+        "/usr/bin/gsutil",
+    ):
+        if Path(candidate).is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def sync_results_to_gcs():
+    """Push ``results/`` to GCS when ``GCS_RESULTS_URI`` is set (Spot VMs).
+
+    Cron alone is unreliable: default cron PATH often omits ``gsutil``
+    (commonly under ``/snap/bin``), so syncs failed silently with ``-q``.
+    Calling this after each completed draw is the durable path; cron remains
+    a backup.
+    """
+    uri = os.environ.get("GCS_RESULTS_URI", "").strip().rstrip("/")
+    if not uri:
+        return
+    gsutil = _find_gsutil()
+    if gsutil is None:
+        print("⚠️  gsutil not found; skipping GCS sync")
+        return
+    result = subprocess.run(
+        [gsutil, "-m", "rsync", "-r", f"{RESULTS_PATH}/", f"{uri}/"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()[-500:]
+        print(f"⚠️  GCS sync failed: {err}")
+    else:
+        print(f"☁️  Synced results/ → {uri}/")
+
+
 def save_checkpoint(completed_iterations, parameters, run_config):
     checkpoint = {
         "completed_iterations": completed_iterations,
@@ -139,9 +183,11 @@ def save_checkpoint(completed_iterations, parameters, run_config):
         "run_config": run_config,
         "timestamp": time.time(),
     }
+    PARQUET_PATH.mkdir(parents=True, exist_ok=True)
     with open(CHECKPOINT_FILE, "w") as f:
         json.dump(checkpoint, f, indent=2)
     print(f"✅ Checkpoint saved: {len(completed_iterations)} iterations completed")
+    sync_results_to_gcs()
 
 
 def load_checkpoint():
@@ -205,6 +251,10 @@ def run_and_save_simulation(job):
     i = job["index"]
     _init_worker(job["zone_file"])
 
+    zone_output_path = None
+    if job["save_zone_parquet"] and (job["chunk_rows"] or job["chunk_plan"] is not None):
+        zone_output_path = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
+
     countries_result, district_result, zone_result = mc.run_simulation(
         crr_adjustment=job["crr_adjustment"],
         time_gathering_water=job["time_gathering_water"],
@@ -223,6 +273,7 @@ def run_and_save_simulation(job):
         chunk_rows=job["chunk_rows"] or None,
         chunk_plan=job["chunk_plan"],
         area_weighted_population=job["area_weighted_population"],
+        zone_output_path=zone_output_path,
     )
 
     district_result.to_parquet(
@@ -231,10 +282,16 @@ def run_and_save_simulation(job):
     countries_result.to_parquet(
         PARQUET_PATH / f"countries_simulation_result_{i}.parquet", index=False
     )
-    if job["save_zone_parquet"] and not zone_result.empty:
-        zone_result[ZONE_RESULT_COLUMNS].to_parquet(
-            PARQUET_PATH / f"zone_simulation_result_{i}.parquet", index=False
-        )
+    if job["save_zone_parquet"]:
+        if zone_output_path is not None:
+            if not zone_output_path.exists():
+                raise RuntimeError(
+                    f"chunked zone run finished but {zone_output_path} was not written"
+                )
+        elif not zone_result.empty:
+            zone_result[ZONE_RESULT_COLUMNS].to_parquet(
+                PARQUET_PATH / f"zone_simulation_result_{i}.parquet", index=False
+            )
 
     return i
 

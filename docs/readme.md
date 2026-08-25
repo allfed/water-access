@@ -38,17 +38,33 @@ Run [`scripts/key_results.ipynb`](../scripts/key_results.ipynb) and [`scripts/di
 
 ## 4. Post-process for QGIS maps
 
-Generate GeoTIFFs for map visualization:
+Generate GeoTIFFs for map visualization (30 arc-second default):
 
-1. Run [`scripts/Data_Manipulation_Scripts/parquet_process.py`](../scripts/Data_Manipulation_Scripts/parquet_process.py) to identify runs closest to the median, 5th, and 95th percentiles.
-2. Rename the identified zone parquet files to:
-   - `zone_simulation_result_median.parquet`
-   - `zone_simulation_result_5th_percentile.parquet`
-   - `zone_simulation_result_95th_percentile.parquet`
-3. Run [`scripts/Data_Manipulation_Scripts/export_results_with_centroids.py`](../scripts/Data_Manipulation_Scripts/export_results_with_centroids.py)
-4. Run one or both raster scripts:
-   - [`scripts/Data_Manipulation_Scripts/rasterise_results.py`](../scripts/Data_Manipulation_Scripts/rasterise_results.py) — unsmoothed 5-arcminute grid (`results/TIFs/output_raster_5_arcmin_partial_percentage.tif`)
-   - [`scripts/Data_Manipulation_Scripts/rasterise_and_smooth_results.py`](../scripts/Data_Manipulation_Scripts/rasterise_and_smooth_results.py) — smoothed variant for global-scale maps
+1. Run [`scripts/Data_Manipulation_Scripts/parquet_process.py`](../scripts/Data_Manipulation_Scripts/parquet_process.py) to select median / 5th / 95th draws and (by default) re-run them locally with zone Parquet:
+
+```bash
+python scripts/Data_Manipulation_Scripts/parquet_process.py
+# selection only: add --no-rerun-zones-locally
+```
+
+That writes `zone_simulation_result_{median,5th_percentile,95th_percentile}.parquet` (add `--force` to overwrite existing zone files).
+2. Export centroids (from `master_30as.parquet`):
+
+```bash
+python scripts/Data_Manipulation_Scripts/export_results_with_centroids.py --label median
+python scripts/Data_Manipulation_Scripts/export_results_with_centroids.py --label 5th_percentile
+python scripts/Data_Manipulation_Scripts/export_results_with_centroids.py --label 95th_percentile
+```
+
+3. Rasterise:
+
+```bash
+python scripts/Data_Manipulation_Scripts/rasterise_results.py --label median
+python scripts/Data_Manipulation_Scripts/rasterise_results.py --label 5th_percentile
+python scripts/Data_Manipulation_Scripts/rasterise_results.py --label 95th_percentile
+```
+
+Outputs land in `results/TIFs/output_raster_30as_<label>_partial_percentage.tif`. Pass `--resolution 5min` on the export/rasterise scripts only if you still have a 5-arc-minute zone run and `GIS_country_points_fid.csv`.
 
 ## 5. Visualize in QGIS (external)
 
