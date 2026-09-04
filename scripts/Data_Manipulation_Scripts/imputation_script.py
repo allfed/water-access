@@ -79,7 +79,9 @@ household_size_file_path = data_dir / "undesa_pd_2022_hh-size-composition.xlsx"
 country_regions_file_path = data_dir / "ISO-3166 Countries.csv"
 # Unified breakdown = JMP-parsed values plus researched fills for the 76
 # countries whose JMP files are blank (see researched_source_breakdown_README).
-# Built by build_unified_source_breakdown.py; JMP values always win.
+# Built by build_unified_source_breakdown.py. Best source wins: an informative
+# JMP row (positive packaged / delivered / borehole) beats research; a JMP row
+# that is blank or catch-all-only is demoted to the research fill.
 jmp_source_breakdown_path = (
     repo_root
     / "data"
