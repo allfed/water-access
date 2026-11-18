@@ -7,9 +7,9 @@ set -e
 
 # Configuration
 PROJECT_ID="water-access-james-2026"
-ZONE="us-east1-b"
+ZONE="us-east1-c"
 INSTANCE_NAME="water-access-compute-spot"
-MACHINE_TYPE="n2-standard-32"
+MACHINE_TYPE="n2-highmem-32"
 BUCKET_NAME="water-access-james-data"
 MAX_RUN_DURATION="96h" # 4 days
 BOOT_DISK_SIZE="100GB"
@@ -17,8 +17,8 @@ BOOT_DISK_SIZE="100GB"
 # 30as production profile (override for 5min legacy runs)
 MC_RESOLUTION="30as"
 MC_INPUT="data/GIS/extracted/master_30as.parquet"
-MC_WORKERS="1"
-MC_ITERATIONS="20"
+MC_WORKERS="12"  # ~16.4 GB peak per 30as worker; 12 fit in the 256 GB of n2-highmem-32
+MC_ITERATIONS="1000"
 MC_SEED="20260808"  # e.g. 20260808 for fixed draws; leave empty for unseeded
 
 # Colors for output
@@ -263,7 +263,7 @@ create_instance() {
     
     print_status "Instance created successfully"
     print_status "Machine type: $MACHINE_TYPE"
-    print_status "Spot pricing: ~\$0.72/hour (70-90% cheaper than on-demand; ~\$18-25 total)"
+    print_status "Spot pricing: ~\$1.20/hour for n2-highmem-32 (~\$8-17 for 1000 draws at 30as)"
     
     # Clean up
     rm /tmp/startup-script.sh

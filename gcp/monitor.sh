@@ -7,11 +7,11 @@ set -e
 
 # Configuration
 PROJECT_ID="water-access-james-2026"
-ZONE="us-east1-b"
+ZONE="us-east1-c"
 INSTANCE_NAME="water-access-compute-spot"
 BUCKET_NAME="water-access-james-data"
 # Overridden from checkpoint.json when present
-TOTAL_ITERATIONS=20
+TOTAL_ITERATIONS=1000
 INSTANCE_STATE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.instance-zone"
 
 resolve_instance_zone() {
@@ -111,7 +111,7 @@ get_instance_details() {
             echo -e "${BLUE}● Uptime:${NC} ${UPTIME_HOURS}h ${UPTIME_MINUTES}m"
             
             # Estimate cost
-            HOURLY_RATE=0.72  # Approximate for n2-highcpu-64 spot
+            HOURLY_RATE=1.20  # Approximate for n2-highmem-32 spot (Nov 2026)
             COST=$(echo "scale=2; $UPTIME_HOURS * $HOURLY_RATE" | bc)
             echo -e "${BLUE}● Estimated Cost:${NC} \$${COST} (at ~\$${HOURLY_RATE}/hour spot pricing)"
         fi
