@@ -183,9 +183,42 @@ class TestReconciliationCoversJmpRows:
         )
         assert total <= 100.5
 
-    def test_jmp_row_never_takes_the_piped_lowering_branch(self):
+    def test_jmp_row_with_interpolated_piped_takes_the_piped_lowering_branch(self):
+        # Lebanon case: JMP survey categories are real data, the piped share was
+        # neighbour-interpolated. Interpolation sits below survey data in the
+        # hierarchy, so piped gives way and the categories are kept intact.
         df = self._frame("jmp", URBANPiped=80.0, URBANBorehole=60.0, RURALPiped=80.0)
-        track = pd.DataFrame({"alpha3": ["AAA"], "URBANPiped": [80.0], "RURALPiped": [80.0]})
+        track = pd.DataFrame(
+            {
+                "alpha3": ["AAA"],
+                "URBANPiped": ["neighbor interpolated"],
+                "RURALPiped": ["neighbor interpolated"],
+            }
+        )
+        after = reconcile_research_rows_with_final_piped(df, track)
+        assert after.at[0, "URBANPiped"] == pytest.approx(40.0)
+        assert after.at[0, "URBANBorehole"] == 60.0
+        # RURAL had no categories to conflict with, so its piped is untouched
+        assert after.at[0, "RURALPiped"] == 80.0
+
+    def test_jmp_row_with_measured_piped_scales_categories_down(self):
+        df = self._frame("jmp", URBANPiped=80.0, URBANBorehole=60.0, RURALPiped=80.0)
+        track = pd.DataFrame(
+            {"alpha3": ["AAA"], "URBANPiped": [pd.NA], "RURALPiped": [pd.NA]}
+        )
+        after = reconcile_research_rows_with_final_piped(df, track)
+        assert after.at[0, "URBANPiped"] == 80.0
+        assert after.at[0, "URBANBorehole"] == pytest.approx(20.0)
+
+    def test_jmp_row_absent_from_track_scales_categories_down(self):
+        df = self._frame("jmp", URBANPiped=80.0, URBANBorehole=60.0, RURALPiped=80.0)
+        track = pd.DataFrame(
+            {
+                "alpha3": ["ZZZ"],
+                "URBANPiped": ["neighbor interpolated"],
+                "RURALPiped": [pd.NA],
+            }
+        )
         after = reconcile_research_rows_with_final_piped(df, track)
         assert after.at[0, "URBANPiped"] == 80.0
         assert after.at[0, "URBANBorehole"] == pytest.approx(20.0)

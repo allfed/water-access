@@ -15,8 +15,15 @@ strict rubric (see "Mapping rubric" below). Research provenance:
 this file with the JMP-parsed breakdown into
 `data/processed/semi-processed/jmp_source_breakdown_unified.csv`:
 
-- **JMP-parsed values always win**; research values only fill rows where the
-  JMP extract is entirely blank.
+- **Best source wins.** A JMP row keeps precedence only when it is
+  *informative*: a positive value in at least one of packaged / delivered /
+  borehole (`jmp_row_is_informative`). A JMP row that is blank, or whose only
+  content is the UnpipedUnaffected catch-all (sparse EU-SILC / HBS blocks), is
+  demoted and the research row is used instead, with the demotion recorded in
+  `research_notes` and printed as a WARNING. Precedence is per country row,
+  not per column: an informative JMP row replaces the whole research row.
+  The parser writes 0.0 for categories a survey did not ask, so an all-zero
+  JMP row is treated as uninformative rather than as measured zeros.
 - Provenance travels on every filled row (`data_origin`, `research_tier`,
   `research_confidence`, `research_source`, `research_url`, `research_flags`,
   `research_notes`, `research_bounds`).
@@ -24,9 +31,9 @@ this file with the JMP-parsed breakdown into
 - A validation report (`jmp_source_breakdown_unified_validation.csv`) lists
   rows whose categories conflict with the WHO/JMP piped share (see below).
 
-To point the model at the unified file, change `jmp_source_breakdown_path` in
-`scripts/Data_Manipulation_Scripts/imputation_script.py` to
-`jmp_source_breakdown_unified.csv` and rerun it.
+`scripts/Data_Manipulation_Scripts/imputation_script.py` reads the unified
+file (`jmp_source_breakdown_path`) and carries `data_origin` through to
+`data/processed/merged_data.csv`.
 
 ## Columns
 
@@ -83,45 +90,41 @@ Research fills can conflict with the WHO/JMP piped share in three ways:
 3. **Reference-year drift**: DHS/census years differ from the WHO piped year
    (COG, ERI, GNQ, IRN, SXM, VCT — sums of ~103–114).
 
-`build_unified_source_breakdown.py` resolves these automatically
-(`reconcile_stratum_with_piped_budget()`), applied to research-origin rows
-only — JMP-origin rows were already fitted by the parser. The rule follows
-the approach James proposed on the 2026-08-06 call, with one carve-out agreed
-2026-08-08:
+One rule handles all three, agreed on the 2026-08-06 call and confirmed on
+2026-09-04: **the source hierarchy is JMP global (piped) → JMP country file →
+researched fills → spatial interpolation, and a stratum that sums past 100
+scales its unpiped categories down with piped protected.** Implemented in
+`reconcile_categories_over_100_pct()` (`jmp_source_parser.py`) and applied in
+three passes:
 
-- **Default (WHO piped < 99.5)** — James's unpiped-budget rule, identical to
-  `normalize_unpiped_subcategories()` in `jmp_source_parser.py`: if the four
-  categories sum past `100 − piped`, scale them all down proportionally to
-  fit. Piped wins, because breakdown surveys are often multi-response and the
-  overlap sits mostly with piped users, who are already counted as losing
-  access. This handles class 3 (e.g. Congo rural ×0.964) and genuine
-  piped-wins conflicts (e.g. St Vincent urban ×0.124, where WHO says 98%
-  piped but the 2012 census said 83%).
-- **Carve-out (WHO piped ≥ 99.5)** — the unpiped budget is a rounding
-  artifact, and scaling to it would zero out measured regulator/census values
-  (Denmark's GEUS-counted 4% boreholes would vanish). Instead the categories
-  are kept (proportionally capped only if they alone exceed 100) and an
-  **effective piped share** `100 − sum(categories)` is written to
-  `URBANPipedEffective` / `RURALPipedEffective`. Examples: Denmark → 96.0;
-  NZ → 83.6 (independently matching Taumata Arowai's registered-supply
-  share); Anguilla urban → 2.4 (piped-as-main-drinking-source, resolving
-  class 2).
+- **Build time** (`build_unified_source_breakdown.py`, research rows): if the
+  five categories sum past `100 − piped`, scale them all down proportionally.
+  Unknown (null) categories are untouched. Recorded in
+  `URBAN_budget_adjustment` / `RURAL_budget_adjustment` as
+  `scaled_to_unpiped_budget(scale=…)`, so raw research values remain
+  recoverable from `researched_source_breakdown.csv`.
+- **Imputation, before spatial interpolation**
+  (`imputation_script.reconcile_research_breakdown_with_piped`): the same
+  scale-down rule for research and JMP rows against the piped share the
+  model actually uses.
+- **Imputation, after spatial interpolation**
+  (`imputation_script.reconcile_research_rows_with_final_piped`): for any row
+  whose piped share had to be neighbour- or continent-interpolated, the
+  measured categories are kept and piped is lowered to
+  `100 − sum(categories)` instead. Interpolation is the bottom of the
+  hierarchy and must never scale real survey or census data down (Lebanon
+  was the live case: interpolated urban piped 93.0 → 68.7). Rows with a
+  measured piped share use the scale-down rule as before.
 
-Every adjustment is recorded in `URBAN_budget_adjustment` /
-`RURAL_budget_adjustment` (`scaled_to_unpiped_budget(scale=…)` or
-`piped_capped`), so raw research values remain recoverable from
-`researched_source_breakdown.csv`. Strata with no WHO piped reference at all
-(e.g. Anguilla rural) are left unadjusted.
+A stratum that sums to *less* than 100 is never scaled up; the remainder is
+written to `URBANUnallocated` / `RURALUnallocated`
+(`apply_unallocated_from_source_gap`). Kevin's caveat from the 2026-08-06
+call still applies to the scale-down rule: proportional scaling assumes the
+overlap is with piped users; if respondents overlap between unpiped
+categories instead, the redistribution is approximate.
 
-**Integration requirement**: when the model adopts the unified breakdown, any
-row with a non-null `PipedEffective` must also override that stratum's piped
-share (else piped=100 + packaged users double-counts the affected
-population). Kevin's recorded caveat from the call still applies to the
-default rule: proportional scaling assumes the overlap is with piped; if
-respondents overlap between unpiped categories instead, the redistribution is
-approximate.
-
-Tests: `tests/test_build_unified_source_breakdown.py`.
+Tests: `tests/test_build_unified_source_breakdown.py`,
+`tests/test_unallocated_from_source_gap.py`, `tests/test_jmp_source_parser.py`.
 
 ## Caution for the manual-vs-electric pump phase
 

@@ -79,7 +79,9 @@ household_size_file_path = data_dir / "undesa_pd_2022_hh-size-composition.xlsx"
 country_regions_file_path = data_dir / "ISO-3166 Countries.csv"
 # Unified breakdown = JMP-parsed values plus researched fills for the 76
 # countries whose JMP files are blank (see researched_source_breakdown_README).
-# Built by build_unified_source_breakdown.py; JMP values always win.
+# Built by build_unified_source_breakdown.py. Best source wins: an informative
+# JMP row (positive packaged / delivered / borehole) beats research; a JMP row
+# that is blank or catch-all-only is demoted to the research fill.
 jmp_source_breakdown_path = (
     repo_root
     / "data"
@@ -640,8 +642,11 @@ def reconcile_research_breakdown_with_piped(df):
 def reconcile_research_rows_with_final_piped(df, spatial_track):
     """Final consistency pass after spatial piped imputation.
 
-    Research rows with imputed piped lower piped when categories conflict;
-    all other rows use the scale-down rule.
+    Rows whose piped share was spatially interpolated (neighbour / continent)
+    keep their measured categories and lower piped when they conflict,
+    whatever the row's data_origin: interpolation is the bottom of the source
+    hierarchy and must never scale real survey data down. Rows with measured
+    piped use the scale-down rule (piped protected).
     """
     from jmp_source_parser import reconcile_categories_over_100_pct
 
@@ -657,7 +662,6 @@ def reconcile_research_rows_with_final_piped(df, spatial_track):
     track = spatial_track.drop_duplicates("alpha3").set_index("alpha3")
     for idx in df.index[df["data_origin"].isin(("research", "jmp"))]:
         alpha3 = df.at[idx, "alpha3"]
-        origin = df.at[idx, "data_origin"]
         for stratum in ("URBAN", "RURAL"):
             piped_col = f"{stratum}Piped"
             piped = df.at[idx, piped_col]
@@ -666,10 +670,8 @@ def reconcile_research_rows_with_final_piped(df, spatial_track):
             category_values = {
                 cat: df.at[idx, f"{stratum}{cat}"] for cat in categories
             }
-            piped_was_imputed = (
-                origin == "research"
-                and alpha3 in track.index
-                and pd.notna(track.at[alpha3, piped_col])
+            piped_was_imputed = alpha3 in track.index and pd.notna(
+                track.at[alpha3, piped_col]
             )
             packaged, delivered, borehole, unaffected, unknown, piped_effective, _ = (
                 reconcile_categories_over_100_pct(

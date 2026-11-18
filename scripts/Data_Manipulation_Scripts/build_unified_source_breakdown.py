@@ -20,8 +20,10 @@ where the JMP extract is entirely blank. Provenance is carried per row.
 Research-filled rows are then reconciled against the WHO/JMP piped share at
 build time (trust_categories_over_piped=False): known categories scale down to
 the unpiped budget when they exceed 100 - piped; unknown categories stay null.
-Imputation reruns the same scale-down rule, then lowers piped on research rows
-whose piped share was spatially imputed. See researched_source_breakdown_README.md.
+Imputation reruns the same scale-down rule, then, for any row whose piped share
+had to be spatially interpolated (neighbour / continent), keeps the measured
+categories and lowers piped instead: interpolation is the bottom of the source
+hierarchy and never scales real data down. See researched_source_breakdown_README.md.
 
 Run from repo root:
   python scripts/Data_Manipulation_Scripts/build_unified_source_breakdown.py
@@ -417,7 +419,8 @@ def main() -> int:
         )
 
     # Reconcile research-origin rows with the WHO piped share (scale-down rule).
-    # Imputation passes re-reconcile research with trust_categories_over_piped.
+    # Imputation re-reconciles, and lowers piped instead on rows whose piped
+    # share was spatially interpolated (trust_categories_over_piped=True).
     for col in (
         "URBANPipedEffective",
         "RURALPipedEffective",
