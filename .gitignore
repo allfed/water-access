@@ -128,9 +128,17 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# result files (keep README figure tracked)
+# result files (keep README figure and summary results tracked)
 results/*
 !results/access_distributions.png
+!results/country_mean_results.csv
+!results/country_median_results.csv
+!results/country_5th_percentile_results.csv
+!results/country_95th_percentile_results.csv
+!results/districts_mean_results.csv
+!results/districts_median_results.csv
+!results/districts_5th_percentile_results.csv
+!results/districts_95th_percentile_results.csv
 
 
 # OS generated files #
