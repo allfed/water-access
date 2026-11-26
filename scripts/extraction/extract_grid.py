@@ -268,7 +268,6 @@ def extract(args) -> dict:
     for r in readers.values():
         r.close()
 
-
     stats["seconds"] = time.time() - t_start
     stats["peak_rss_gb"] = peak_rss_gb()
     stats["out_bytes"] = os.path.getsize(args.out)

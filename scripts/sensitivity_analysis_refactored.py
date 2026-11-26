@@ -277,9 +277,7 @@ class RefactoredSensitivityAnalyzer:
                 # yields 0 without divide-by-zero warnings.
                 denom = loaded_velocity + unloaded_velocity
                 avg_velocity = (
-                    2.0 * loaded_velocity * unloaded_velocity / denom
-                    if denom
-                    else 0.0
+                    2.0 * loaded_velocity * unloaded_velocity / denom if denom else 0.0
                 )
 
                 results.append(

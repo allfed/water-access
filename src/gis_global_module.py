@@ -1326,9 +1326,7 @@ def calculate_population_water_access(
             100.5 in either stratum, or if unallocated_vulnerable_fraction is
             not a float in [0, 1].
     """
-    g = _validate_unallocated_vulnerable_fraction(
-        unallocated_vulnerable_fraction
-    )
+    g = _validate_unallocated_vulnerable_fraction(unallocated_vulnerable_fraction)
 
     for col in (
         "URBANPackaged",
@@ -1451,8 +1449,8 @@ def calculate_population_water_access(
         stratum_pop_unknown = df_zones["pop_zone"] * weight * unknown_share / 100
         unallocated_total = unallocated_total + stratum_pop_unallocated
         unallocated_affected = unallocated_affected + stratum_pop_unallocated * g
-        unallocated_unaffected = (
-            unallocated_unaffected + stratum_pop_unallocated * (1 - g)
+        unallocated_unaffected = unallocated_unaffected + stratum_pop_unallocated * (
+            1 - g
         )
         unpiped_unknown_affected = unpiped_unknown_affected + stratum_pop_unknown * g
         unpiped_unknown_unaffected = (
@@ -1524,8 +1522,7 @@ def calculate_population_water_access(
 
     # Calculate zone population with and without water access
     df_zones["zone_pop_with_water"] = (
-        df_zones["population_affected_with_access"]
-        + df_zones["zone_pop_unaffected"]
+        df_zones["population_affected_with_access"] + df_zones["zone_pop_unaffected"]
     )
     df_zones["zone_pop_without_water"] = (
         df_zones["pop_zone"] - df_zones["zone_pop_with_water"]

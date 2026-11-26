@@ -433,18 +433,22 @@ def main() -> int:
             continue
         piped = piped_reference.get(row["alpha3"], {})
         for stratum in ("URBAN", "RURAL"):
-            packaged, delivered, borehole, unaffected, unknown, piped_effective, note = (
-                reconcile_categories_over_100_pct(
-                    piped_pct=piped.get(f"{stratum}Piped"),
-                    packaged_pct=_category_pct(row, stratum, "Packaged"),
-                    delivered_pct=_category_pct(row, stratum, "Delivered"),
-                    borehole_pct=_category_pct(row, stratum, "Borehole"),
-                    unpiped_unaffected_pct=_category_pct(
-                        row, stratum, "UnpipedUnaffected"
-                    ),
-                    unpiped_unknown_pct=_category_pct(row, stratum, "UnpipedUnknown"),
-                    trust_categories_over_piped=False,
-                )
+            (
+                packaged,
+                delivered,
+                borehole,
+                unaffected,
+                unknown,
+                piped_effective,
+                note,
+            ) = reconcile_categories_over_100_pct(
+                piped_pct=piped.get(f"{stratum}Piped"),
+                packaged_pct=_category_pct(row, stratum, "Packaged"),
+                delivered_pct=_category_pct(row, stratum, "Delivered"),
+                borehole_pct=_category_pct(row, stratum, "Borehole"),
+                unpiped_unaffected_pct=_category_pct(row, stratum, "UnpipedUnaffected"),
+                unpiped_unknown_pct=_category_pct(row, stratum, "UnpipedUnknown"),
+                trust_categories_over_piped=False,
             )
             for cat, value in zip(
                 CATEGORIES, (packaged, delivered, borehole, unaffected, unknown)

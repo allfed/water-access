@@ -103,9 +103,7 @@ def parse_args(argv=None):
         "--workers",
         type=int,
         default=None,
-        help=(
-            f"simultaneous worker processes (default {MAX_WORKERS_30AS})"
-        ),
+        help=(f"simultaneous worker processes (default {MAX_WORKERS_30AS})"),
     )
     parser.add_argument(
         "--output-dir",

@@ -90,7 +90,9 @@ def main() -> None:
         "zone_pop_without_water",
         "percentage_with_water",
     ]
-    raster_data = np.empty((len(variables_to_rasterize), height, width), dtype=np.float32)
+    raster_data = np.empty(
+        (len(variables_to_rasterize), height, width), dtype=np.float32
+    )
 
     for i, variable in enumerate(variables_to_rasterize):
         print(f"Rasterizing {variable} ...")

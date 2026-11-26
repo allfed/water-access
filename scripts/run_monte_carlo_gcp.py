@@ -233,7 +233,9 @@ def run_and_save_simulation(job):
     _init_worker(job["zone_file"])
 
     zone_output_path = None
-    if job["save_zone_parquet"] and (job["chunk_rows"] or job["chunk_plan"] is not None):
+    if job["save_zone_parquet"] and (
+        job["chunk_rows"] or job["chunk_plan"] is not None
+    ):
         zone_output_path = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
 
     countries_result, district_result, zone_result = mc.run_simulation(
@@ -413,7 +415,10 @@ def main(argv=None):
     ]
 
     pool = multiprocessing.Pool(processes=workers, maxtasksperchild=1)
-    pending = [(job["index"], pool.apply_async(run_and_save_simulation, (job,))) for job in jobs]
+    pending = [
+        (job["index"], pool.apply_async(run_and_save_simulation, (job,)))
+        for job in jobs
+    ]
     pool.close()
 
     progress = tqdm(total=len(iterations_to_run), desc="Simulating")

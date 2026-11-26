@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT_DIR = Path(__file__).resolve().parents[1] / "scripts" / "Data_Manipulation_Scripts"
+SCRIPT_DIR = (
+    Path(__file__).resolve().parents[1] / "scripts" / "Data_Manipulation_Scripts"
+)
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from jmp_source_parser import (  # noqa: E402
@@ -44,7 +46,13 @@ def test_parse_indonesia_has_packaged_and_borehole(raw_dir):
     latest = max(records, key=lambda r: r.get("year") or 0)
     has_source_data = any(
         latest.get(f"{indicator}_{suffix}_pct") is not None
-        for indicator in ("packaged", "delivered", "borehole", "piped", "unpiped_unaffected")
+        for indicator in (
+            "packaged",
+            "delivered",
+            "borehole",
+            "piped",
+            "unpiped_unaffected",
+        )
         for suffix in ("urban", "rural", "total")
     )
     assert has_source_data
@@ -93,12 +101,14 @@ def test_borehole_urban_rural_preserved_when_present():
 
 
 def test_reconcile_categories_over_100_pct_scales_to_budget():
-    pkg, delivered, borehole, unaffected, unknown, _, _ = reconcile_categories_over_100_pct(
-        piped_pct=90.0,
-        packaged_pct=80.0,
-        delivered_pct=10.0,
-        borehole_pct=5.0,
-        unpiped_unaffected_pct=5.0,
+    pkg, delivered, borehole, unaffected, unknown, _, _ = (
+        reconcile_categories_over_100_pct(
+            piped_pct=90.0,
+            packaged_pct=80.0,
+            delivered_pct=10.0,
+            borehole_pct=5.0,
+            unpiped_unaffected_pct=5.0,
+        )
     )
     assert pkg == 8.0
     assert delivered == 1.0
@@ -108,14 +118,18 @@ def test_reconcile_categories_over_100_pct_scales_to_budget():
 
 
 def test_reconcile_categories_over_100_pct_scales_proportionally():
-    pkg, delivered, borehole, unaffected, unknown, _, _ = reconcile_categories_over_100_pct(
-        piped_pct=90.0,
-        packaged_pct=8.0,
-        delivered_pct=4.0,
-        borehole_pct=4.0,
-        unpiped_unaffected_pct=4.0,
+    pkg, delivered, borehole, unaffected, unknown, _, _ = (
+        reconcile_categories_over_100_pct(
+            piped_pct=90.0,
+            packaged_pct=8.0,
+            delivered_pct=4.0,
+            borehole_pct=4.0,
+            unpiped_unaffected_pct=4.0,
+        )
     )
-    known = [v for v in (pkg, delivered, borehole, unaffected, unknown) if v is not None]
+    known = [
+        v for v in (pkg, delivered, borehole, unaffected, unknown) if v is not None
+    ]
     assert pytest.approx(sum(known)) == 10.0
     assert pytest.approx(pkg) == 4.0
     assert pytest.approx(unaffected) == 2.0
@@ -126,7 +140,9 @@ def test_select_survey_for_country_respects_year_gap():
         {"year": 2015, "survey": "OLD", "packaged_urban_pct": 80.0},
         {"year": 2022, "survey": "NEW", "packaged_urban_pct": 10.0},
     ]
-    selected = select_survey_for_country(records, piped_reference_year=2022, max_year_gap=5)
+    selected = select_survey_for_country(
+        records, piped_reference_year=2022, max_year_gap=5
+    )
     assert selected["survey"] == "NEW"
     none_within_gap = select_survey_for_country(
         records[:1], piped_reference_year=2022, max_year_gap=5
@@ -151,11 +167,7 @@ def test_apply_piped_reference_and_normalize_preserves_unpiped_unaffected():
     mapped = breakdown_to_model_columns(normalized)
     assert mapped["URBANPackaged"] < 80.0
     assert mapped["URBANUnpipedUnaffected"] > 0.0
-    assert (
-        mapped["URBANPackaged"]
-        + mapped["URBANUnpipedUnaffected"]
-        <= 5.0 + 1e-6
-    )
+    assert mapped["URBANPackaged"] + mapped["URBANUnpipedUnaffected"] <= 5.0 + 1e-6
 
 
 def test_apply_piped_reference_uses_country_piped_when_global_missing():
@@ -178,7 +190,9 @@ def test_apply_piped_reference_uses_country_piped_when_global_missing():
     mapped = breakdown_to_model_columns(normalized)
     # Urban budget = 100 - 99 = 1% from country row 6 piped
     assert mapped["URBANPackaged"] == pytest.approx(50 / 55, abs=0.001)
-    assert pytest.approx(mapped["URBANPackaged"] + mapped["URBANUnpipedUnaffected"]) == 1.0
+    assert (
+        pytest.approx(mapped["URBANPackaged"] + mapped["URBANUnpipedUnaffected"]) == 1.0
+    )
     # Rural budget = 100 - 97 = 3%
     assert mapped["RURALPackaged"] == pytest.approx(2.0, abs=0.001)
     assert mapped["RURALUnpipedUnaffected"] == pytest.approx(1.0, abs=0.001)

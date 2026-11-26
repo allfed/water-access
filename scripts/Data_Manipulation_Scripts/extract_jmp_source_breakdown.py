@@ -28,7 +28,9 @@ from jmp_source_parser import (  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = REPO_ROOT / "data" / "processed" / "semi-processed"
-WATER_CSV = REPO_ROOT / "data" / "original_data" / "WHO Household Water Data - 2023 Data.csv"
+WATER_CSV = (
+    REPO_ROOT / "data" / "original_data" / "WHO Household Water Data - 2023 Data.csv"
+)
 
 
 def main() -> int:

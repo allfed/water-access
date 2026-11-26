@@ -56,9 +56,7 @@ def main() -> int:
 
     codes = sorted(country.alpha_3 for country in pycountry.countries)
     to_download = [
-        iso3
-        for iso3 in codes
-        if not _is_valid_xlsx(local_dir / f"{iso3}.xlsx")
+        iso3 for iso3 in codes if not _is_valid_xlsx(local_dir / f"{iso3}.xlsx")
     ]
     print(f"{len(codes)} ISO3 codes; {len(to_download)} to download")
 

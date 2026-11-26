@@ -52,9 +52,7 @@ class TestUnallocatedFromSourceGap:
                 )
             ]
         )
-        out = apply_unallocated_from_source_gap(
-            df, report_path=tmp_path / "report.csv"
-        )
+        out = apply_unallocated_from_source_gap(df, report_path=tmp_path / "report.csv")
         assert out.at[0, "URBANUnpipedUnaffected"] == pytest.approx(5.0)
         assert out.at[0, "URBANUnallocated"] == pytest.approx(25.0)
         assert out.at[0, "RURALUnpipedUnaffected"] == pytest.approx(0.0)
@@ -72,9 +70,7 @@ class TestUnallocatedFromSourceGap:
                 )
             ]
         )
-        out = apply_unallocated_from_source_gap(
-            df, report_path=tmp_path / "report.csv"
-        )
+        out = apply_unallocated_from_source_gap(df, report_path=tmp_path / "report.csv")
         assert out.at[0, "URBANBorehole"] == 1.0
         assert out.at[0, "URBANUnpipedUnaffected"] == 0.0
         assert out.at[0, "URBANUnallocated"] == 0.0
@@ -82,9 +78,7 @@ class TestUnallocatedFromSourceGap:
 
     def test_unknown_country_still_gets_unallocated(self, tmp_path):
         df = pd.DataFrame([source_row("XXX", URBANPiped=40.0, RURALPiped=40.0)])
-        out = apply_unallocated_from_source_gap(
-            df, report_path=tmp_path / "report.csv"
-        )
+        out = apply_unallocated_from_source_gap(df, report_path=tmp_path / "report.csv")
         assert out.at[0, "URBANUnpipedUnaffected"] == 0.0
         assert out.at[0, "URBANUnallocated"] == pytest.approx(60.0)
 
@@ -95,28 +89,26 @@ class TestUnallocatedFromSourceGap:
                 source_row("DEU", URBANPiped=100.0, RURALPiped=100.0),
             ]
         )
-        apply_unallocated_from_source_gap(
-            df, report_path=tmp_path / "report.csv"
-        )
+        apply_unallocated_from_source_gap(df, report_path=tmp_path / "report.csv")
         report = pd.read_csv(tmp_path / "report.csv")
         assert len(report) == 4
         assert list(report.columns) == ["alpha3", "stratum", "gap", "unallocated"]
 
     def test_over_100_row_raises(self, tmp_path):
         df = pd.DataFrame(
-            [source_row("KEN", URBANPiped=50.0, RURALPiped=95.0, RURALUnpipedUnaffected=43.7)]
+            [
+                source_row(
+                    "KEN", URBANPiped=50.0, RURALPiped=95.0, RURALUnpipedUnaffected=43.7
+                )
+            ]
         )
         with pytest.raises(ValueError, match="sum past"):
-            apply_unallocated_from_source_gap(
-                df, report_path=tmp_path / "report.csv"
-            )
+            apply_unallocated_from_source_gap(df, report_path=tmp_path / "report.csv")
 
     def test_out_of_range_category_raises(self, tmp_path):
         df = pd.DataFrame([source_row("KEN", URBANPiped=-5.0, RURALPiped=10.0)])
         with pytest.raises(ValueError, match=r"outside \[0, 100\]"):
-            apply_unallocated_from_source_gap(
-                df, report_path=tmp_path / "report.csv"
-            )
+            apply_unallocated_from_source_gap(df, report_path=tmp_path / "report.csv")
 
     def test_no_nans_in_new_columns(self, tmp_path):
         df = pd.DataFrame(
@@ -125,9 +117,7 @@ class TestUnallocatedFromSourceGap:
                 source_row("XXX"),
             ]
         )
-        out = apply_unallocated_from_source_gap(
-            df, report_path=tmp_path / "report.csv"
-        )
+        out = apply_unallocated_from_source_gap(df, report_path=tmp_path / "report.csv")
         assert out["URBANUnallocated"].notna().all()
         assert out["RURALUnallocated"].notna().all()
 
@@ -169,8 +159,12 @@ class TestReconciliationCoversJmpRows:
         assert after.at[0, "URBANPiped"] == 50.0
 
     def test_usa_rural_like_row_is_fixed_by_the_final_pass(self):
-        df = self._frame("jmp", URBANPiped=100.0, RURALPiped=95.0, RURALUnpipedUnaffected=43.7)
-        track = pd.DataFrame({"alpha3": ["AAA"], "URBANPiped": [pd.NA], "RURALPiped": [pd.NA]})
+        df = self._frame(
+            "jmp", URBANPiped=100.0, RURALPiped=95.0, RURALUnpipedUnaffected=43.7
+        )
+        track = pd.DataFrame(
+            {"alpha3": ["AAA"], "URBANPiped": [pd.NA], "RURALPiped": [pd.NA]}
+        )
         after = reconcile_research_rows_with_final_piped(df, track)
         assert after.at[0, "RURALUnpipedUnaffected"] == pytest.approx(5.0)
         assert after.at[0, "RURALPiped"] == 95.0
@@ -224,8 +218,12 @@ class TestReconciliationCoversJmpRows:
         assert after.at[0, "URBANBorehole"] == pytest.approx(20.0)
 
     def test_research_row_still_takes_the_piped_lowering_branch(self):
-        df = self._frame("research", URBANPiped=82.0, URBANBorehole=69.0, RURALPiped=82.0)
-        track = pd.DataFrame({"alpha3": ["AAA"], "URBANPiped": [82.0], "RURALPiped": [82.0]})
+        df = self._frame(
+            "research", URBANPiped=82.0, URBANBorehole=69.0, RURALPiped=82.0
+        )
+        track = pd.DataFrame(
+            {"alpha3": ["AAA"], "URBANPiped": [82.0], "RURALPiped": [82.0]}
+        )
         after = reconcile_research_rows_with_final_piped(df, track)
         assert after.at[0, "URBANPiped"] == pytest.approx(31.0)
         assert after.at[0, "URBANBorehole"] == 69.0

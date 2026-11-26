@@ -189,9 +189,7 @@ def run_simulation(
     assert (
         0 <= rural_borehole_lose_fraction <= 1
     ), "Rural borehole lose fraction must be between 0 and 1."
-    assert isinstance(
-        unallocated_vulnerable_fraction, (int, float)
-    ) and not isinstance(
+    assert isinstance(unallocated_vulnerable_fraction, (int, float)) and not isinstance(
         unallocated_vulnerable_fraction, bool
     ), "Unallocated vulnerable fraction must be a number."
     assert (

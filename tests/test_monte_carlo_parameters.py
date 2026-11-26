@@ -41,4 +41,8 @@ def test_time_gathering_is_positive_with_median_in_range():
     params = sample_parameters(500)
     times = params["time_gatherings"]
     assert times.min() > 0
-    assert TIME_GATHERING_LOWER_ESTIMATE <= np.median(times) <= TIME_GATHERING_UPPER_ESTIMATE
+    assert (
+        TIME_GATHERING_LOWER_ESTIMATE
+        <= np.median(times)
+        <= TIME_GATHERING_UPPER_ESTIMATE
+    )

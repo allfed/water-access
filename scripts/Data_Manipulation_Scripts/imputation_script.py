@@ -605,27 +605,35 @@ def reconcile_research_breakdown_with_piped(df):
         for stratum in ("URBAN", "RURAL"):
             piped = df.at[idx, f"{stratum}Piped"]
             piped_pct = piped if pd.notna(piped) else None
-            category_values = {
-                cat: df.at[idx, f"{stratum}{cat}"] for cat in categories
-            }
+            category_values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
             packaged, delivered, borehole, unaffected, unknown, piped_effective, _ = (
                 reconcile_categories_over_100_pct(
                     piped_pct=piped_pct,
-                    packaged_pct=category_values["Packaged"]
-                    if pd.notna(category_values["Packaged"])
-                    else None,
-                    delivered_pct=category_values["Delivered"]
-                    if pd.notna(category_values["Delivered"])
-                    else None,
-                    borehole_pct=category_values["Borehole"]
-                    if pd.notna(category_values["Borehole"])
-                    else None,
-                    unpiped_unaffected_pct=category_values["UnpipedUnaffected"]
-                    if pd.notna(category_values["UnpipedUnaffected"])
-                    else None,
-                    unpiped_unknown_pct=category_values["UnpipedUnknown"]
-                    if pd.notna(category_values["UnpipedUnknown"])
-                    else None,
+                    packaged_pct=(
+                        category_values["Packaged"]
+                        if pd.notna(category_values["Packaged"])
+                        else None
+                    ),
+                    delivered_pct=(
+                        category_values["Delivered"]
+                        if pd.notna(category_values["Delivered"])
+                        else None
+                    ),
+                    borehole_pct=(
+                        category_values["Borehole"]
+                        if pd.notna(category_values["Borehole"])
+                        else None
+                    ),
+                    unpiped_unaffected_pct=(
+                        category_values["UnpipedUnaffected"]
+                        if pd.notna(category_values["UnpipedUnaffected"])
+                        else None
+                    ),
+                    unpiped_unknown_pct=(
+                        category_values["UnpipedUnknown"]
+                        if pd.notna(category_values["UnpipedUnknown"])
+                        else None
+                    ),
                     trust_categories_over_piped=False,
                 )
             )
@@ -667,30 +675,38 @@ def reconcile_research_rows_with_final_piped(df, spatial_track):
             piped = df.at[idx, piped_col]
             if pd.isna(piped):
                 continue
-            category_values = {
-                cat: df.at[idx, f"{stratum}{cat}"] for cat in categories
-            }
+            category_values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
             piped_was_imputed = alpha3 in track.index and pd.notna(
                 track.at[alpha3, piped_col]
             )
             packaged, delivered, borehole, unaffected, unknown, piped_effective, _ = (
                 reconcile_categories_over_100_pct(
                     piped_pct=piped,
-                    packaged_pct=category_values["Packaged"]
-                    if pd.notna(category_values["Packaged"])
-                    else None,
-                    delivered_pct=category_values["Delivered"]
-                    if pd.notna(category_values["Delivered"])
-                    else None,
-                    borehole_pct=category_values["Borehole"]
-                    if pd.notna(category_values["Borehole"])
-                    else None,
-                    unpiped_unaffected_pct=category_values["UnpipedUnaffected"]
-                    if pd.notna(category_values["UnpipedUnaffected"])
-                    else None,
-                    unpiped_unknown_pct=category_values["UnpipedUnknown"]
-                    if pd.notna(category_values["UnpipedUnknown"])
-                    else None,
+                    packaged_pct=(
+                        category_values["Packaged"]
+                        if pd.notna(category_values["Packaged"])
+                        else None
+                    ),
+                    delivered_pct=(
+                        category_values["Delivered"]
+                        if pd.notna(category_values["Delivered"])
+                        else None
+                    ),
+                    borehole_pct=(
+                        category_values["Borehole"]
+                        if pd.notna(category_values["Borehole"])
+                        else None
+                    ),
+                    unpiped_unaffected_pct=(
+                        category_values["UnpipedUnaffected"]
+                        if pd.notna(category_values["UnpipedUnaffected"])
+                        else None
+                    ),
+                    unpiped_unknown_pct=(
+                        category_values["UnpipedUnknown"]
+                        if pd.notna(category_values["UnpipedUnknown"])
+                        else None
+                    ),
                     trust_categories_over_piped=piped_was_imputed,
                 )
             )
@@ -801,9 +817,7 @@ def apply_unallocated_from_source_gap(df, report_path=None):
     for col in checked_cols:
         if df[col].isna().any():
             bad = df.loc[df[col].isna(), "alpha3"].tolist()
-            raise ValueError(
-                f"{col} contains NaN after Unallocated gap step: {bad}"
-            )
+            raise ValueError(f"{col} contains NaN after Unallocated gap step: {bad}")
         out_of_range = df.loc[(df[col] < 0) | (df[col] > 100), ["alpha3", col]]
         if not out_of_range.empty:
             raise ValueError(
@@ -1255,9 +1269,9 @@ def main(
 
     # add region and subregion for Taiwan
     df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "region"] = "Asia"
-    df_cleaned_merge.loc[
-        df_cleaned_merge["alpha3"] == "TWN", "subregion"
-    ] = "Eastern Asia"
+    df_cleaned_merge.loc[df_cleaned_merge["alpha3"] == "TWN", "subregion"] = (
+        "Eastern Asia"
+    )
 
     # import weight data
     df_weight = calculate_average_weight_per_country(

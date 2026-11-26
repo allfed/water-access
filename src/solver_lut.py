@@ -157,7 +157,7 @@ def _span(values, axis):
 
 
 # ---------------------------------------------------------------------------
-# Grid sizing 
+# Grid sizing
 # ---------------------------------------------------------------------------
 
 #: Number of slope nodes. The LUT grid budgets 60k-130k solver calls per draw; with the

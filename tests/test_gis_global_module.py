@@ -983,7 +983,9 @@ class TestCalculatePopulationWaterAccess:
         )
         result = calculate_population_water_access(df_zones)
         assert result["zone_pop_with_water"].iloc[0] == pytest.approx(1000.0)
-        assert result["population_affected_with_access"].iloc[0] == pytest.approx(1000.0)
+        assert result["population_affected_with_access"].iloc[0] == pytest.approx(
+            1000.0
+        )
 
 
 class TestCalculateWaterRations:

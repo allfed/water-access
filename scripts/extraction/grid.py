@@ -88,9 +88,7 @@ def load_master_grid() -> MasterGrid:
             crs=str(src.crs),
         )
     if (grid.width, grid.height) != GRID_SHAPE:
-        raise ValueError(
-            f"{path} is {grid.width}x{grid.height}, expected {GRID_SHAPE}"
-        )
+        raise ValueError(f"{path} is {grid.width}x{grid.height}, expected {GRID_SHAPE}")
     return grid
 
 

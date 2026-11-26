@@ -75,7 +75,11 @@ class TestDefaultBudgetRule:
                 unpiped_unaffected_pct=80.2,
             )
         )
-        total = sum(v for v in (packaged, delivered, borehole, unaffected, unknown) if v is not None)
+        total = sum(
+            v
+            for v in (packaged, delivered, borehole, unaffected, unknown)
+            if v is not None
+        )
         assert abs(total - 89.0) < 0.01
         assert piped_eff is None
         assert "scaled_to_unpiped_budget" in note
@@ -177,9 +181,17 @@ class TestValidator:
         rural = rural or {}
         row = {"alpha3": alpha3}
         for stratum, values in (("URBAN", urban), ("RURAL", rural)):
-            for cat in ("Packaged", "Delivered", "Borehole", "UnpipedUnaffected", "UnpipedUnknown"):
+            for cat in (
+                "Packaged",
+                "Delivered",
+                "Borehole",
+                "UnpipedUnaffected",
+                "UnpipedUnknown",
+            ):
                 row[f"{stratum}{cat}"] = values.get(cat, pd.NA)
-            row[f"{stratum}PipedEffective"] = (piped_effective or {}).get(stratum, pd.NA)
+            row[f"{stratum}PipedEffective"] = (piped_effective or {}).get(
+                stratum, pd.NA
+            )
         return row
 
     def test_missing_reference_is_reported_not_silently_passed(self):
