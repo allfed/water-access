@@ -301,9 +301,6 @@ class TestProcessMCResults:
         assert os.path.exists(
             os.path.join(temp_dir, "country_95th_percentile_results.csv")
         )
-        assert os.path.exists(
-            os.path.join(temp_dir, "countries_simulation_results.pkl")
-        )
 
         # Remove the temporary directory when you're done
         shutil.rmtree(temp_dir)

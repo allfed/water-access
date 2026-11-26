@@ -142,7 +142,6 @@ data/.DS_Store
 # GCP deploy state (active zone after fallback create)
 gcp/.instance-zone
 data/GIS/source_rasters/
-.venv-phase0/
 
 # scripted extraction outputs (large parquet/csv, never committed)
 data/GIS/extracted/

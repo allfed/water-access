@@ -1,8 +1,7 @@
-"""Chunked execution of the global analysis, for the 30 arc-second grid .
+"""Chunked execution of the global analysis, for the 30 arc-second grid.
 
-At 5 arc-minutes the model holds every populated cell in memory at once: 1.4M
-rows, ~3 GB peak. At 30 arc-seconds there are ~140M populated cells and the same
-approach needs ~57 GB -- more than twice the 24 GB memory budget.
+At 30 arc-seconds there are ~140M populated cells; holding them all in memory at
+once needs ~57 GB -- more than twice the 24 GB memory budget.
 
 The way out is to notice **what the model actually aggregates over**. Every
 per-cell calculation is independent, and every aggregation is grouped by
@@ -37,11 +36,9 @@ explicitly:
 ``pop_density_perc``, worth calling out, is otherwise *not* on that list: it
 normalises population density within a country, so whole-country chunks make it
 exact for free. That is exactly why country groups, rather than an arbitrary row
-range, are the unit of work.
-
-The monolithic path is untouched and remains the reference;
-``scripts/validate_chunking.py`` asserts the two produce identical country and
-district frames on the same input at fixed parameters.
+range, are the unit of work. On the same input and parameters, the chunked path
+produces the same country and district frames as the whole-grid path in
+:func:`src.gis_global_module.run_global_analysis`.
 """
 
 import tempfile
@@ -58,8 +55,7 @@ import src.solver_lut as solver_lut
 
 #: Default chunk budget, in *post-filter* (modelled) rows.
 #:
-#: Calibrated, not guessed. Peak RSS was measured against chunk size on the
-#: 5-arcmin grid and fits
+#: Calibrated, not guessed. Peak RSS was measured against chunk size and fits
 #:
 #:     peak GB ~= 1.0 + 1.2 * (millions of modelled cells in the largest chunk)
 #:
@@ -80,24 +76,18 @@ PLANNING_COLUMNS = ("ISOCODE", "shapeID", "pop_density", "slope_1")
 #: Four float64 coordinate columns are ~37% of the frame's footprint.
 COORDINATE_COLUMNS = ("left", "top", "right", "bottom")
 
-#: The two of those a cos-latitude area weighting *does* need back (they give
-#: the cell-centre latitude). Half the saving, and only when the flag is on.
+#: The two of those the cos-latitude population weighting needs back (they
+#: give the cell-centre latitude).
 LATITUDE_COLUMNS = tuple(gis.LATITUDE_COLUMNS)
 
 #: Every column anything downstream of preprocessing reads. The preprocessed
 #: frame carries roughly twice this many -- the GRIP road densities (consumed by
 #: road_analysis and dead thereafter), the nodata indicators, the raw population
-#: density, and the country table's geography columns. In the monolithic path
-#: they are harmless passengers that get handed back to the caller; a chunked
-#: run throws the per-cell frame away, so carrying them is pure cost.
+#: density, and the country table's geography columns. A chunked run throws the
+#: per-cell frame away, so carrying them is pure cost.
 #:
 #: Must include the URBAN*/RURAL* source-share columns used by
 #: ``calculate_population_water_access`` (Packaged through Unallocated).
-#: Dropping those made 30as fail with a misleading "stale merged_data" error.
-#:
-#: Dropping unread columns cannot change a number -- ``validate_chunking.py``
-#: is what proves that, since it compares against the monolithic path which
-#: keeps them.
 CHUNK_KEEP_COLUMNS = (
     # identifiers and grouping keys
     "fid",
@@ -121,8 +111,7 @@ CHUNK_KEEP_COLUMNS = (
     "RURALPiped",
     "PBO",
     "Household_Size",
-    # source-breakdown shares (needed by calculate_population_water_access;
-    # dropping them made 30as look like a stale merged_data.csv)
+    # source-breakdown shares (needed by calculate_population_water_access)
     "URBANPackaged",
     "RURALPackaged",
     "URBANDelivered",
@@ -171,21 +160,15 @@ class ChunkPlan:
     slope_range: tuple
     #: ``(min, max)`` country average body mass over every surviving country.
     mass_range: tuple
-    #: Grid cell edge length in degrees .
+    #: Grid cell edge length in degrees.
     cell_size_degrees: float
     #: Total surviving rows.
     total_rows: int
-    #: Per-ISOCODE ``pop_density`` totals, for chunks holding a partial country.
-    #: Totals of the *area-weighted* weight when :attr:`area_weighted_population`
-    #: is set, since that is what the run will normalise against.
+    #: Per-ISOCODE totals of the population split weight
+    #: (``pop_density x cos(latitude)``), for chunks holding a partial country.
     density_totals: dict = field(default_factory=dict)
     #: Diagnostics for the run header.
     notes: dict = field(default_factory=dict)
-    #: Whether the plan was built with cos-latitude area weighting. The survivor
-    #: set (and hence the chunk sizes, the pinned LUT ranges and the density
-    #: totals) depends on it, so a plan may only be reused by a run with the
-    #: same setting.
-    area_weighted_population: bool = True
 
     def __len__(self):
         return len(self.chunks)
@@ -213,7 +196,6 @@ class ChunkPlan:
             f"= {self.notes.get('largest_country', '?')}"
             + (f", split by district: {', '.join(split)}" if split else "")
             + f"), cell {self.cell_size_degrees * 3600:.0f} arcsec"
-            + (", cos-lat area weighted" if self.area_weighted_population else "")
         )
 
 
@@ -221,8 +203,8 @@ def read_parquet_cell_size(path):
     """Read ``cell_size_degrees`` from a Parquet footer, if it is there.
 
     ``scripts/extraction/extract_grid.py`` stamps the master-grid cell size into
-    the file metadata precisely so a consumer can apply the resolution-aware population
-    threshold without reading the coordinate columns.
+    the file metadata so a consumer can apply the population threshold without
+    reading the coordinate columns.
 
     Returns:
         float or None.
@@ -266,13 +248,13 @@ def plan_chunks(
     country_file=None,
     max_rows_per_chunk=DEFAULT_CHUNK_ROWS,
     cell_size_degrees=None,
-    area_weighted_population=True,
 ):
     """Work out which countries go in which chunk, and the global LUT ranges.
 
-    Reads three columns of the zone frame -- ISOCODE, pop_density, slope_1 --
-    and replays just enough of :func:`gis_global_module.merge_and_adjust_population`
-    (the per-country density normalisation and the resolution-aware population filter) to
+    Reads a few columns of the zone frame (ISOCODE, shapeID, pop_density,
+    slope_1 and the latitude bounds) and replays just enough of
+    :func:`gis_global_module.merge_and_adjust_population` (the per-country
+    population normalisation and the population filter) to
     know how many cells each country actually contributes. Countries are then
     bin-packed largest-first into chunks under ``max_rows_per_chunk``; a country
     bigger than the budget on its own becomes its own chunk, which is the
@@ -284,12 +266,6 @@ def plan_chunks(
         max_rows_per_chunk (int): budget, in post-filter rows.
         cell_size_degrees (float, optional): overrides both the Parquet footer
             and the ``left``/``right`` inference.
-        area_weighted_population (bool, optional): normalise population by
-            ``pop_density x cos(latitude)`` rather than ``pop_density`` alone,
-            matching :func:`gis_global_module.merge_and_adjust_population`'s
-            argument of the same name. Must match the setting the run itself
-            uses: it changes the survivor set, the chunk sizes and the density
-            totals handed to split countries. Defaults to True.
 
     Returns:
         ChunkPlan
@@ -300,13 +276,11 @@ def plan_chunks(
     if cell_size_degrees is None:
         cell_size_degrees = read_parquet_cell_size(zone_file)
 
-    columns = list(PLANNING_COLUMNS)
-    if area_weighted_population:
-        # The pre-pass has to reproduce the run's weight exactly, so it needs
-        # the cell-centre latitude too.
-        columns += [c for c in LATITUDE_COLUMNS if c not in columns]
+    # The pre-pass has to reproduce the run's weight exactly, so it needs the
+    # cell-centre latitude too.
+    columns = list(PLANNING_COLUMNS) + list(LATITUDE_COLUMNS)
     if cell_size_degrees is None:
-        # Fall back to the column-based inference  -- the CSV path, and
+        # Fall back to the column-based inference -- the CSV path, and
         # any Parquet without the footer stamp.
         columns += ["left", "right"]
 
@@ -320,7 +294,7 @@ def plan_chunks(
     # deliberately the *verbatim* expression from merge_and_adjust_population,
     # not an equivalent one: the survivor set decides the global slope range,
     # which the LUT grid is pinned to, so a last-bit difference here would show
-    # up as a chunked-vs-monolithic mismatch.
+    # up as a mismatch between chunked and whole-grid runs.
     if df_input["alpha3"].duplicated().any():
         raise ValueError(
             "country table has duplicate alpha3 codes; the chunk planner assumes "
@@ -344,9 +318,7 @@ def plan_chunks(
     # scalar is kept as-is, *not* coerced to a Python float: pop_density is
     # float32, and dividing by a float64 would promote the result and stop it
     # matching a whole-world run.
-    split_weights = gis.population_split_weights(
-        frame, area_weighted_population=area_weighted_population
-    )
+    split_weights = gis.population_split_weights(frame)
     density_totals = {
         str(key): group.sum()
         for key, group in split_weights.groupby(iso, observed=True, sort=True)
@@ -445,7 +417,6 @@ def plan_chunks(
         cell_size_degrees=float(cell_size_degrees),
         total_rows=int(counts.sum()),
         density_totals=density_totals,
-        area_weighted_population=bool(area_weighted_population),
         notes={
             "countries": list(counts.index),
             "largest_country": str(counts.index[0]),
@@ -460,16 +431,14 @@ def plan_chunks(
     )
 
 
-def _chunk_columns(zone_file, area_weighted_population=True):
+def _chunk_columns(zone_file):
     """Which zone columns a chunk needs to read.
 
-    The cell size comes from the plan, so the four float64 coordinate columns
-    can be skipped -- worth ~37% of the frame at 30 arc-seconds. Only possible
-    for Parquet; a CSV read is all-or-nothing here because the column set has to
-    survive :func:`gis_global_module.optimise_zone_dtypes` unchanged.
-
-    Area weighting needs the cell-centre latitude, so ``top``/``bottom`` come
-    back when it is on; ``left``/``right`` still do not.
+    The cell size comes from the plan, so ``left``/``right`` can be skipped.
+    ``top``/``bottom`` are kept for the cell-centre latitude used by the
+    population weighting. Only possible for Parquet; a CSV read is
+    all-or-nothing here because the column set has to survive
+    :func:`gis_global_module.optimise_zone_dtypes` unchanged.
     """
     if not _is_parquet(zone_file):
         return None  # everything
@@ -477,9 +446,7 @@ def _chunk_columns(zone_file, area_weighted_population=True):
 
     if gis.Path(zone_file).is_dir():
         return None
-    dropped = set(COORDINATE_COLUMNS)
-    if area_weighted_population:
-        dropped -= set(LATITUDE_COLUMNS)
+    dropped = set(COORDINATE_COLUMNS) - set(LATITUDE_COLUMNS)
     available = [f.name for f in pq.ParquetFile(str(zone_file)).schema_arrow]
     return [c for c in available if c not in dropped]
 
@@ -505,7 +472,6 @@ def run_chunked_global_analysis(
     zone_file=None,
     progress=True,
     spill_dir=None,
-    area_weighted_population=True,
     zone_output_path=None,
     zone_output_columns=None,
 ):
@@ -534,9 +500,6 @@ def run_chunked_global_analysis(
             ``32 bytes x every modelled cell`` -- 4.5 GB at 30 arc-seconds --
             to the peak *while a chunk frame is also live*, which is the worst
             possible moment for it.
-        area_weighted_population (bool): see
-            :func:`gis_global_module.merge_and_adjust_population`. A supplied
-            ``plan`` must agree with it.
         zone_output_path (optional): if set with ``zone_output_columns``, append
             per-cell zone results to this Parquet file as each chunk completes.
         zone_output_columns (optional): columns to write (e.g. fid and the two
@@ -553,25 +516,10 @@ def run_chunked_global_analysis(
 
     zone_file = zone_file or gis.zone_input_file(use_sample_data)
     if plan is None:
-        plan = plan_chunks(
-            zone_file,
-            max_rows_per_chunk=chunk_rows,
-            area_weighted_population=area_weighted_population,
-        )
-    elif bool(plan.area_weighted_population) != bool(area_weighted_population):
-        # The plan's density totals, survivor set and pinned LUT ranges are all
-        # computed under one weighting or the other. Reusing the wrong one would
-        # silently normalise split countries against the wrong divisor.
-        raise ValueError(
-            "chunk plan was built with area_weighted_population="
-            f"{plan.area_weighted_population}, but the run asks for "
-            f"{bool(area_weighted_population)}; rebuild the plan."
-        )
+        plan = plan_chunks(zone_file, max_rows_per_chunk=chunk_rows)
 
     df_input = _compact_country_table(pd.read_csv(gis.COUNTRY_DATA_FILE))
-    columns = _chunk_columns(
-        zone_file, area_weighted_population=area_weighted_population
-    )
+    columns = _chunk_columns(zone_file)
 
     country_parts, district_parts = [], []
     weighted_files, country_weighted_files = [], []
@@ -607,13 +555,10 @@ def run_chunked_global_analysis(
                 rural_adjustment=rural_adjustment,
                 cell_size_degrees=plan.cell_size_degrees,
                 # Only a partial country needs the national divisor supplied;
-                # a whole-country chunk derives the identical value itself, and
-                # leaving it to do so keeps that path byte-for-byte the one the
-                # monolithic run takes.
+                # a whole-country chunk derives the identical value itself.
                 density_totals=(
                     plan.density_totals if selection.is_partial_country else None
                 ),
-                area_weighted_population=area_weighted_population,
             )
             del df_zones_input
             df_zones = df_zones[list(CHUNK_KEEP_COLUMNS)].copy()
@@ -771,10 +716,8 @@ def _read_chunk(zone_file, columns, selection):
     """Read one chunk's rows, restricted to ``columns`` where possible.
 
     Parquet reads push the selection down into Arrow, so peak memory is the
-    *filtered* result plus a row group of decode buffers. A CSV has to be read
-    whole and filtered afterwards -- fine for the 5 arc-minute grid, where the
-    whole file fits comfortably, and the reason memory-bounded chunking needs
-    the Parquet input .
+    *filtered* result plus a row group of decode buffers. A CSV (small sample
+    inputs only) is read whole and filtered afterwards.
     """
     if selection.is_partial_country:
         column, values = "shapeID", list(selection.shape_ids)

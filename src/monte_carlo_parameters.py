@@ -3,8 +3,7 @@
 Set your estimates for lower and upper bounds for the scenario you want to run.
 
 Monte-Carlo driver scripts draw their per-iteration parameters from here
-(``scripts/run_monte_carlo.py``, ``scripts/run_monte_carlo_gcp.py``,
-``scripts/run_monte_carlo_test.py``)
+(``scripts/run_monte_carlo.py``, ``scripts/run_monte_carlo_gcp.py``).
 """
 
 # -----------------------------------------------------------------------------
@@ -63,7 +62,8 @@ RURAL_PDR_PARETO_LOC = 1.0
 # WATER-SOURCE ACCOUNTING PARAMETERS
 # -----------------------------------------------------------------------------
 
-# Share of borehole users who lose access when electric pumping fails
+# Share of borehole users who lose access when motorised pumping fails.
+# Derived in data/original_data/borehole_pump_type_estimates_README.md.
 URBAN_BOREHOLE_LOSE_FRACTION_LOWER_ESTIMATE = 0.63
 URBAN_BOREHOLE_LOSE_FRACTION_UPPER_ESTIMATE = 0.80
 

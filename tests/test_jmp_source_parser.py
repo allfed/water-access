@@ -187,9 +187,9 @@ def test_apply_piped_reference_uses_country_piped_when_global_missing():
 class TestTotalOnlySurveyFallback:
     """Surveys reporting only country totals must not ship zeros.
 
-    Before the fix only borehole had a total -> urban/rural fallback, so
-    total-only instruments (MMR_2021_HFPS, UKR_2024_SWS) silently shipped
-    packaged / delivered / other-unpiped as 0.
+    Every category needs a total -> urban/rural fallback, otherwise total-only
+    instruments (MMR_2021_HFPS, UKR_2024_SWS) would ship packaged / delivered /
+    other-unpiped as 0.
     """
 
     def test_fallback_applies_to_every_category(self):

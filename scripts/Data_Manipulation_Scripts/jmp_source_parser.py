@@ -608,9 +608,9 @@ def map_country_names_to_alpha3(
     """Map WHO/JMP country names to alpha3 codes, refusing silent collisions.
 
     ``pycountry.countries.search_fuzzy`` is a best-effort matcher: "Niger"
-    resolves to Nigeria (NGA), so before the manual override was added, one of
-    the two countries silently lost its row. Any two DISTINCT country names
-    resolving to the same alpha3 now raises instead. The same name repeated
+    resolves to Nigeria (NGA), so without the manual override one of the two
+    countries would silently lose its row. Any two DISTINCT country names
+    resolving to the same alpha3 raise instead. The same name repeated
     across year rows is normal and is deduplicated before the check.
     """
     import pycountry

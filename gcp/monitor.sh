@@ -137,8 +137,8 @@ check_progress() {
     DISTRICT_COUNT=${DISTRICT_COUNT:-0}
     COUNTRIES_COUNT=${COUNTRIES_COUNT:-0}
 
-    # 30as profile: country + district only (no zone parquet). Old logic took
-    # min(zone, district, countries), so zone=0 forced COMPLETED=0 forever.
+    # Zone Parquet is off by default (country + district only), so only count
+    # zone files towards completion when the run writes them.
     if [ "$ZONE_COUNT" -eq 0 ]; then
         COMPLETED=$COUNTRIES_COUNT
         if [ "$DISTRICT_COUNT" -gt 0 ] && [ "$DISTRICT_COUNT" -lt "$COMPLETED" ]; then
@@ -180,7 +180,7 @@ check_progress() {
     echo -e "${MAGENTA}● Remaining:${NC} $REMAINING iterations"
     echo -e "  - Countries results: $COUNTRIES_COUNT"
     echo -e "  - District results: $DISTRICT_COUNT"
-    echo -e "  - Zone results: $ZONE_COUNT (0 expected for 30as)"
+    echo -e "  - Zone results: $ZONE_COUNT (0 unless --save-zone-parquet)"
 
     # Estimate completion time
     if [ $COMPLETED -gt 0 ] && [ -n "$RUN_SINCE" ]; then

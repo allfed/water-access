@@ -9,13 +9,9 @@ Wraps the same simulation path as ``run_monte_carlo.py`` but:
 For a 30 arc-second production run:
 
     python scripts/run_monte_carlo_gcp.py \\
-        --resolution 30as \\
         --input data/GIS/extracted/master_30as.parquet \\
         --workers 1 \\
         --seed 20260808
-
-Use the same ``--seed`` on a 5 arc-minute twin and compare with
-``scripts/compare_smoke_runs.py``.
 """
 
 import argparse
@@ -40,7 +36,6 @@ import src.gis_monte_carlo as mc  # noqa: E402
 from src.monte_carlo_parameters import sample_parameters  # noqa: E402
 from scripts.run_monte_carlo import (  # noqa: E402
     CHUNK_ROWS_30AS,
-    MAX_WORKERS,
     MAX_WORKERS_30AS,
     ZONE_RESULT_COLUMNS,
     _init_worker,
@@ -70,12 +65,6 @@ def parse_args(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--resolution",
-        choices=("5min", "30as"),
-        default="5min",
-        help="grid resolution (default 5min)",
-    )
-    parser.add_argument(
         "--iterations",
         type=int,
         default=1000,
@@ -85,31 +74,25 @@ def parse_args(argv=None):
         "--input",
         type=Path,
         default=None,
-        help="zone frame (CSV or Parquet). Required for 30as.",
+        help="zone frame (CSV or Parquet; default the 30 arc-second master grid)",
     )
     parser.add_argument(
         "--workers",
         type=int,
         default=None,
-        help="simultaneous worker processes (default 1 at 30as, 24 at 5min)",
+        help=f"simultaneous worker processes (default {MAX_WORKERS_30AS})",
     )
     parser.add_argument(
         "--chunk-rows",
         type=int,
         default=None,
-        help=f"chunk budget at 30as (default {CHUNK_ROWS_30AS:,}; 0 disables)",
+        help=f"chunk budget (default {CHUNK_ROWS_30AS:,}; 0 disables)",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=None,
-        help="fix the parameter draws (required for 30as/5min twin comparison)",
-    )
-    parser.add_argument(
-        "--area-weighted-population",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="split population by pop_density x cos(latitude) (default on)",
+        help="fix the parameter draws (default: unseeded)",
     )
     parser.add_argument(
         "--save-zone-parquet",
@@ -122,7 +105,7 @@ def parse_args(argv=None):
         "--no-save-zone-parquet",
         dest="save_zone_parquet",
         action="store_false",
-        help="force zone Parquet off (default at 30as)",
+        help="force zone Parquet off (default)",
     )
     parser.add_argument(
         "--output-dir",
@@ -211,7 +194,7 @@ def get_completed_iterations(num_iterations, require_zone):
     return completed
 
 
-def process_saved_results(num_iterations, require_zone, write_pickle):
+def process_saved_results(num_iterations, require_zone):
     print("\n📊 Processing saved results...")
     import pandas as pd
 
@@ -234,12 +217,10 @@ def process_saved_results(num_iterations, require_zone, write_pickle):
             countries_simulation_results,
             plot=False,
             output_dir=str(RESULTS_PATH),
-            write_pickle=write_pickle,
         )
         mc.process_districts_results(
             districts_simulation_results,
             output_dir=str(RESULTS_PATH),
-            write_pickle=write_pickle,
         )
         print(f"✅ Processed {len(completed)} simulation results")
     else:
@@ -272,7 +253,6 @@ def run_and_save_simulation(job):
         zone_columns=ZONE_RESULT_COLUMNS if job["save_zone_parquet"] else [],
         chunk_rows=job["chunk_rows"] or None,
         chunk_plan=job["chunk_plan"],
-        area_weighted_population=job["area_weighted_population"],
         zone_output_path=zone_output_path,
     )
 
@@ -312,32 +292,20 @@ def main(argv=None):
     global RESULTS_PATH, PARQUET_PATH, CHECKPOINT_FILE
 
     args = parse_args(argv)
-    is_30as = args.resolution == "30as"
-    workers = (
-        args.workers
-        if args.workers is not None
-        else (MAX_WORKERS_30AS if is_30as else MAX_WORKERS)
-    )
+    workers = args.workers if args.workers is not None else MAX_WORKERS_30AS
     save_zone_parquet = (
-        args.save_zone_parquet if args.save_zone_parquet is not None else not is_30as
+        args.save_zone_parquet if args.save_zone_parquet is not None else False
     )
-    write_pickle = not is_30as
 
     if args.input is not None:
         gis.URB_DATA_FILE = args.input
-    elif is_30as:
-        raise SystemExit("--input is required for --resolution 30as")
 
     RESULTS_PATH = args.output_dir
     PARQUET_PATH = RESULTS_PATH / "parquet_files"
     CHECKPOINT_FILE = PARQUET_PATH / "checkpoint.json"
     PARQUET_PATH.mkdir(parents=True, exist_ok=True)
 
-    chunk_rows = (
-        args.chunk_rows
-        if args.chunk_rows is not None
-        else (CHUNK_ROWS_30AS if is_30as else 0)
-    )
+    chunk_rows = args.chunk_rows if args.chunk_rows is not None else CHUNK_ROWS_30AS
     chunk_plan = None
     if chunk_rows:
         import src.chunked_analysis as chunked
@@ -346,29 +314,20 @@ def main(argv=None):
         chunk_plan = chunked.plan_chunks(
             gis.URB_DATA_FILE,
             max_rows_per_chunk=chunk_rows,
-            area_weighted_population=args.area_weighted_population,
         )
         print(f"  {chunk_plan.describe()}", flush=True)
 
     run_config = {
-        "resolution": args.resolution,
         "iterations": args.iterations,
         "zone_file": str(gis.URB_DATA_FILE),
         "workers": workers,
         "chunk_rows": chunk_rows,
         "seed": args.seed,
-        "area_weighted_population": args.area_weighted_population,
         "save_zone_parquet": save_zone_parquet,
     }
 
-    print(f"Resolution: {args.resolution}")
     print(f"Zone frame: {gis.URB_DATA_FILE}")
     print(f"Workers: {workers}")
-    if is_30as:
-        print(
-            "30as profile: country/district Parquet only "
-            "(no zone Parquet, no pickles)."
-        )
 
     completed_iterations = get_completed_iterations(
         args.iterations, require_zone=save_zone_parquet
@@ -377,9 +336,7 @@ def main(argv=None):
 
     if completed_iterations and len(completed_iterations) >= args.iterations:
         print("✅ All iterations complete! Processing results...")
-        process_saved_results(
-            args.iterations, save_zone_parquet, write_pickle=write_pickle
-        )
+        process_saved_results(args.iterations, save_zone_parquet)
         return 0
 
     if checkpoint and "parameters" in checkpoint:
@@ -419,9 +376,7 @@ def main(argv=None):
         i for i in range(args.iterations) if i not in completed_iterations
     ]
     if not iterations_to_run:
-        process_saved_results(
-            args.iterations, save_zone_parquet, write_pickle=write_pickle
-        )
+        process_saved_results(args.iterations, save_zone_parquet)
         return 0
 
     signal.signal(signal.SIGTERM, handle_preemption)
@@ -453,7 +408,6 @@ def main(argv=None):
             "save_zone_parquet": save_zone_parquet,
             "chunk_rows": chunk_rows or None,
             "chunk_plan": chunk_plan,
-            "area_weighted_population": args.area_weighted_population,
         }
         for idx in iterations_to_run
     ]
@@ -487,9 +441,7 @@ def main(argv=None):
 
     if not shutdown_requested:
         save_checkpoint(completed_iterations, parameters, run_config)
-        process_saved_results(
-            args.iterations, save_zone_parquet, write_pickle=write_pickle
-        )
+        process_saved_results(args.iterations, save_zone_parquet)
 
     elapsed = time.time() - started
     print(

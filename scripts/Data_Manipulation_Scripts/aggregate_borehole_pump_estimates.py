@@ -5,9 +5,10 @@ borehole users, % 0-100, low/high bounds per stratum) and weights each country
 by its borehole-dependent population from data/processed/merged_data.csv
 (Population x urban share x URBANBorehole, and the rural counterpart).
 
-The HEMP-scenario lose fraction for a stratum is 1 - handpump_share:
-handpump users keep their source when electric pumping fails, everyone else
-on a motorized borehole is displaced.
+The lose fraction for a stratum is 1 - handpump_share: handpump users keep
+their source when motorised pumping fails, everyone else on a motorised
+borehole is displaced. Method and sources are described in
+data/original_data/borehole_pump_type_estimates_README.md.
 
 Usage:
     python scripts/Data_Manipulation_Scripts/aggregate_borehole_pump_estimates.py

@@ -1,8 +1,7 @@
 """Merge a percentile zone Parquet with cell centroids for map rasterisation.
 
-At 30 arc-seconds centroids come from ``master_30as.parquet`` (``left/top/
-right/bottom``). The merged table is written as Parquet (CSV is impractical
-at this cell count).
+Centroids come from ``master_30as.parquet`` (``left/top/right/bottom``). The
+merged table is written as Parquet (CSV is impractical at this cell count).
 
 Default input is the median zone map; pass ``--label 5th_percentile`` or
 ``95th_percentile`` for the other draws.
@@ -21,8 +20,6 @@ repo_root = data_script_dir.parent.parent
 parquet_data_dir = repo_root / "results" / "parquet_files"
 results_dir = repo_root / "results"
 master_30as = repo_root / "data" / "GIS" / "extracted" / "master_30as.parquet"
-# Legacy 5-arc-minute centroid table (only used if --resolution 5min).
-fid_csv_5min = repo_root / "data" / "GIS" / "GIS_country_points_fid.csv"
 
 
 def parse_args():
@@ -32,12 +29,6 @@ def parse_args():
         default="median",
         choices=("median", "5th_percentile", "95th_percentile"),
         help="which zone_simulation_result_<label>.parquet to export",
-    )
-    p.add_argument(
-        "--resolution",
-        choices=("30as", "5min"),
-        default="30as",
-        help="grid used for centroids (default 30as)",
     )
     return p.parse_args()
 
@@ -64,17 +55,6 @@ def centroids_from_master(master_path: Path, fids: pd.Series) -> pd.DataFrame:
     return bounds[["fid", "longitude_centroid", "latitude_centroid"]]
 
 
-def centroids_from_fid_csv(csv_path: Path) -> pd.DataFrame:
-    original_df = pd.read_csv(csv_path)
-    original_df["longitude_centroid"] = (
-        original_df["left"] + original_df["right"]
-    ) / 2
-    original_df["latitude_centroid"] = (
-        original_df["top"] + original_df["bottom"]
-    ) / 2
-    return original_df[["fid", "longitude_centroid", "latitude_centroid"]]
-
-
 def main() -> None:
     args = parse_args()
     zone_path = parquet_data_dir / f"zone_simulation_result_{args.label}.parquet"
@@ -85,23 +65,15 @@ def main() -> None:
         )
 
     processed_df = pd.read_parquet(zone_path)
-    if args.resolution == "30as":
-        if not master_30as.exists():
-            raise SystemExit(f"Missing {master_30as}")
-        print(f"Loading centroids from {master_30as} ...")
-        centroids = centroids_from_master(master_30as, processed_df["fid"])
-        # Analysis cells only (left join). A full right-join to every master
-        # cell is ~220M rows and is not needed for the GeoTIFF burn.
-        how = "left"
-    else:
-        if not fid_csv_5min.exists():
-            raise SystemExit(f"Missing {fid_csv_5min}")
-        print(f"Loading centroids from {fid_csv_5min} ...")
-        centroids = centroids_from_fid_csv(fid_csv_5min)
-        how = "right"
+    if not master_30as.exists():
+        raise SystemExit(f"Missing {master_30as}")
+    print(f"Loading centroids from {master_30as} ...")
+    centroids = centroids_from_master(master_30as, processed_df["fid"])
 
-    merged_df = processed_df.merge(centroids, on="fid", how=how)
-    print(f"Merged shape: {merged_df.shape} (how={how})")
+    # Analysis cells only (left join). A full right-join to every master
+    # cell is ~220M rows and is not needed for the GeoTIFF burn.
+    merged_df = processed_df.merge(centroids, on="fid", how="left")
+    print(f"Merged shape: {merged_df.shape}")
     print(f"NaN counts:\n{merged_df.isna().sum()}")
 
     results_dir.mkdir(parents=True, exist_ok=True)

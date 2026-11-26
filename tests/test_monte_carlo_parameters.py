@@ -37,7 +37,7 @@ def test_borehole_and_unallocated_ranges():
     assert g.max() <= UNALLOCATED_VULNERABLE_FRACTION_UPPER_ESTIMATE
 
 
-def test_time_gathering_is_lognormal_not_legacy_normal():
+def test_time_gathering_is_positive_with_median_in_range():
     params = sample_parameters(500)
     times = params["time_gatherings"]
     assert times.min() > 0

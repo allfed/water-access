@@ -1,32 +1,24 @@
 #!/usr/bin/env python
-"""Scripted replacement for the undocumented manual QGIS extraction.
+"""Build the 30 arc-second model input grid from the public source rasters.
 
-Builds the per-cell master table that the water-access model consumes, on
-either master lattice , straight from the public source rasters in
-``data/GIS/source_rasters/``.  Output is Parquet with the *verbatim* legacy
-column contract , optionally plus a legacy CSV.
+Builds the per-cell master table that the water-access model consumes,
+straight from the public source rasters in ``data/GIS/source_rasters/``.
+Output is Parquet with the model's input column contract.
 
-    # 5 arc-minute (validation grid; ~2.2M rows, ~1 min, <3 GB RSS)
     .venv/bin/python scripts/extraction/extract_grid.py \
-        --resolution 5min --out data/GIS/extracted/master_5min.parquet
-
-    # 30 arc-second (production grid; ~140M rows)
-    .venv/bin/python scripts/extraction/extract_grid.py \
-        --resolution 30as --out data/GIS/extracted/master_30as.parquet
+        --out data/GIS/extracted/master_30as.parquet
 
 Memory model: the grid is processed in full-width row blocks and each block is
 flushed to its own Parquet row group, so peak RSS is a function of
 ``--block-rows``, never of the grid size.  The full 43200x21600 stack is never
 materialised.
 
-Row selection (reproduces the legacy pipeline exactly):
-  1. drop cells whose centre falls in no geoBoundaries CGAZ ADM1 polygon
-     (legacy ``dropna(subset=["shapeGroup"])``);
+Row selection:
+  1. drop cells whose centre falls in no geoBoundaries CGAZ ADM1 polygon;
   2. drop cells with a nodata value in any of dtw_1 / pop_density / GHS_SMOD /
-     slope_1 (legacy ``drop_nan_rows``).  GRIP nodata is *not* a drop reason --
-     the legacy CSV keeps 7,675 such rows.
-Consequently the ``*_nan`` indicator columns are all-zero in the output, which
-is exactly what the legacy CSV contains.  ``--keep-nan-rows`` disables step 2
+     slope_1.  GRIP nodata is *not* a drop reason.
+Consequently the ``*_nan`` indicator columns are all-zero in the output.
+``--keep-nan-rows`` disables step 2
 for diagnostics and then the indicators become informative.
 """
 
@@ -57,7 +49,7 @@ from layers import (  # noqa: E402
     open_readers,
 )
 
-#: The legacy column contract, in order .
+#: The model's input column contract, in order.
 OUTPUT_COLUMNS = [
     "fid",
     "left",
@@ -129,9 +121,9 @@ def _dict_array(codes: np.ndarray, categories: np.ndarray) -> pa.Array:
 
 def extract(args) -> dict:
     t_start = time.time()
-    grid = load_master_grid(args.resolution)
+    grid = load_master_grid()
     print(
-        f"master grid [{grid.resolution}] {grid.width}x{grid.height} "
+        f"master grid {grid.width}x{grid.height} "
         f"cell={grid.cell_size:.11f} origin=({grid.transform.c:.9f}, "
         f"{grid.transform.f:.9f}) crs={grid.crs}",
         flush=True,
@@ -153,7 +145,7 @@ def extract(args) -> dict:
     iso_cats, iso_codes = np.unique(admin.iso, return_inverse=True)
 
     # File-level provenance. `cell_size_degrees` in particular lets a consumer
-    # apply the resolution-aware population filter resolution-aware population filter without reading the
+    # apply the population filter without reading the
     # left/right columns at all -- those four float64 coordinate columns are
     # ~37% of the in-memory footprint at 30 arc-second.
     schema = build_schema({}).with_metadata(
@@ -162,7 +154,7 @@ def extract(args) -> dict:
             for k, v in {
                 "pipeline": "scripts/extraction/extract_grid.py",
                 "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                "resolution": grid.resolution,
+                "resolution": "30as",
                 "grid_width": grid.width,
                 "grid_height": grid.height,
                 "cell_size_degrees": repr(grid.cell_size),
@@ -191,7 +183,6 @@ def extract(args) -> dict:
         "blocks": 0,
         "nan_by_layer": {c: 0 for c in RASTER_NAN_COLUMNS},
     }
-    csv_chunks = []
 
     blocks = list(iter_row_blocks(grid, args.block_rows))
     if args.limit_blocks:
@@ -257,15 +248,13 @@ def extract(args) -> dict:
         arrays.append(pa.array(any_nan))
 
         table = pa.Table.from_arrays(arrays, schema=schema)
-        # Bounded row groups keep the file streamable: Phase C / D can read it
-        # a row group at a time instead of materialising ~300M rows at once.
+        # Bounded row groups keep the file streamable: the model can read it
+        # a row group at a time instead of materialising ~220M rows at once.
         writer.write_table(
             table, row_group_size=max(min(rr.size, args.row_group_rows), 1)
         )
         stats["rows_written"] += rr.size
         stats["blocks"] += 1
-        if args.format == "csv":
-            csv_chunks.append(table.to_pandas())
 
         del values, nan_masks, adm, keep, has_admin, rr, cc, arrays, table
         print(
@@ -279,14 +268,6 @@ def extract(args) -> dict:
     for r in readers.values():
         r.close()
 
-    if args.format == "csv":
-        import pandas as pd
-
-        csv_path = os.path.splitext(args.out)[0] + ".csv"
-        pd.concat(csv_chunks, ignore_index=True)[OUTPUT_COLUMNS].to_csv(
-            csv_path, index=False
-        )
-        print(f"legacy CSV -> {csv_path}", flush=True)
 
     stats["seconds"] = time.time() - t_start
     stats["peak_rss_gb"] = peak_rss_gb()
@@ -295,7 +276,6 @@ def extract(args) -> dict:
         "\n".join(
             [
                 "",
-                f"resolution        : {args.resolution}",
                 f"cells scanned     : {stats['cells_total']:,}",
                 f"cells w/o ADM1    : {stats['cells_no_admin']:,}",
                 f"cells dropped nan : {stats['cells_dropped_nan']:,}",
@@ -315,33 +295,18 @@ def extract(args) -> dict:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("--resolution", choices=("5min", "30as"), required=True)
     p.add_argument("--out", required=True, help="output .parquet path")
-    p.add_argument(
-        "--format",
-        choices=("parquet", "csv"),
-        default="parquet",
-        help="'csv' additionally writes the legacy CSV next to the parquet",
-    )
     p.add_argument(
         "--block-rows",
         type=int,
-        default=None,
-        help="master rows per block (default 540 at 5min, 480 at 30as)",
-    )
-    p.add_argument(
-        "--pop-agg",
-        choices=("average", "nearest", "bilinear"),
-        default="average",
-        help="resampling for GPW density when the master grid is coarser than "
-        "30 arc-second (ignored at 30as, where the grids coincide)",
+        default=480,
+        help="master rows per block (default 480)",
     )
     p.add_argument(
         "--pop-raster",
         default=None,
-        help="override the GPW density GeoTIFF (default: the UN WPP-adjusted "
-        "product; pass data/GIS/source_rasters/gpw_v4_density_2020_30sec.tif "
-        "for the unadjusted fallback)",
+        help="override the GPW density GeoTIFF (default: the unadjusted "
+        "product, data/GIS/source_rasters/gpw_v4_density_2020_30sec.tif)",
     )
     p.add_argument("--slope-raster", default=None, help="override the slope GeoTIFF")
     p.add_argument("--smod-raster", default=None, help="override the GHS-SMOD GeoTIFF")
@@ -362,15 +327,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit-blocks",
         type=int,
         default=0,
-        help="stop after N row blocks (smoke test of the 30as path)",
+        help="stop after N row blocks (smoke test)",
     )
     return p
 
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
-    if args.block_rows is None:
-        args.block_rows = 540 if args.resolution == "5min" else 480
     # Resolve user paths against the *invocation* cwd before pinning the
     # process to the repo root, so relative --out works from anywhere.
     args.out = os.path.abspath(args.out)

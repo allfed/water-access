@@ -1,7 +1,6 @@
-"""Rasterise zone population results to a GeoTIFF.
+"""Rasterise zone population results to a 30 arc-second GeoTIFF.
 
-Default grid is 30 arc-seconds. Reads the Parquet written by
-``export_results_with_centroids.py`` (CSV is no longer used at 30as).
+Reads the Parquet written by ``export_results_with_centroids.py``.
 """
 
 from __future__ import annotations
@@ -21,6 +20,9 @@ repo_root = Path(__file__).resolve().parent.parent.parent
 results_dir = repo_root / "results"
 tif_dir = results_dir / "TIFs"
 
+# Output grid spacing: 30 arc-seconds, in degrees.
+RESOLUTION_DEGREES = 30 / 3600
+
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
@@ -31,25 +33,11 @@ def parse_args():
         help="which exported centroids Parquet to rasterise",
     )
     p.add_argument(
-        "--resolution",
-        choices=("30as", "5min"),
-        default="30as",
-        help="output grid spacing (default 30as)",
-    )
-    p.add_argument(
         "--filled",
         action="store_true",
         help="use the *_no_nans.parquet export (missing cells as 0)",
     )
     return p.parse_args()
-
-
-def resolution_degrees(name: str) -> float:
-    if name == "30as":
-        return 30 / 3600  # 0.008333...°
-    if name == "5min":
-        return 5 / 60
-    raise ValueError(name)
 
 
 def main() -> None:
@@ -69,10 +57,10 @@ def main() -> None:
 
     print(f"Reading {input_path} ...")
     df = pd.read_parquet(input_path)
-    resolution = resolution_degrees(args.resolution)
+    resolution = RESOLUTION_DEGREES
     tif_dir.mkdir(parents=True, exist_ok=True)
     output_filename = tif_dir / (
-        f"output_raster_{args.resolution}_{args.label}_partial_percentage.tif"
+        f"output_raster_30as_{args.label}_partial_percentage.tif"
     )
 
     gdf = gpd.GeoDataFrame(
@@ -90,7 +78,7 @@ def main() -> None:
     width = int(np.ceil((x_max - x_min) / resolution))
     height = int(np.ceil((y_max - y_min) / resolution))
     transform = from_origin(x_min, y_max, resolution, resolution)
-    print(f"Grid {width} x {height} at {args.resolution} ({resolution}°)")
+    print(f"Grid {width} x {height} at {resolution}°")
 
     denom = gdf["zone_pop_without_water"] + gdf["zone_pop_with_water"]
     gdf["percentage_with_water"] = np.where(

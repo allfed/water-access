@@ -22,14 +22,14 @@ git lfs pull  # Ensure all data files are downloaded
 
 ## Cost Estimates
 
-| Configuration | vCPUs | Memory | Spot Price | Est. Runtime | Total Cost |
-|--------------|-------|---------|------------|--------------|------------|
-| e2-highcpu-16 (Spot) | 16 | 16 GB | ~$0.12/hr | 4-5 days | $12-15 |
-| e2-highcpu-32 (Spot) | 32 | 32 GB | ~$0.24/hr | 2-3 days | $12-18 |
-| n2-highcpu-32 (Spot) | 32 | 32 GB | ~$0.36/hr | 2 days | $18-25 |
-| n2-highcpu-64 (Spot) | 64 | 64 GB | ~$0.72/hr | 1 day | $18-25 |
+Each Monte Carlo worker peaks at about 16.4 GB of memory, so the number of
+workers is set by memory rather than vCPUs.
 
-**Recommended**: `e2-highcpu-16` or `e2-highcpu-32` for best cost/performance ratio
+| Configuration | vCPUs | Memory | Workers | Spot Price | Total Cost (1000 draws) |
+|--------------|-------|---------|---------|------------|------------|
+| n2-highmem-32 (Spot) | 32 | 256 GB | 12 | ~$1.20/hr | $8-17 |
+
+**Recommended**: `n2-highmem-32`, the machine `deploy-spot.sh` uses.
 
 ## Step 1: Enable Required APIs
 
@@ -71,15 +71,14 @@ gsutil cp data/processed/merged_data.csv gs://water-access-data/input/data/proce
 gsutil -m cp -r src scripts environment.yml gs://water-access-data/code/
 ```
 
-### 30 arc-second input (required for `--resolution 30as`)
+### 30 arc-second zone input
 
 `master_30as.parquet` (~3.4 GB) is **not in git** (see `.gitignore`). Build it
-locally before a 30as cloud run:
+locally before a cloud run:
 
 ```bash
 # Follow scripts/extraction/README.md (source rasters + extract_grid.py)
 python scripts/extraction/extract_grid.py \
-    --resolution 30as \
     --out data/GIS/extracted/master_30as.parquet
 ```
 
@@ -90,16 +89,16 @@ gsutil -m cp data/GIS/extracted/master_30as.parquet \
     gs://water-access-data/input/data/GIS/extracted/
 ```
 
-Or use `./gcp/deploy-spot.sh upload`, which checks for the local parquet when
-`MC_RESOLUTION=30as` in `deploy-spot.sh` and uploads it automatically.
+Or use `./gcp/deploy-spot.sh upload`, which checks for the local parquet and
+uploads it automatically.
 
 ## Step 4: Create Spot VM Instance
 
-### Option A: Basic e2-highcpu-16 Spot VM (Recommended for cost)
+### Option A: Create the VM by hand
 ```bash
 gcloud compute instances create water-access-compute-spot \
     --zone=us-central1-a \
-    --machine-type=e2-highcpu-16 \
+    --machine-type=n2-highmem-32 \
     --provisioning-model=SPOT \
     --instance-termination-action=STOP \
     --max-run-duration=24h \
@@ -131,11 +130,10 @@ mkdir -p results/parquet_files
 # Check for existing checkpoint
 gsutil -m cp gs://water-access-data/checkpoints/* results/parquet_files/ 2>/dev/null || true
 
-# Run simulation with checkpointing (30as production profile)
+# Run simulation with checkpointing
 nohup python scripts/run_monte_carlo_gcp.py \
-    --resolution 30as \
     --input data/GIS/extracted/master_30as.parquet \
-    --workers 1 \
+    --workers 12 \
     > simulation.log 2>&1 &
 
 # Setup periodic checkpoint upload (every hour)
@@ -143,20 +141,12 @@ nohup python scripts/run_monte_carlo_gcp.py \
 '
 ```
 
-### Option B: More powerful e2-highcpu-32 Spot VM (Faster completion)
+### Option B: Use the deployment script
+`deploy-spot.sh` uploads code and data, writes the startup script, and creates
+the VM. Edit the configuration and `MC_*` variables at the top of the script,
+then run:
 ```bash
-gcloud compute instances create water-access-compute-spot \
-    --zone=us-central1-a \
-    --machine-type=e2-highcpu-32 \
-    --provisioning-model=SPOT \
-    --instance-termination-action=STOP \
-    --max-run-duration=24h \
-    --boot-disk-size=100GB \
-    --boot-disk-type=pd-standard \
-    --image-family=ubuntu-2204-lts \
-    --image-project=ubuntu-os-cloud \
-    --scopes=storage-rw \
-    --metadata-from-file=startup-script=gcp/startup-script.sh
+./gcp/deploy-spot.sh deploy
 ```
 
 ## Step 5: Connect to VM and Monitor Progress
@@ -248,41 +238,12 @@ gcloud alpha billing accounts budgets list --billing-account=YOUR_BILLING_ACCOUN
 ## Tips for Cost Optimization
 
 1. **Use Spot VMs**: 70-90% cheaper than regular VMs
-2. **Choose e2 machine types**: Better price/performance for this workload
+2. **Choose high-memory machine types**: Memory, not vCPUs, limits the number of workers
 3. **Use us-central1**: Generally cheapest region
 4. **Set max-run-duration**: Prevents runaway costs
 5. **Delete instances promptly**: Stop paying as soon as job completes
 6. **Use Standard storage**: Cheaper than SSD for this use case
 7. **Monitor actively**: Check progress regularly to avoid waste
-
-## 30as vs 5min smoke validation
-
-Before a full 1000-draw production run, validate resolution with a seeded twin
-comparison (same `--seed`, `--workers 1`, ~10 draws):
-
-```bash
-# 30as smoke
-python scripts/run_monte_carlo.py --resolution 30as \
-    --input data/GIS/extracted/master_30as.parquet \
-    --iterations 10 --workers 1 --seed 20260808 \
-    --output-dir results/validation/smoke30 2>&1 | tee results/validation/smoke30_run.log
-
-# 5min twin (same seed)
-python scripts/run_monte_carlo.py --resolution 5min \
-    --iterations 10 --workers 1 --seed 20260808 \
-    --output-dir results/validation/twin5min 2>&1 | tee results/validation/twin5min_run.log
-
-python scripts/compare_smoke_runs.py \
-    --run-30as results/validation/smoke30 \
-    --run-5min results/validation/twin5min \
-    --log-30as results/validation/smoke30_run.log \
-    --log-5min results/validation/twin5min_run.log \
-    --out results/validation/smoke_comparison.md
-```
-
-The comparison script checks that `PARAM_DRAW` lines match and reports global
-population-weighted medians. Pass criteria: `percent_with_water` within ±2 pp and
-30as walking access ≥ 5min.
 
 ## Troubleshooting
 
@@ -297,7 +258,6 @@ cd ~/water-access
 source ~/miniconda3/bin/activate
 mamba activate water-access
 python scripts/run_monte_carlo_gcp.py \
-    --resolution 30as \
     --input data/GIS/extracted/master_30as.parquet \
     --workers 1
 ```

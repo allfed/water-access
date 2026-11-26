@@ -14,10 +14,7 @@ import warnings
 
 import src.solver_lut as solver_lut
 
-# ## Import Data from CSVs.
-# CSVs created in previous script, which did the cycling mobility on a per country basis
-#
-# ### GIS Data From QGIS Export
+# ### GIS data, built by scripts/extraction/extract_grid.py from:
 # https://ghsl.jrc.ec.europa.eu/download.php?ds=smod <- urbanisation
 #
 # https://www.earthenv.org/topography <- topography
@@ -37,7 +34,7 @@ repo_root = script_dir.parent
 results_dir = repo_root / "results"
 
 # Define paths relative to the src directory
-URB_DATA_FILE = repo_root / "data" / "GIS" / "updated_GIS_output_cleaned.csv"
+URB_DATA_FILE = repo_root / "data" / "GIS" / "extracted" / "master_30as.parquet"
 URB_DATA_FILE_SAMPLE = repo_root / "data" / "GIS" / "GIS_data_zones_sample.csv"
 
 COUNTRY_DATA_FILE = repo_root / "data" / "processed" / "merged_data.csv"
@@ -127,14 +124,14 @@ def run_weighted_median_on_grouped_df(df, groupby_column, value_column, weight_c
 
 
 #: Wall-clock seconds the most recent :func:`load_data` call spent reading the
-#: zone frame off disk. Records load time so benchmarks can measure solver/refactor time excluding the
+#: zone frame off disk. Records load time so benchmarks can measure model time excluding the
 #: initial data load, and the load happens several frames down inside
 #: ``run_global_analysis``, so it is recorded here rather than plumbed through
 #: every signature.
 LAST_LOAD_SECONDS = 0.0
 
-#: File extensions that :func:`load_data` reads as Parquet . Anything
-#: else is read as CSV, byte-for-byte as before.
+#: File extensions that :func:`load_data` reads as Parquet. Anything
+#: else is read as CSV.
 PARQUET_SUFFIXES = (".parquet", ".parq", ".pq")
 
 
@@ -158,19 +155,19 @@ FLOAT32_ZONE_COLUMNS = (
     "slope_1",
 )
 
-#: Zone columns stored as categoricals . At 30 arc-seconds these are
+#: Zone columns stored as categoricals. At 30 arc-seconds these are
 #: ~140M repetitions of a few thousand short strings; as objects they alone cost
 #: more than the whole numeric frame.
 CATEGORICAL_ZONE_COLUMNS = ("shapeName", "shapeID", "ISOCODE")
 
 
 def optimise_zone_dtypes(df_zones_input):
-    """Shrink a freshly loaded zone frame in place .
+    """Shrink a freshly loaded zone frame in place.
 
     float64 rasters become float32, repeated identifier strings become
-    categoricals, and the NaN-indicator flags become ``int8``. At 5 arc-minutes
-    this is a convenience; at 30 arc-seconds (~140M rows) it is the difference
-    between fitting in 32 GB and not.
+    categoricals, and the NaN-indicator flags become ``int8``. At 30
+    arc-seconds (~140M rows) this is the difference between fitting in 32 GB
+    and not.
 
     Args:
         df_zones_input (DataFrame): the zone frame as read off disk.
@@ -202,9 +199,9 @@ def optimise_zone_dtypes(df_zones_input):
 def _read_zone_frame(path):
     """Read a zone frame from Parquet or CSV, dispatching on the file extension.
 
-    Parquet/CSV dispatch: the 30 arc-second extract is Parquet (a CSV would be ~40 GB) but
-    carries the identical column contract, so everything downstream is unchanged.
-    A directory is treated as a partitioned Parquet dataset.
+    The 30 arc-second extract is Parquet (a CSV would be ~40 GB); small sample
+    frames such as the test fixture are CSV with the same columns. A directory
+    is treated as a partitioned Parquet dataset.
     """
     candidate = Path(path)
     if candidate.is_dir() or candidate.suffix.lower() in PARQUET_SUFFIXES:
@@ -217,9 +214,9 @@ def load_data(urb_data_file, country_data_file):
     Load data from CSV (or Parquet) files.
 
     Parameters:
-    - urb_data_file (str): The file path of the urban data file. CSV by default;
-      a ``.parquet``/``.parq``/``.pq`` file, or a directory holding a partitioned
-      Parquet dataset, is read as Parquet instead .
+    - urb_data_file (str): The file path of the zone data file. A
+      ``.parquet``/``.parq``/``.pq`` file, or a directory holding a partitioned
+      Parquet dataset, is read as Parquet; anything else as CSV.
     - country_data_file (str): The file path of the country data CSV file.
 
     Returns:
@@ -319,36 +316,26 @@ def manage_slope(df_zones_input):
 
 
 # -----------------------------------------------------------------------------
-# Resolution-aware population filter: the "does this cell hold anybody?" filter is a DENSITY threshold, not a
-# headcount.
-#
-# The model has always dropped cells holding <= 10 people. At 5 arc-minutes a
-# cell is roughly 85 km^2 at the equator, so 10 people is about 0.1 person/km^2
-# -- an "effectively uninhabited" bar. Carried over verbatim to a 30 arc-second
-# grid, where cells are 100x smaller in area, the same 10 people would mean
-# ~10 people/km^2 and would silently delete most of the rural tail, which is
-# precisely the population this model exists to describe.
-#
-# So the threshold scales with cell area: 10 people at 5 arc-minutes (i.e. the
-# historical behaviour, bit-for-bit), 0.1 people at 30 arc-seconds.
+# Population filter: the "does this cell hold anybody?" filter is a DENSITY
+# threshold, not a headcount. Cells holding <= 0.1 people at 30 arc-seconds
+# (~0.85 km^2 at the equator, so ~0.1 person/km^2) count as uninhabited. The
+# threshold scales with cell area so the implied density is the same for any
+# cell size.
 # -----------------------------------------------------------------------------
 
-# Cell edge length of the reference (5 arc-minute) grid, in degrees.
-FIVE_ARCMIN_DEGREES = 300 / 3600
+# Cell edge length of the 30 arc-second model grid, in degrees.
+THIRTY_ARCSEC_DEGREES = 30 / 3600
 
-# People per cell below which a 5-arc-minute cell is treated as uninhabited.
-MIN_POP_PER_CELL_5_ARCMIN = 10
+# People per 30 arc-second cell below which a cell is treated as uninhabited.
+MIN_POP_PER_CELL_30_ARCSEC = 0.1
 
 
-def infer_cell_size_degrees(df_zones_input, default=FIVE_ARCMIN_DEGREES):
+def infer_cell_size_degrees(df_zones_input, default=THIRTY_ARCSEC_DEGREES):
     """Infer the grid cell edge length, in degrees, from a zone DataFrame.
 
     Uses the ``left``/``right`` cell-bound columns that the GIS extract carries.
-    The measured width is snapped to whole arc-seconds, both because every grid
-    this model consumes is defined in whole arc-seconds and because snapping
-    makes the 5-arc-minute case land on exactly ``FIVE_ARCMIN_DEGREES`` -- which
-    is what keeps :func:`minimum_population_per_cell` bit-identical to the old
-    hard-coded threshold despite the CSV's truncated coordinate text.
+    The measured width is snapped to whole arc-seconds, because the grid is
+    defined in whole arc-seconds and the stored coordinates are float32.
 
     Args:
         df_zones_input (DataFrame): zone frame, ideally with ``left``/``right``.
@@ -376,24 +363,21 @@ def infer_cell_size_degrees(df_zones_input, default=FIVE_ARCMIN_DEGREES):
 def minimum_population_per_cell(cell_size_degrees):
     """People-per-cell threshold below which a cell counts as uninhabited.
 
-    Scales the historical 5-arc-minute threshold by the cell AREA ratio, so the
-    implied population density is the same at every resolution . At
-    ``cell_size_degrees == FIVE_ARCMIN_DEGREES`` the ratio is exactly 1.0 and
-    the result is exactly ``MIN_POP_PER_CELL_5_ARCMIN``.
+    Scales the 30 arc-second threshold by the cell AREA ratio, so the implied
+    population density is the same for any cell size.
 
     Args:
         cell_size_degrees (float): cell edge length in degrees.
 
     Returns:
-        float: threshold in people per cell. 10 at 5 arc-minutes, 0.1 at
-        30 arc-seconds.
+        float: threshold in people per cell (0.1 at 30 arc-seconds).
     """
-    area_ratio = (cell_size_degrees / FIVE_ARCMIN_DEGREES) ** 2
-    return MIN_POP_PER_CELL_5_ARCMIN * area_ratio
+    area_ratio = (cell_size_degrees / THIRTY_ARCSEC_DEGREES) ** 2
+    return MIN_POP_PER_CELL_30_ARCSEC * area_ratio
 
 
 #: Columns the cos-latitude area weight needs. The 22-column input contract
-#: guarantees them; only the minimal frames used in unit tests lack them.
+#: guarantees them.
 LATITUDE_COLUMNS = ("top", "bottom")
 
 
@@ -410,8 +394,8 @@ def cell_centre_latitude(df):
 
     Raises:
         ValueError: if either bound column is missing. There is deliberately no
-            fallback: silently assuming a latitude would silently reweight the
-            world's population, which is the exact failure this is here to fix.
+            fallback: assuming a latitude would silently reweight the world's
+            population.
     """
     missing = [column for column in LATITUDE_COLUMNS if column not in df.columns]
     if missing:
@@ -424,39 +408,27 @@ def cell_centre_latitude(df):
     return (df["top"] + df["bottom"]) / 2
 
 
-def population_split_weights(df, area_weighted_population=True):
+def population_split_weights(df):
     """The per-cell weight a country's population is split in proportion to.
 
-    Historically this was population *density* alone. On a lat/long grid that is
-    wrong by a factor of the cell's ground area: cells are a constant number of
-    degrees wide, so their east-west extent shrinks as ``cos(latitude)`` toward
-    the poles, and people-per-cell is ``density x area``. Weighting by density
-    alone therefore over-weights a country's poleward cells relative to its
-    equatorward ones. National totals are unaffected (the weights are
-    renormalised per country); the *placement* within a country is not.
-
-    The area-weighted form is the default as of 2026-08-09 (Kevin sign-off);
-    see ``results/validation/cos_lat_diff.md`` for the size of the correction.
+    The weight is ``pop_density x cos(latitude)``. On a lat/long grid cells are
+    a constant number of degrees wide, so their east-west extent shrinks as
+    ``cos(latitude)`` toward the poles, and people-per-cell is
+    ``density x area``. National totals are set by the country table (the
+    weights are renormalised per country); this weight sets the *placement*
+    within a country.
 
     Args:
         df (DataFrame): zone frame carrying ``pop_density`` and ``top``/
-            ``bottom`` (the latter two only when area weighting is on).
-        area_weighted_population (bool): True (default) weights by
-            ``pop_density x cos(latitude)``. False reproduces the historical
-            density-only weight exactly, dtype included, and is what the
-            pre-2026-08-09 published results were produced with.
+            ``bottom``.
 
     Returns:
         Series: the weight, aligned to ``df``'s index.
     """
-    density = df["pop_density"]
-    if not area_weighted_population:
-        return density
     # float32 in, float32 out (pop_density and the bounds are both float32 after
-    # optimise_zone_dtypes), so the per-country sums below stay in the same
-    # precision regime as the density-only path -- which is what lets the
-    # chunked planner's pre-pass reproduce them bit for bit.
-    return density * np.cos(np.radians(cell_centre_latitude(df)))
+    # optimise_zone_dtypes), which is what lets the chunked planner's pre-pass
+    # reproduce the per-country sums bit for bit.
+    return df["pop_density"] * np.cos(np.radians(cell_centre_latitude(df)))
 
 
 # Function for merging dataframes and adjusting populations
@@ -465,7 +437,6 @@ def merge_and_adjust_population(
     df_input,
     cell_size_degrees=None,
     density_totals=None,
-    area_weighted_population=True,
 ):
     """
     Merge and adjust population data based on zone and country information.
@@ -474,31 +445,19 @@ def merge_and_adjust_population(
         df_zones_input (DataFrame): Input DataFrame containing zone information.
         df_input (DataFrame): Input DataFrame containing country information.
         cell_size_degrees (float, optional): grid cell edge length, for the
-            resolution-aware population threshold. Defaults to None, i.e. infer it from the
-            frame's ``left``/``right`` columns as before. The 30 arc-second
-            Parquet records it in its footer metadata, so a chunked reader can
-            supply it here and skip reading the four float64 coordinate columns
-            entirely -- they are ~37% of the frame's footprint.
-        density_totals (mapping, optional): per-ISOCODE totals of
-            ``pop_density`` over the *whole* country. Defaults to None, i.e.
-            compute them from the rows present. Only a chunked run that has had
-            to split a country across chunks needs this: population density is
-            normalised nationally, so a partial country would otherwise
-            normalise against its own fragment and invent people. Values must be
-            the same dtype the column carries, or the arithmetic will promote
-            and stop matching a whole-world run bit for bit. When
-            ``area_weighted_population`` is set these must be totals of the
-            *area-weighted* weight, i.e. the same quantity
-            :func:`population_split_weights` returns.
-        area_weighted_population (bool, optional): split each country's
-            population in proportion to ``pop_density x cos(latitude)`` rather
-            than ``pop_density`` alone -- see
-            :func:`population_split_weights`. **Defaults to True** as of
-            2026-08-09: weighting by density alone mis-places population within
-            any country spanning latitudes, and leaving the correction off by
-            default was judged a trap. Pass False for the legacy behaviour,
-            which is bit-identical to the code before this argument existed and
-            is what every pre-2026-08-09 published figure used.
+            population threshold. Defaults to None, i.e. infer it from the
+            frame's ``left``/``right`` columns. The 30 arc-second Parquet
+            records it in its footer metadata, so a chunked reader can supply
+            it here and skip reading the four coordinate columns.
+        density_totals (mapping, optional): per-ISOCODE totals of the
+            population split weight (:func:`population_split_weights`) over
+            the *whole* country. Defaults to None, i.e. compute them from the
+            rows present. Only a chunked run that has had to split a country
+            across chunks needs this: population is normalised nationally, so
+            a partial country would otherwise normalise against its own
+            fragment and invent people. Values must be the same dtype as the
+            weight, or the arithmetic will promote and stop matching a
+            whole-world run bit for bit.
 
     Returns:
         DataFrame: DataFrame with merged and adjusted population data.
@@ -508,24 +467,18 @@ def merge_and_adjust_population(
     """
     assert not df_zones_input.empty, "df_zones_input is empty"
     assert not df_input.empty, "df_input is empty"
-    # this analysis loses some data as the overlap between the rasters is not perfect. To reduce this error, use the 30 arc second data. Too much heavy lifting for my computer to do this at the moment.
     # merge df_input and df_zones on ISO_CC. This assigns all the country data to each zone.
     # join inner will remove some of the data that is not in both datasets
     df_zones = df_zones_input.merge(
         df_input, left_on="ISOCODE", right_on="alpha3", how="inner"
     )
 
-    # convert population density to percent of national population on a per country basis, grouped by ISO_CC
-    # Prevent division by zero when country population sum is zero
-    # NOTE: group_keys=False is required on pandas >= 2.0. Pandas 1.x returned the
-    # original (flat) index here; pandas 2.x prepends the group keys, producing a
-    # MultiIndex that cannot be assigned back onto df_zones. group_keys=False
-    # restores the pandas 1.x result exactly -- values are unchanged.
-    # The weight is pop_density by default and pop_density * cos(latitude) when
-    # area weighting is on; everything below is indifferent to which.
-    split_weights = population_split_weights(
-        df_zones, area_weighted_population=area_weighted_population
-    )
+    # convert the split weight (pop_density * cos(latitude)) to percent of
+    # national population on a per country basis, grouped by ISO_CC.
+    # Prevent division by zero when country population sum is zero.
+    # group_keys=False keeps the flat index so the result can be assigned back
+    # onto df_zones (pandas >= 2.0 otherwise prepends the group keys).
+    split_weights = population_split_weights(df_zones)
     grouped = split_weights.groupby(
         df_zones["ISOCODE"], group_keys=False, observed=True, sort=True
     )
@@ -550,8 +503,8 @@ def merge_and_adjust_population(
     ].transform("sum")
 
     # trim the dataframe to only include rows where there is a population.
-    # The threshold is resolution-aware : exactly 10 people per cell at
-    # 5 arc-minutes, 0.1 at 30 arc-seconds -- the same ~0.1 person/km^2 bar.
+    # The threshold is 0.1 people per 30 arc-second cell (~0.1 person/km^2),
+    # scaled by cell area.
     if cell_size_degrees is None:
         cell_size_degrees = infer_cell_size_degrees(df_zones_input)
     min_pop_per_cell = minimum_population_per_cell(cell_size_degrees)
@@ -566,13 +519,13 @@ def merge_and_adjust_population(
 def decategorise(df):
     """Turn a frame's categorical columns back into plain object columns.
 
-    Categoricals are a *per-cell* memory optimisation . The ~200-row
+    Categoricals are a *per-cell* memory optimisation. The ~200-row
     country and ~3000-row district aggregates gain nothing from them and lose
     something important: a categorical keeps its full category list after rows
     are filtered out, so a later ``groupby`` on it (as the Monte Carlo result
-    processors do) resurrects the dropped countries as empty groups. Handing the
-    aggregates back with the dtypes they have always had keeps every downstream
-    consumer -- groupbys, pickles, notebooks -- working unchanged.
+    processors do) resurrects the dropped countries as empty groups. Plain
+    object columns keep every downstream consumer (groupbys, parquet files,
+    notebooks) working.
 
     Args:
         df (DataFrame): an aggregate frame.
@@ -591,15 +544,15 @@ def decategorise(df):
 
 
 def compact_zone_frame(df_zones):
-    """Shrink a merged zone frame in place .
+    """Shrink a merged zone frame in place.
 
     Two jobs:
 
     1. The country merge broadcasts the country table's text columns (Entity,
        region, subregion, Continent, the alpha codes...) onto every single cell,
-       and de-categorises ISOCODE on the way through. Measured at 5 arc-minutes
-       those object columns are ~60% of the whole frame; at 30 arc-seconds they
-       would be tens of GB of pointers to a couple of hundred distinct strings.
+       and de-categorises ISOCODE on the way through. At 30 arc-seconds those
+       object columns would be tens of GB of pointers to a couple of hundred
+       distinct strings.
     2. pandas groups a categorical over *every* category by default, including
        ones the merge and the population filter just deleted -- which would
        inject empty groups into every downstream groupby. Pruning the category
@@ -619,62 +572,6 @@ def compact_zone_frame(df_zones):
         elif isinstance(df_zones[column].dtype, pd.CategoricalDtype):
             df_zones[column] = df_zones[column].cat.remove_unused_categories()
     return df_zones
-
-
-# Function for road analysis
-# def road_analysis_old(df_zones):
-#     """
-#     Perform road analysis on the given DataFrame.
-
-#     Args:
-#         df_zones (pandas.DataFrame): The DataFrame containing the zones data.
-
-#     Returns:
-#         pandas.DataFrame: The DataFrame with additional columns for road analysis.
-
-#     """
-#     # Define the columns to work with for GRIP data
-#     columns = ["grip_1_1", "grip_2_1", "grip_3_1", "grip_4_1", "grip_5_1"]
-
-#     # Create a numpy array from the DataFrame for faster processing
-#     data = df_zones[columns].to_numpy()
-
-#     # Find the index of the first non-zero value in each row
-#     non_zero_indices = np.argmax(data != 0, axis=1)
-
-#     # Handle rows with all zeros
-#     all_zeros = np.all(data == 0, axis=1)
-#     non_zero_indices[all_zeros] = -1  # Set a distinct value for rows with all zeros
-
-#     # Map indices to road types
-#     road_types = np.array(
-#         [
-#             "No Roads",
-#             "Highways",
-#             "Primary Roads",
-#             "Secondary Roads",
-#             "Tertiary Roads",
-#             "Local Roads",
-#         ]
-#     )
-
-#     # Assign the dominant road type
-#     df_zones["dominant_road_type"] = road_types[
-#         non_zero_indices + 1
-#     ]  # +1 to adjust for 'No Roads'
-
-#     # Load the Crr mapping table
-#     df_crr = pd.read_csv(CRR_FILE)
-
-#     # Create a dictionary from the DataFrame
-#     crr_mapping = pd.Series(
-#         df_crr.Crr.values, index=df_crr["Assigned Zone Surface"]
-#     ).to_dict()
-
-#     # Map the road types in df_zones to Crr values
-#     df_zones["Crr"] = df_zones["dominant_road_type"].map(crr_mapping)
-
-#     return df_zones
 
 
 def crr_add_uncertainty(road_type, adjustment):
@@ -797,14 +694,13 @@ def preprocess_frame(
     rural_adjustment,
     cell_size_degrees=None,
     density_totals=None,
-    area_weighted_population=True,
 ):
     """Run the preprocessing pipeline over frames that are already in memory.
 
     This is the body of :func:`preprocess_data` with the file loading lifted
     out, so the chunked driver (:mod:`src.chunked_analysis`) can feed it one
-    country-group at a time and be running *exactly* the same code as the
-    monolithic path.
+    country-group at a time and be running *exactly* the same code as a
+    whole-grid run.
 
     Args:
         df_zones_input (DataFrame): raw zone frame, straight off disk.
@@ -815,9 +711,6 @@ def preprocess_frame(
             :func:`merge_and_adjust_population`.
         density_totals (mapping, optional): see
             :func:`merge_and_adjust_population`.
-        area_weighted_population (bool, optional): see
-            :func:`merge_and_adjust_population`. Defaults to True; pass False
-            for the legacy density-only split.
 
     Returns:
         pandas.DataFrame: the preprocessed zone frame.
@@ -834,13 +727,11 @@ def preprocess_frame(
         df_input,
         cell_size_degrees=cell_size_degrees,
         density_totals=density_totals,
-        area_weighted_population=area_weighted_population,
     )
     df_zones = road_analysis(df_zones, crr_adjustment=crr_adjustment)
     df_zones = calculate_nat_piped(df_zones)
-    # Memory optimization. Done here, at the end of the pipeline, rather than inside
-    # merge_and_adjust_population / road_analysis, so that those functions'
-    # returned dtypes -- and the unit tests pinning them -- are untouched.
+    # Memory optimization, done at the end of the pipeline so that
+    # merge_and_adjust_population and road_analysis return plain dtypes.
     df_zones = compact_zone_frame(df_zones)
     return df_zones
 
@@ -861,16 +752,14 @@ def preprocess_data(
     urban_adjustment,
     rural_adjustment,
     use_sample_data=False,
-    area_weighted_population=True,
 ):
     """
     Preprocesses data by loading, managing, merging, and adjusting population data.
 
     Args:
         crr_adjustment (float): The adjustment factor for road analysis.
-        area_weighted_population (bool, optional): see
-            :func:`merge_and_adjust_population`. Defaults to True; pass False
-            for the legacy density-only split.
+        urban_adjustment, rural_adjustment (float): Euclidean-distance factors.
+        use_sample_data (bool): read the small sample zone file instead.
 
     Returns:
         pandas.DataFrame: The preprocessed data.
@@ -885,7 +774,6 @@ def preprocess_data(
         crr_adjustment=crr_adjustment,
         urban_adjustment=urban_adjustment,
         rural_adjustment=rural_adjustment,
-        area_weighted_population=area_weighted_population,
     )
 
 
@@ -1410,10 +1298,9 @@ def calculate_population_water_access(
     equals ``pop_zone`` whenever the six shares sum to 100 in both strata.
 
     ``Unallocated`` is the share of a stratum whose source type is unknown
-    after harmonisation (see UNALLOCATED_GAP_INVESTIGATION.md). Its allocation
-    is a model parameter rather than a silent assumption: the previous code
-    computed the unaffected population as a clipped residual, which implicitly
-    treated 100% of the unallocated mass as unaffected (g = 0).
+    after harmonisation (see ``apply_unallocated_from_source_gap`` in
+    ``imputation_script.py``). Its allocation is a sampled model parameter
+    (g) rather than a fixed assumption.
 
     Args:
         df_zones (pandas.DataFrame): DataFrame containing zone information.
@@ -1424,9 +1311,9 @@ def calculate_population_water_access(
             displaced from their usual source.
         unallocated_vulnerable_fraction (float): Share of the unallocated
             population treated as grid-vulnerable (i.e. added to the affected
-            population). A float g in [0, 1] — 0.0 reproduces the historical
-            residual behaviour on clean data, 1.0 is the all-vulnerable
-            bracket. Defaults to 0.0.
+            population). A float g in [0, 1]: 0.0 treats all unallocated
+            users as unaffected, 1.0 treats them all as vulnerable. Defaults
+            to 0.0.
 
     Returns:
         pandas.DataFrame: DataFrame with additional columns representing the population
@@ -1461,8 +1348,8 @@ def calculate_population_water_access(
             df_zones[col] = df_zones[col].fillna(0)
 
     # The Unallocated columns are NOT defaulted to zero: silently assuming
-    # zero would reinstate the residual behaviour on stale data and hide the
-    # ~348M-person share-sum gap the parameter exists to bracket.
+    # zero on an out-of-date country table would hide the share-sum gap the
+    # unallocated parameter exists to bracket.
     missing_unallocated = [
         col
         for col in ("URBANUnallocated", "RURALUnallocated")
@@ -1523,7 +1410,6 @@ def calculate_population_water_access(
         * rural_borehole_lose_fraction
         / 100
     )
-    # Now used in the unaffected accounting below (it used to be dead code).
     df_zones["zone_pop_unpiped_unaffected"] = (
         df_zones["pop_zone"]
         * df_zones["urban_rural"]
@@ -1779,9 +1665,8 @@ def calculate_weighted_results(df_zones):
         raise ValueError("Input DataFrame is empty")
 
     # Only the four columns the lambda reads are passed to it. That keeps the
-    # per-group frames small at 30 arc-seconds  and, incidentally,
-    # silences the pandas 2.x FutureWarning about `apply` operating on the
-    # grouping column -- the grouping column is no longer in the selection.
+    # per-group frames small at 30 arc-seconds and keeps the grouping column
+    # out of the selection (pandas 2.x warns when `apply` operates on it).
     df_median_group = (
         df_zones.groupby("ISOCODE", observed=True)[
             [
@@ -2090,7 +1975,7 @@ def process_country_data(df_zones):
 
 
 #: The only zone columns :func:`process_district_data` reads. ``run_global_analysis``
-#: hands it a copy of exactly these rather than of the whole frame .
+#: hands it a copy of exactly these rather than of the whole frame.
 DISTRICT_ZONE_COLUMNS = (
     "shapeID",
     "Entity",
@@ -2184,7 +2069,7 @@ def process_district_data(df_zones):
     # use groupby to create weighted median, needs to be speerate from the above groupby as it uses apply, which can't be used in the same groupby
     # needs to use apply because the function required two columns as input
     # Selecting the two columns the lambda reads keeps the per-group frames
-    # small  and silences the pandas 2.x grouping-column FutureWarning.
+    # small and silences the pandas 2.x grouping-column FutureWarning.
     df_median_group = df_zones.groupby(["shapeID"], observed=True)[
         ["dtw_1", "pop_zone"]
     ].apply(
@@ -2329,7 +2214,6 @@ def run_global_analysis(
     zone_columns=None,  # Memory optimization: trim the returned per-cell frame
     chunk_rows=None,  # Memory optimization: run country-group by country-group
     chunk_plan=None,  # reuse a plan across draws
-    area_weighted_population=True,  # cos-latitude cell-area weighting; False = legacy
     zone_output_path=None,  # chunked mode: stream per-cell columns here
 ):
     """
@@ -2343,9 +2227,10 @@ def run_global_analysis(
         met (str): metabolic equivalent of task (energy for walking).
         watts (float): The power output in watts (energy for cycling).
         urban_borehole_lose_fraction (float): Share of urban borehole users who lose access
-            when electric pumping fails (scenario parameter, see ELECTRIC_BOREHOLE_SHARE_ESTIMATE.md).
+            when motorised pumping fails (see
+            data/original_data/borehole_pump_type_estimates_README.md).
         rural_borehole_lose_fraction (float): Share of rural borehole users who lose access
-            when electric pumping fails.
+            when motorised pumping fails.
         unallocated_vulnerable_fraction (float): Share of the population whose
             source type is unallocated that is treated as grid-vulnerable.
             Float in [0, 1]. See calculate_population_water_access.
@@ -2356,28 +2241,19 @@ def run_global_analysis(
         zone_columns (list, optional): if given, only these columns of the
             per-cell zone frame are returned; an empty list returns an empty
             frame (no rows), meaning "I do not need the per-cell output".
-            Defaults to None (every column, the historical behaviour). Memory optimization: at
+            Defaults to None (every column). Memory optimization: at
             30 arc-seconds the full zone frame is tens of GB and callers keep
-            three columns of it, so handing back the whole thing is what
-            actually blows the memory budget.
+            three columns of it.
         chunk_rows (int, optional): if set, run the analysis one group of whole
             countries at a time, each group holding at most this many modelled
-            cells . Peak memory then
-            follows this number instead of the size of the grid. The returned
-            per-cell frame is empty in this mode -- per-cell output does not
-            outlive its chunk, which is the whole point. Defaults to None, i.e.
-            the monolithic path, unchanged.
+            cells. Peak memory then follows this number instead of the size of
+            the grid. The returned per-cell frame is empty in this mode.
+            Defaults to None, i.e. the whole grid in memory at once (only
+            practical for small inputs such as the sample data).
         chunk_plan (ChunkPlan, optional): a plan from
             :func:`src.chunked_analysis.plan_chunks` to reuse instead of
             recomputing it. The plan depends only on the input file, so a
             multi-draw run should build it once.
-        area_weighted_population (bool, optional): split each country's
-            population by ``pop_density x cos(latitude)`` rather than
-            ``pop_density`` alone (see :func:`population_split_weights`).
-            **Defaults to True** as of 2026-08-09; pass False for the
-            historical, bit-identical behaviour. A supplied ``chunk_plan`` must
-            have been built with the same setting -- the planner's pre-pass
-            normalises with the same weight.
         zone_output_path (str or Path, optional): in chunked mode, stream
             ``zone_columns`` to this Parquet file instead of returning them.
 
@@ -2405,7 +2281,6 @@ def run_global_analysis(
             use_sample_data=use_sample_data,
             chunk_rows=chunk_rows or chunked.DEFAULT_CHUNK_ROWS,
             plan=chunk_plan,
-            area_weighted_population=area_weighted_population,
             zone_output_path=zone_output_path,
             zone_output_columns=list(zone_columns) if zone_columns else None,
         )
@@ -2418,7 +2293,6 @@ def run_global_analysis(
         urban_adjustment=urban_adjustment,
         rural_adjustment=rural_adjustment,
         use_sample_data=use_sample_data,
-        area_weighted_population=area_weighted_population,
     )
     df_zones = calculate_and_merge_bicycle_distance(
         df_zones,
@@ -2450,9 +2324,8 @@ def run_global_analysis(
     # print(len(df_zones["ISOCODE"].unique()))
 
     # add df_districts.
-    # Memory optimization: this used to copy the whole ~60-column zone frame purely because
-    # process_district_data adds a column to what it is given. Copying just the
-    # columns it reads is behaviourally identical and ~4x smaller.
+    # Memory optimization: process_district_data adds a column to what it is
+    # given, so pass it a copy of just the columns it reads.
     df_zones_districts = df_zones[list(DISTRICT_ZONE_COLUMNS)].copy()
     df_districts = process_district_data(df_zones_districts)
     del df_zones_districts
@@ -2461,7 +2334,7 @@ def run_global_analysis(
     # drop countries in df_distciricts if they don't appear in df_copuntries
     df_districts = df_districts[df_districts["ISOCODE"].isin(df_countries["ISOCODE"])]
 
-    # Memory optimization: the aggregates leave with their historical dtypes; only the
+    # Memory optimization: the aggregates leave with plain dtypes; only the
     # per-cell frame keeps the categorical/float32 treatment.
     df_countries = decategorise(df_countries)
     df_districts = decategorise(df_districts)
@@ -2473,7 +2346,7 @@ def run_global_analysis(
         zone_columns = list(zone_columns)
         # An explicitly empty selection means "I do not need the per-cell frame
         # at all" -- return the schema with no rows, so a 140M-row index does
-        # not get pickled back to the parent process for nothing .
+        # not get sent back to the parent process for nothing.
         df_zones = df_zones.iloc[:0] if not zone_columns else df_zones[zone_columns]
 
     # print("\n\n 5 \n\n")
@@ -2486,6 +2359,8 @@ def run_global_analysis(
 
 if __name__ == "__main__":
 
+    # A single run over the 30 arc-second grid (data/GIS/extracted/master_30as.parquet,
+    # built by scripts/extraction/extract_grid.py), using central parameter values.
     df_countries, df_districts, zones_results = run_global_analysis(
         crr_adjustment=0,
         time_gathering_water=2.84,
@@ -2496,10 +2371,14 @@ if __name__ == "__main__":
         hill_polarity="downhill_uphill",
         urban_adjustment=1.3,
         rural_adjustment=1.4,
+        urban_borehole_lose_fraction=0.72,
+        rural_borehole_lose_fraction=0.29,
+        unallocated_vulnerable_fraction=0.5,
         calculate_distance=True,
         plot=True,
         human_mass=62,  # gets overridden by country specific weight
         use_sample_data=False,
+        chunk_rows=chunked.DEFAULT_CHUNK_ROWS,
     )
 
     df_countries.to_csv(COUNTRY_RESULTS_FILE_PATH, index=False)

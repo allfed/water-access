@@ -1,29 +1,21 @@
-"""Master-grid definition for the scripted raster extraction .
+"""Master-grid definition for the scripted raster extraction.
 
-The master grid is the Kummu *distance to surface water* lattice:
+The master grid is the Kummu *distance to surface water* lattice at
+30 arc-seconds: 43200 x 21600 cells, EPSG:4326, cell 0.00833333 deg.
 
-    30 arc-second : 43200 x 21600, EPSG:4326, cell 0.00833333 deg
-    5 arc-minute  :  4320 x  2160, EPSG:4326, cell 0.08333333 deg  (the same
-                     lattice divided by 10)
-
-Both are taken *verbatim* from the corresponding Kummu GeoTIFF rather than
-being reconstructed from constants, so the emitted ``left/top/right/bottom``
-values are bit-identical to the legacy QGIS export
-(``data/GIS/updated_GIS_output_cleaned.csv``).  Note the origin is
-(-179.999999007, +90.002416350) -- *not* (-180, +90); every other raster in the
-pipeline is therefore very slightly off-lattice and must be read through
-``rasterio.warp.reproject`` (nearest) rather than by raw array indexing.
+It is taken *verbatim* from the Kummu GeoTIFF rather than reconstructed from
+constants. Note the origin is (-179.999999007, +90.002416350) -- *not*
+(-180, +90); every other raster in the pipeline is therefore very slightly
+off-lattice and must be read through ``rasterio.warp.reproject`` (nearest)
+rather than by raw array indexing.
 
 ``fid`` encoding
 ----------------
-The legacy CSV uses **column-major, 1-based** ids::
+Cell ids are **column-major, 1-based**::
 
     fid = col * nrows + row + 1
 
-verified to match on 100% of the 2,190,446 legacy rows (``nrows`` = 2160 at
-5 arc-minute).  The obvious row-major ``row * ncols + col`` alternative matches
-0% of them, so the legacy convention is reproduced here and extended to 30
-arc-second with ``nrows`` = 21600.
+with ``nrows`` = 21600.
 """
 
 from __future__ import annotations
@@ -35,24 +27,21 @@ import numpy as np
 import rasterio
 from affine import Affine
 
-RESOLUTIONS = ("5min", "30as")
-
 #: Repository root, derived from this file's location (scripts/extraction/).
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 RASTER_DIR = os.path.join(REPO_ROOT, "data", "GIS", "source_rasters")
 
-#: The file that *defines* the master grid for each resolution .
-GRID_DEFINING_RASTER = {
-    "5min": os.path.join(RASTER_DIR, "distance2water_5arcmin.tif"),
-    "30as": os.path.join(RASTER_DIR, "distance2water_30arcsec.tif"),
-}
+#: The file that *defines* the master grid.
+GRID_DEFINING_RASTER = os.path.join(RASTER_DIR, "distance2water_30arcsec.tif")
+
+#: Expected (width, height) of the master grid.
+GRID_SHAPE = (43200, 21600)
 
 
 @dataclass(frozen=True)
 class MasterGrid:
-    """An immutable description of one of the two master lattices."""
+    """An immutable description of the master lattice."""
 
-    resolution: str
     width: int
     height: int
     transform: Affine
@@ -70,8 +59,8 @@ class MasterGrid:
     def cell_bounds(self, rows: np.ndarray, cols: np.ndarray):
         """Return ``(left, top, right, bottom)`` in degrees for cell indices.
 
-        Phase A's resolution-aware population filter infers the cell size from
-        ``right - left``, so these columns are load-bearing, not decoration.
+        The model infers the cell size from ``right - left`` and the cell
+        latitude from ``top``/``bottom``, so these columns are load-bearing.
         """
         t = self.transform
         left = t.c + cols * t.a
@@ -79,15 +68,13 @@ class MasterGrid:
         return left, top, left + t.a, top + t.e
 
     def fid(self, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
-        """Legacy column-major, 1-based cell id (see module docstring)."""
+        """Column-major, 1-based cell id (see module docstring)."""
         return cols.astype(np.int64) * self.height + rows.astype(np.int64) + 1
 
 
-def load_master_grid(resolution: str) -> MasterGrid:
-    """Read the master grid straight off the Kummu raster for ``resolution``."""
-    if resolution not in RESOLUTIONS:
-        raise ValueError(f"resolution must be one of {RESOLUTIONS}, got {resolution!r}")
-    path = GRID_DEFINING_RASTER[resolution]
+def load_master_grid() -> MasterGrid:
+    """Read the master grid straight off the Kummu 30 arc-second raster."""
+    path = GRID_DEFINING_RASTER
     if not os.path.exists(path):
         raise FileNotFoundError(
             f"grid-defining raster missing: {path}\n"
@@ -95,16 +82,14 @@ def load_master_grid(resolution: str) -> MasterGrid:
         )
     with rasterio.open(path) as src:
         grid = MasterGrid(
-            resolution=resolution,
             width=src.width,
             height=src.height,
             transform=src.transform,
             crs=str(src.crs),
         )
-    expected = {"5min": (4320, 2160), "30as": (43200, 21600)}[resolution]
-    if (grid.width, grid.height) != expected:
+    if (grid.width, grid.height) != GRID_SHAPE:
         raise ValueError(
-            f"{path} is {grid.width}x{grid.height}, expected {expected} "
+            f"{path} is {grid.width}x{grid.height}, expected {GRID_SHAPE}"
         )
     return grid
 

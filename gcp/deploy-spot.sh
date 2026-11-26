@@ -14,10 +14,9 @@ BUCKET_NAME="water-access-james-data"
 MAX_RUN_DURATION="96h" # 4 days
 BOOT_DISK_SIZE="100GB"
 
-# 30as production profile (override for 5min legacy runs)
-MC_RESOLUTION="30as"
+# Monte Carlo run profile
 MC_INPUT="data/GIS/extracted/master_30as.parquet"
-MC_WORKERS="12"  # ~16.4 GB peak per 30as worker; 12 fit in the 256 GB of n2-highmem-32
+MC_WORKERS="12"  # ~16.4 GB peak per worker; 12 fit in the 256 GB of n2-highmem-32
 MC_ITERATIONS="1000"
 MC_SEED="20260808"  # e.g. 20260808 for fixed draws; leave empty for unseeded
 
@@ -112,10 +111,6 @@ upload_data() {
 }
 
 upload_30as_input() {
-    if [ "$MC_RESOLUTION" != "30as" ]; then
-        return 0
-    fi
-
     local parquet_path="data/GIS/extracted/master_30as.parquet"
     if [ ! -f "$parquet_path" ]; then
         print_error "30as profile requires $parquet_path on this machine."
@@ -195,16 +190,16 @@ EXISTING_COUNT=$(ls results/parquet_files/countries_simulation_result_*.parquet 
 log "Found $EXISTING_COUNT existing country simulation results on disk"
 
 # Cron PATH is minimal and often omits /snap/bin (where GCE gsutil lives),
-# which silently broke the old one-liner. Export a usable PATH and log errors.
+# so export a usable PATH and log errors.
 (crontab -l 2>/dev/null | grep -v 'rsync -r results/' || true
  echo "*/30 * * * * cd $WORK_DIR && PATH=/snap/bin:/usr/bin:/bin:\$PATH GCS_RESULTS_URI=gs://__BUCKET_NAME__/results gsutil -m rsync -r results/ gs://__BUCKET_NAME__/results/ >> /root/gcs_sync.log 2>&1"
 ) | crontab -
 
-# Run simulation (30as profile; see deploy-spot.sh MC_* variables)
+# Run simulation (see deploy-spot.sh MC_* variables)
 log "Starting Monte Carlo simulation at $(date)"
 cd "$WORK_DIR"
 export GCS_RESULTS_URI="gs://__BUCKET_NAME__/results"
-MC_ARGS="--resolution __MC_RESOLUTION__ --input __MC_INPUT__ --workers __MC_WORKERS__ --iterations __MC_ITERATIONS__"
+MC_ARGS="--input __MC_INPUT__ --workers __MC_WORKERS__ --iterations __MC_ITERATIONS__"
 if [ -n "__MC_SEED__" ]; then
     MC_ARGS="$MC_ARGS --seed __MC_SEED__"
 fi
@@ -215,7 +210,6 @@ log "Setup completed at $(date)"
 EOF
 
     sed -e "s/__BUCKET_NAME__/${BUCKET_NAME}/g" \
-        -e "s/__MC_RESOLUTION__/${MC_RESOLUTION}/g" \
         -e "s|__MC_INPUT__|${MC_INPUT}|g" \
         -e "s/__MC_WORKERS__/${MC_WORKERS}/g" \
         -e "s/__MC_ITERATIONS__/${MC_ITERATIONS}/g" \
@@ -263,7 +257,7 @@ create_instance() {
     
     print_status "Instance created successfully"
     print_status "Machine type: $MACHINE_TYPE"
-    print_status "Spot pricing: ~\$1.20/hour for n2-highmem-32 (~\$8-17 for 1000 draws at 30as)"
+    print_status "Spot pricing: ~\$1.20/hour for n2-highmem-32 (~\$8-17 for 1000 draws)"
     
     # Clean up
     rm /tmp/startup-script.sh
@@ -312,7 +306,7 @@ check_progress() {
         rm -f "$TEMP_CHECKPOINT"
     fi
 
-    # 30as writes country+district only (no zone parquet). Count countries.
+    # Runs write country and district results only (no zone parquet). Count countries.
     COMPLETED=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/countries_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
     DISTRICT=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/district_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
     ZONE_N=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/zone_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')

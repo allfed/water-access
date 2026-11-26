@@ -5,9 +5,8 @@ covering the 76 countries/territories whose JMP country files carry **no**
 source-type breakdown (blank rows). Values were compiled from national
 censuses, DHS/EPHS final reports, drinking-water regulator statistics and
 statistical-office publications, then mapped into the JMP schema under a
-strict rubric (see "Mapping rubric" below). Research provenance:
-`~/Documents/ProgrammingIsFun/ALLFED/borehole-gap-research/REPORT.md`
-(2026-08-07) and its per-region section files.
+strict rubric (see "Mapping rubric" below). Each row records its source,
+survey year and confidence.
 
 ## How it is used
 
@@ -90,10 +89,9 @@ Research fills can conflict with the WHO/JMP piped share in three ways:
 3. **Reference-year drift**: DHS/census years differ from the WHO piped year
    (COG, ERI, GNQ, IRN, SXM, VCT — sums of ~103–114).
 
-One rule handles all three, agreed on the 2026-08-06 call and confirmed on
-2026-09-04: **the source hierarchy is JMP global (piped) → JMP country file →
-researched fills → spatial interpolation, and a stratum that sums past 100
-scales its unpiped categories down with piped protected.** Implemented in
+One rule handles all three: **the source hierarchy is JMP global (piped) →
+JMP country file → researched fills → spatial interpolation, and a stratum
+that sums past 100 scales its unpiped categories down with piped protected.** Implemented in
 `reconcile_categories_over_100_pct()` (`jmp_source_parser.py`) and applied in
 three passes:
 
@@ -112,27 +110,25 @@ three passes:
   whose piped share had to be neighbour- or continent-interpolated, the
   measured categories are kept and piped is lowered to
   `100 − sum(categories)` instead. Interpolation is the bottom of the
-  hierarchy and must never scale real survey or census data down (Lebanon
-  was the live case: interpolated urban piped 93.0 → 68.7). Rows with a
-  measured piped share use the scale-down rule as before.
+  hierarchy and must never scale real survey or census data down. Rows with
+  a measured piped share use the scale-down rule.
 
 A stratum that sums to *less* than 100 is never scaled up; the remainder is
 written to `URBANUnallocated` / `RURALUnallocated`
-(`apply_unallocated_from_source_gap`). Kevin's caveat from the 2026-08-06
-call still applies to the scale-down rule: proportional scaling assumes the
+(`apply_unallocated_from_source_gap`). Proportional scaling assumes the
 overlap is with piped users; if respondents overlap between unpiped
 categories instead, the redistribution is approximate.
 
 Tests: `tests/test_build_unified_source_breakdown.py`,
 `tests/test_unallocated_from_source_gap.py`, `tests/test_jmp_source_parser.py`.
 
-## Caution for the manual-vs-electric pump phase
+## Pump type
 
 Private wells in high-income countries (Nordics, Austria, Jersey, NZ) are
 near-universally electric-pumped: the Borehole populations added here for
 rich countries are mostly CIL-vulnerable, unlike DHS-country handpump
-boreholes. The `urban/rural_borehole_lose_fraction` parameters — or a future
-per-country pump-type split — must reflect this. Direct pump-type signals
+boreholes. The `urban/rural_borehole_lose_fraction` ranges are derived in
+`borehole_pump_type_estimates_README.md`. Direct pump-type signals
 captured in `bounds_notes`: Sint Maarten census G-12 (windmill/electric/no
 pump), Bosnia hydrophore vs dug wells (~11:1), French Guiana's 36 documented
 handpumps, Iran's gravity-fed qanats.

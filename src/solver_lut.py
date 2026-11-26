@@ -1,8 +1,7 @@
 """Per-draw solver lookup tables for the walking and cycling mobility models.
 
-The global analysis used to call ``fsolve`` once per grid cell per model
-(~2.19M cells at 5 arc-minutes, ~140M at 30 arc-seconds). That is ~4 minutes of
-solver time today and would be ~7 hours per draw at 30 arc-seconds.
+Solving the walking and cycling models with ``fsolve`` once per grid cell would
+take ~7 hours per draw at 30 arc-seconds (~140M cells).
 
 The velocities, however, only depend on three per-cell quantities -- terrain
 ``slope``, the road-class rolling resistance ``Crr``, and the country's average
@@ -13,8 +12,8 @@ for each draw we solve the models once on a coarse grid of
 onto the cells -- linearly in slope, cubically in mass. The cost becomes ~10^5
 solver calls per draw *independent of the number of cells*.
 
-Fidelity notes (why this reproduces ``single_bike_run``/``single_lankford_run``
-to well inside the LUT validation tolerance):
+Fidelity notes (why this closely reproduces ``single_bike_run`` and
+``single_lankford_run``):
 
 * The bike LUT stores the **uncapped** root of the power equation. The 7 m/s
   ceiling in ``single_bike_run`` is a kink; interpolating across it would smear
@@ -35,11 +34,10 @@ to well inside the LUT validation tolerance):
   discontinuous artefact no smooth interpolant can reproduce, so cells whose
   ``beta`` lands near one of those turning points are simply handed back to
   ``single_bike_run`` and solved exactly. It is a tiny fraction of cells, and it
-  keeps the refactor bit-faithful to the frozen model instead of silently
-  "fixing" it (see the non-goals in the spec).
+  keeps the lookup table faithful to the per-cell model.
 
-``single_bike_run`` and ``single_lankford_run`` are untouched and remain the
-ground truth; ``scripts/validate_lut.py`` (LUT validation) checks this layer against them.
+``single_bike_run`` and ``single_lankford_run`` remain the ground truth that
+this layer approximates.
 """
 
 import contextlib
@@ -59,7 +57,7 @@ def pinned_grid_ranges(slope_range=None, mass_range=None):
     The chunked driver processes one group of countries at a time. Left to
     itself each chunk would build its grid over *its own* observed slope and
     mass range, so the same cell would be interpolated on a different grid
-    depending on which chunk it landed in, and the chunked and monolithic runs
+    depending on which chunk it landed in, and chunked and whole-grid runs
     would disagree in the last few decimal places. Pinning both axes to the
     globally observed ranges (measured once, in the planning pre-pass) makes the
     LUT a pure function of the draw -- identical in every chunk, and identical
@@ -88,10 +86,10 @@ _FORCE_LUT = [False]
 def force_lut():
     """Take the LUT path regardless of row count, for the duration of the block.
 
-    :func:`should_use_lut` normally sends small frames down the original
-    per-cell solver loop, which is *more* accurate than the LUT. That is the
-    right default, but it would make a chunked run disagree with a monolithic
-    one whenever a chunk happened to fall under the threshold. Chunked runs pin
+    :func:`should_use_lut` normally sends small frames down the per-cell
+    solver loop, which is *more* accurate than the LUT. That is the right
+    default, but it would make a chunked run disagree with a whole-grid one
+    whenever a chunk happened to fall under the threshold. Chunked runs pin
     the choice so every cell is solved the same way wherever it lands.
     """
     previous = _FORCE_LUT[0]
@@ -112,11 +110,10 @@ def lut_cache():
 
     A chunked run solves the same draw over and over, once per country group,
     and with the axes pinned the table it builds is *bit-identical* every time.
-    Caching turns an O(chunks) solver cost back into O(1) -- measured at 5
-    arc-minutes with seven chunks, it takes the chunked run from 145 s to 45 s.
+    Caching turns an O(chunks) solver cost back into O(1).
 
     Off by default, because a cached table is a few MB that would otherwise
-    live for the whole process, and the monolithic path builds each table
+    live for the whole process, and a whole-grid run builds each table
     exactly once anyway.
     """
     previous = _LUT_CACHE[0]
@@ -177,18 +174,18 @@ DEFAULT_N_MASS = 21
 SLOPE_GRID_POWER = 3.0
 
 #: Below this many cells the lookup table costs more than it saves, so the
-#: original per-cell solver loop is used instead. This also keeps the unit
-#: tests that monkeypatch ``single_bike_run``/``single_lankford_run`` and count
-#: the calls on the exact legacy code path.
+#: per-cell solver loop is used instead. This also keeps the unit tests that
+#: monkeypatch ``single_bike_run``/``single_lankford_run`` and count the calls
+#: on the per-cell path.
 LUT_MIN_ROWS = 1000
 
 #: Cells interpolated per pass. Interpolation gathers sixteen temporaries the
 #: length of its input, so an unchunked 140M-cell frame would need ~18 GB of
-#: scratch on its own .
+#: scratch on its own.
 EVAL_CHUNK_SIZE = 4_000_000
 
 #: A LUT is built per distinct Crr value. Real data has six road classes; if a
-#: caller passes something pathological we fall back to the legacy loop rather
+#: caller passes something pathological we fall back to the per-cell loop rather
 #: than build a huge table.
 MAX_CRR_CLASSES = 32
 
@@ -593,7 +590,7 @@ def evaluate_bicycle_lut(lut, slope, crr, mass, chunk_size=EVAL_CHUNK_SIZE):
 
     Evaluated in chunks: every gather allocates one temporary the length of the
     input, and there are sixteen of them, which at 140M cells would be ~18 GB of
-    scratch in one go .
+    scratch in one go.
 
     Args:
         lut (dict): output of :func:`build_bicycle_lut`.

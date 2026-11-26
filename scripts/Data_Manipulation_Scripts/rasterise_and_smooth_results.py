@@ -1,4 +1,4 @@
-"""Rasterise zone population results to a smoothed GeoTIFF (30as default)."""
+"""Rasterise zone population results to a smoothed 30 arc-second GeoTIFF."""
 
 from __future__ import annotations
 
@@ -18,6 +18,9 @@ repo_root = Path(__file__).resolve().parent.parent.parent
 results_dir = repo_root / "results"
 tif_dir = results_dir / "TIFs"
 
+# Output grid spacing: 30 arc-seconds, in degrees.
+RESOLUTION_DEGREES = 30 / 3600
+
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
@@ -26,17 +29,12 @@ def parse_args():
         default="median",
         choices=("median", "5th_percentile", "95th_percentile"),
     )
-    p.add_argument("--resolution", choices=("30as", "5min"), default="30as")
     p.add_argument(
         "--filled",
         action="store_true",
         help="use the *_no_nans.parquet export",
     )
     return p.parse_args()
-
-
-def resolution_degrees(name: str) -> float:
-    return 30 / 3600 if name == "30as" else 5 / 60
 
 
 def main() -> None:
@@ -51,11 +49,9 @@ def main() -> None:
         raise SystemExit(f"Missing {input_path}")
 
     df = pd.read_parquet(input_path)
-    resolution = resolution_degrees(args.resolution)
+    resolution = RESOLUTION_DEGREES
     tif_dir.mkdir(parents=True, exist_ok=True)
-    output_filename = tif_dir / (
-        f"output_raster_{args.resolution}_{args.label}_smoothed.tif"
-    )
+    output_filename = tif_dir / f"output_raster_30as_{args.label}_smoothed.tif"
 
     gdf = gpd.GeoDataFrame(
         df,

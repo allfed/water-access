@@ -7,9 +7,9 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ---
-The Water Access model is a tool that simulates global access to freshwater sources by walking or cycling in the event of global catastrophic infrastructure loss (CIL). The output of the model can be used to identify areas at various resolutions (global, continental, country, district, and 5-arcminute zonal) which will be at highest risk of water insecurity in a catastrophe. This model can be useful for researchers, developers, and disaster response teams who are interested in understanding the potential impact of CIL on water access. The model is implemented in Python and its outputs have the potential to be integrated into other analysis and visualization tools (e.g., QGIS).
+The Water Access model is a tool that simulates global access to freshwater sources by walking or cycling in the event of global catastrophic infrastructure loss (CIL). The output of the model can be used to identify areas at various resolutions (global, continental, country, district, and 30 arc-second (~1 km) zonal) which will be at highest risk of water insecurity in a catastrophe. This model can be useful for researchers, developers, and disaster response teams who are interested in understanding the potential impact of CIL on water access. The model is implemented in Python and its outputs have the potential to be integrated into other analysis and visualization tools (e.g., QGIS).
 
-![Distributions plot](https://github.com/allfed/water-access/blob/main/results/access_distributions.png)
+![Distributions plot](results/access_distributions.png)
 
 ## Installation
 To install the Water Access package, we recommend setting up a virtual environment using [mamba](https://mamba.readthedocs.io/) (faster) or `conda`. This will ensure that the package and its dependencies are isolated from other projects on your machine, which can prevent conflicts and make it easier to manage your dependencies. Here are the steps to follow:
@@ -57,7 +57,9 @@ Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distr
 
 ### Re-run the model with new assumptions
 
-1. Run [`scripts/run_monte_carlo.py`](scripts/run_monte_carlo.py) — Monte Carlo simulations (resource-intensive; parameter ranges are defined at the top of the script).
+The model runs on a 30 arc-second (~1 km) grid of about 220 million land cells. The grid file (`data/GIS/extracted/master_30as.parquet`, ~3.5 GB) is not stored in git; build it from the public source rasters with [`scripts/extraction/`](scripts/extraction/README.md).
+
+1. Run [`scripts/run_monte_carlo.py`](scripts/run_monte_carlo.py) — Monte Carlo simulations (resource-intensive; parameter ranges are defined in [`src/monte_carlo_parameters.py`](src/monte_carlo_parameters.py)). Each draw is processed a group of countries at a time, and the per-draw country and district results are written to `results/parquet_files/`, with summary CSVs in `results/`.
 2. Run [`scripts/key_results.ipynb`](scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](scripts/distribution_plots.ipynb) to analyze the new outputs.
 
 For a single deterministic run (no Monte Carlo), use [`src/gis_global_module.py`](src/gis_global_module.py).
@@ -69,7 +71,7 @@ For large runs on Google Cloud Spot VMs, see [`gcp/gcp-setup.md`](gcp/gcp-setup.
 The model splits non-piped drinking-water users by JMP source type (packaged, delivered, borehole/tubewell, and other unaffected unpiped). Household survey columns are matched to each country's latest piped reference year within a 5-year window, taken from the same JMP/WHO global CSV used for piped shares. If tracked unpiped subcategories (packaged + delivered + borehole) plus other unpiped sources (standpipe, wells, springs, rainwater, etc.) exceed the unpiped budget (`100% − piped`), all unpiped shares are scaled proportionally. To refresh these inputs from WHO/UNICEF JMP household country files:
 
 ```bash
-# 1. Download country xlsx files (copies from ../well-coverage/data/raw if present)
+# 1. Download country xlsx files
 python scripts/Data_Manipulation_Scripts/download_jmp_country_files.py
 
 # 2. Parse source-type percentages for all countries
@@ -79,13 +81,9 @@ python scripts/Data_Manipulation_Scripts/extract_jmp_source_breakdown.py
 python scripts/Data_Manipulation_Scripts/imputation_script.py
 ```
 
-Default borehole displacement scenarios: 50% urban, 25% rural (JMP does not distinguish handpump vs motorized). Displaced users — piped, packaged, delivered, and the displaced borehole share — all regain access only if walking or cycling range allows. Unaffected unpiped users are the residual share after subtracting those displaced categories from total unpiped (`100% − piped`). Parsed `UnpipedUnaffected` columns are used only when scaling survey breakdowns to the unpiped budget. Override via `urban_borehole_lose_fraction` and `rural_borehole_lose_fraction` in `calculate_population_water_access()`.
+JMP does not distinguish handpump from motorised boreholes, so the share of borehole users who lose access when motorised pumping fails is sampled in the Monte Carlo: 63–80% urban and 23–35% rural (derivation in [`data/original_data/borehole_pump_type_estimates_README.md`](data/original_data/borehole_pump_type_estimates_README.md)). Displaced users — piped, packaged, delivered, and the displaced borehole share — all regain access only if walking or cycling range allows. Unaffected unpiped users are the residual share after subtracting those displaced categories from total unpiped (`100% − piped`). Parsed `UnpipedUnaffected` columns are used only when scaling survey breakdowns to the unpiped budget. Override via `urban_borehole_lose_fraction` and `rural_borehole_lose_fraction` in `calculate_population_water_access()`.
 
 Countries without JMP household breakdowns can be filled manually in [`data/original_data/researched_source_breakdown.csv`](data/original_data/researched_source_breakdown.csv) (see the README there for provenance rules). Venezuela uses ENCOVI 2024 published shares.
-
-### 30 arc-second resolution
-
-Build the extracted grid with [`scripts/extraction/`](scripts/extraction/), then run Monte Carlo with `--resolution 30as`. At 30 arc-seconds the driver writes aggregate parquets and summary CSVs only (no per-cell zone parquets or simulation pickles). See [`docs/README.md`](docs/README.md) and [`gcp/gcp-setup.md`](gcp/gcp-setup.md) for local and cloud workflows.
 
 ## Full reproduction
 

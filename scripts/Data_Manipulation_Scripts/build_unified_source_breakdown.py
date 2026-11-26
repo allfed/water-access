@@ -128,7 +128,7 @@ def _category_pct(row, stratum: str, category: str) -> float | None:
 def jmp_row_is_informative(row) -> bool:
     """Whether a JMP row measured anything the research fill could not.
 
-    "Best source wins" (Kevin, 2026-08-11): a JMP row only outranks a curated
+    "Best source wins": a JMP row only outranks a curated
     research row if it is informative, meaning it carries a positive value in
     at least one of packaged / delivered / borehole. A row whose entire content
     is the UnpipedUnaffected catch-all — the shape sparse EU-SILC / HBS blocks
@@ -188,9 +188,8 @@ def validate(
       2. categories alone, and categories + piped, inside 100 + tolerance;
       3. when NEITHER a PipedEffective nor a WHO reference piped share exists,
          the sum cannot be verified at all — that is reported explicitly rather
-         than passing silently (the old code only ran check 2 inside an
-         ``elif piped_value is not None`` branch, so a missing reference looked
-         like a clean row).
+         than passing silently, so a missing reference cannot look like a
+         clean row.
 
     When ``merged_alpha3`` is given, every country the model ships must have a
     row here; the ones that do not are reported so they cannot vanish into a
@@ -459,7 +458,7 @@ def main() -> int:
                 adjustments.append((row["alpha3"], stratum, note))
 
     # Coverage: every country the model ships must have a row here, even if it
-    # is an empty one. Countries silently absent from this CSV used to become
+    # is an empty one. Otherwise an absent country would silently become
     # all-zero categories via the downstream fillna(0) with no trace in the
     # provenance columns.
     merged_alpha3 = None

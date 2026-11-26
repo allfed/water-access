@@ -3,7 +3,6 @@ from scipy.stats import norm, lognorm, genpareto
 import pandas as pd
 from pathlib import Path
 import sys
-import pickle
 import os
 
 # Resolve project root and update sys.path
@@ -111,7 +110,6 @@ def run_simulation(
     zone_columns=None,
     chunk_rows=None,
     chunk_plan=None,
-    area_weighted_population=True,
     zone_output_path=None,
 ):
     """Run a simulation to analyze global water access from walking or cycling
@@ -128,9 +126,9 @@ def run_simulation(
                                               transportation using buckets.
     - met (int or float): The metabolic equivalent of task (MET) value.
     - urban_borehole_lose_fraction (float): Share of urban borehole users who
-      lose access when electric pumping fails.
+      lose access when motorised pumping fails.
     - rural_borehole_lose_fraction (float): Share of rural borehole users who
-      lose access when electric pumping fails.
+      lose access when motorised pumping fails.
     - unallocated_vulnerable_fraction (float): Share of the population whose
       source type is unallocated that is treated as grid-vulnerable (float in
       [0, 1]).
@@ -144,17 +142,11 @@ def run_simulation(
       full frame is tens of GB and callers usually keep only a few columns.
     - chunk_rows (int, optional): run the analysis one group of whole countries
       at a time, at most this many modelled cells per group. Defaults to None
-      (monolithic path). The returned per-cell frame is empty in chunked mode.
+      (whole grid in memory, small inputs only). The returned per-cell frame
+      is empty in chunked mode.
     - chunk_plan (optional): a ``src.chunked_analysis.ChunkPlan`` to reuse. Build
                              it once in the parent process rather than once per
                              draw -- it depends only on the input file.
-    - area_weighted_population (bool, optional): split each country's population
-                             by ``pop_density x cos(latitude)`` instead of
-                             ``pop_density`` alone, correcting the lat/long
-                             grid's poleward cell-area shrinkage. Defaults to
-                             True as of 2026-08-09; pass False for the
-                             historical behaviour. A supplied ``chunk_plan``
-                             must have been built with the same setting.
     - zone_output_path (optional): in chunked mode, stream ``zone_columns`` to
                              this Parquet file per chunk.
 
@@ -225,15 +217,12 @@ def run_simulation(
         zone_columns=zone_columns,
         chunk_rows=chunk_rows,
         chunk_plan=chunk_plan,
-        area_weighted_population=area_weighted_population,
         zone_output_path=zone_output_path,
     )
     return df_countries, df_districts, df_zones
 
 
-def process_mc_results(
-    countries_simulation_results, plot=True, output_dir="results", write_pickle=True
-):
+def process_mc_results(countries_simulation_results, plot=True, output_dir="results"):
     """Process the Monte Carlo simulation results. Calculate the median, 95th
     percentile, 5th percentile, max, and min values and plot the results.
 
@@ -264,10 +253,8 @@ def process_mc_results(
         .reset_index()[["ISOCODE", "Entity", "region", "subregion"]]
     )  # noqa
 
-    # NOTE: numeric_only=True is required on pandas >= 2.0. Pandas 1.x silently
-    # dropped the non-numeric ("nuisance") columns here; pandas 2.x raises on them
-    # instead. Passing numeric_only=True restores the pandas 1.x result exactly --
-    # the non-numeric columns are merged back in below from `non_numeric_cols`.
+    # numeric_only=True: pandas >= 2.0 raises on the non-numeric columns. They
+    # are merged back in below from `non_numeric_cols`.
     # Calculate the mean results for each country for all cols
     all_means = (
         pd.concat(ordered_results)
@@ -325,25 +312,13 @@ def process_mc_results(
         os.path.join(output_dir, "country_5th_percentile_results.csv")
     )
 
-    # Step 4: optional legacy pickle of per-draw country frames. Notebooks read
-    # per-draw country parquets instead; at 30 arc-seconds pickles are off.
-    if write_pickle:
-        with open(
-            os.path.join(output_dir, "countries_simulation_results.pkl"), "wb"
-        ) as f:
-            pickle.dump(countries_simulation_results, f)
-    else:
-        print("Skipping countries_simulation_results.pkl (write_pickle=False).")
-
     print(
         "Country simulation results have been processed and saved to the "
         "results folder."
     )
 
 
-def process_districts_results(
-    districts_simulation_results, output_dir="results", write_pickle=True
-):
+def process_districts_results(districts_simulation_results, output_dir="results"):
     """Process the Monte Carlo simulation results. Calculate the median, 95th
     percentile, 5th percentile, max, and min values and plot the results.
 
@@ -434,15 +409,6 @@ def process_districts_results(
     all_percentile_5s.to_csv(
         os.path.join(output_dir, "districts_5th_percentile_results.csv")
     )
-
-    # Step 4: pickle the simulation results. See process_mc_results.
-    if write_pickle:
-        with open(
-            os.path.join(output_dir, "districts_simulation_results.pkl"), "wb"
-        ) as f:
-            pickle.dump(districts_simulation_results, f)
-    else:
-        print("Skipping districts_simulation_results.pkl (write_pickle=False).")
 
     print(
         "Districts simulation results have been processed and saved to the "

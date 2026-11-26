@@ -4,8 +4,10 @@ without water.
 Selection uses the GLOBAL row of ``countries_simulation_result_*.parquet``
 (equivalent to summing ``zone_pop_*`` over a zone file).
 
-Default is to re-run those draws locally with zone Parquet and copy
-them to the names expected by the export/rasterise scripts. Pass
+The Monte Carlo run only stores country and district aggregates, so by
+default those three draws are re-run locally (with the parameters stored in
+``checkpoint.json``) to write their per-cell zone Parquet, which is copied to
+the names expected by the export/rasterise scripts. Pass
 ``--no-rerun-zones-locally`` to only identify the median, 5th, and 95th percentile runs.
 """
 
@@ -137,9 +139,6 @@ def _job_for_draw(run_id: int, parameters: dict, run_config: dict, chunk_plan):
         "save_zone_parquet": True,
         "chunk_rows": run_config.get("chunk_rows") or None,
         "chunk_plan": chunk_plan,
-        "area_weighted_population": bool(
-            run_config.get("area_weighted_population", True)
-        ),
     }
 
 
@@ -172,13 +171,7 @@ def rerun_zone_draws_locally(selected: pd.DataFrame, *, force: bool = False) -> 
     chunk_plan = None
     if chunk_rows:
         print(f"Planning chunks (budget {chunk_rows:,}) ...", flush=True)
-        chunk_plan = chunked.plan_chunks(
-            zone_file,
-            max_rows_per_chunk=chunk_rows,
-            area_weighted_population=bool(
-                run_config.get("area_weighted_population", True)
-            ),
-        )
+        chunk_plan = chunked.plan_chunks(zone_file, max_rows_per_chunk=chunk_rows)
         print(f"  {chunk_plan.describe()}", flush=True)
 
     label_by_id = {}

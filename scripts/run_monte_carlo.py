@@ -1,21 +1,13 @@
 """Local Monte Carlo driver.
 
-Defaults reproduce the historical *harness*: 1000 iterations against the
-5 arc-minute CSV, per-iteration zone/district/country Parquet dumps, and
-optional legacy pickles (notebooks read per-draw country parquets instead).
-The one deliberate model change since is the
-cos-latitude population split, on by default since 2026-08-09 --
-``--no-area-weighted-population`` restores the pre-correction placement.
-
-``--resolution 30as`` switches to the 30 arc-second profile: aggregate-only persistence
-(no per-cell Parquet, no pickles -- at ~140M cells those are terabytes and
-tens of GB respectively), and the per-cell frame is trimmed to the three columns
-anything downstream actually uses before it ever leaves the worker.
+Runs 1000 iterations against the 30 arc-second grid (``master_30as.parquet``)
+and persists the per-draw country and district aggregates (no per-cell Parquet
+by default -- at ~140M cells that is terabytes). The per-cell frame is trimmed
+to the three columns anything downstream actually uses before it ever leaves
+the worker.
 
     python scripts/run_monte_carlo.py
     python scripts/run_monte_carlo.py --iterations 10 --workers 4
-    python scripts/run_monte_carlo.py --resolution 30as --iterations 10 \
-        --input data/GIS/extracted/master_30as.parquet
 """
 
 import argparse
@@ -47,13 +39,9 @@ PARQUET_PATH = RESULTS_PATH / "parquet_files"
 # but multiprocessing will speed up large batches signimficantly
 NUM_ITERATIONS = 1000
 
-# Define maximum simultaneous processes to run for multiprocessing
-# 15 was the most that could run on a 32 core hyperthreaded machine
-MAX_WORKERS = 15
-
-# At 30 arc-seconds each worker holds a ~140M-row frame, so the parallelism that
-# is free at 5 arc-minutes is what blows the 24 GB budget. Run one draw
-# at a time unless the operator says otherwise.
+# At 30 arc-seconds each worker holds a chunk of up to CHUNK_ROWS_30AS cells,
+# so parallel workers quickly blow the 24 GB budget. Run one draw at a time
+# unless the operator says otherwise.
 MAX_WORKERS_30AS = 1
 
 # Country-group chunk budget at 30 arc-seconds. See
@@ -69,8 +57,8 @@ ZONE_RESULT_COLUMNS = ["fid", "zone_pop_with_water", "zone_pop_without_water"]
 # -------------------------------------------------------------------------------
 
 # The walking and cycling sampling parameters live in
-# src/monte_carlo_parameters.py so that this script, run_monte_carlo_gcp.py and
-# run_monte_carlo_test.py can never disagree about them again.
+# src/monte_carlo_parameters.py so that this script and run_monte_carlo_gcp.py
+# can never disagree about them.
 
 # -------------------------------------------------------------------------------
 
@@ -96,15 +84,6 @@ def parse_args(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--resolution",
-        choices=("5min", "30as"),
-        default="5min",
-        help=(
-            "grid resolution of the input. '5min' (default) keeps the historical "
-            "behaviour; '30as' switches to aggregate-only persistence."
-        ),
-    )
-    parser.add_argument(
         "--iterations",
         type=int,
         default=NUM_ITERATIONS,
@@ -116,8 +95,8 @@ def parse_args(argv=None):
         default=None,
         help=(
             "zone frame to run against: a CSV, a .parquet file, or a directory "
-            "holding a partitioned Parquet dataset. Defaults to the 5 arc-minute "
-            "CSV the model has always used."
+            "holding a partitioned Parquet dataset. Defaults to the 30 arc-second "
+            "master grid."
         ),
     )
     parser.add_argument(
@@ -125,8 +104,7 @@ def parse_args(argv=None):
         type=int,
         default=None,
         help=(
-            f"simultaneous worker processes (default {MAX_WORKERS} at 5min, "
-            f"{MAX_WORKERS_30AS} at 30as -- a 30as worker holds a ~140M-row frame)"
+            f"simultaneous worker processes (default {MAX_WORKERS_30AS})"
         ),
     )
     parser.add_argument(
@@ -140,13 +118,13 @@ def parse_args(argv=None):
         dest="save_zone_parquet",
         action="store_true",
         default=None,
-        help="force per-iteration per-cell Parquet dumps on (default: on at 5min)",
+        help="write per-iteration per-cell Parquet dumps (default: off)",
     )
     parser.add_argument(
         "--no-save-zone-parquet",
         dest="save_zone_parquet",
         action="store_false",
-        help="force them off (default: off at 30as, where they would be terabytes)",
+        help="do not write them (default; they would be terabytes)",
     )
     parser.add_argument(
         "--chunk-rows",
@@ -155,8 +133,8 @@ def parse_args(argv=None):
         help=(
             "run each draw one group of whole countries at a time, at most this "
             "many modelled cells per group. Peak memory then follows this "
-            f"number, not the grid size. Default: {CHUNK_ROWS_30AS:,} at 30as, "
-            "off at 5min. 0 disables it."
+            f"number, not the grid size. Default: {CHUNK_ROWS_30AS:,}. "
+            "0 disables it."
         ),
     )
     parser.add_argument(
@@ -164,25 +142,13 @@ def parse_args(argv=None):
         dest="plot",
         action="store_true",
         default=None,
-        help="show the country choropleths at the end (default: on at 5min)",
+        help="show the country choropleths at the end (default: off)",
     )
     parser.add_argument(
         "--no-plot",
         dest="plot",
         action="store_false",
-        help="suppress them (default at 30as, and what you want on a headless box)",
-    )
-    parser.add_argument(
-        "--area-weighted-population",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help=(
-            "split each country's population by pop_density x cos(latitude) "
-            "rather than pop_density alone, correcting the lat/long grid's "
-            "poleward cell-area shrinkage. Default: on (2026-08-09). "
-            "--no-area-weighted-population reproduces the pre-correction "
-            "behaviour every earlier published result was produced under."
-        ),
+        help="suppress them (default, and what you want on a headless box)",
     )
     parser.add_argument(
         "--seed",
@@ -190,8 +156,7 @@ def parse_args(argv=None):
         default=None,
         help=(
             "seed the Monte Carlo parameter draws, so that two runs consume "
-            "IDENTICAL parameter tuples -- what the 30as/5min twin comparison "
-            "needs. Default: unseeded, exactly as before."
+            "IDENTICAL parameter tuples. Default: unseeded."
         ),
     )
     return parser.parse_args(argv)
@@ -200,10 +165,8 @@ def parse_args(argv=None):
 def format_parameter_draws(parameters, num_iterations):
     """Render one ``PARAM_DRAW`` line per draw, for log-to-log diffing.
 
-    The 30as/5min twin comparison compares a 30 arc-second run against a 5 arc-minute twin and needs
-    evidence that the only difference between them was the resolution. Both run
-    logs carry these lines, so ``diff <(grep PARAM_DRAW a.log) <(grep PARAM_DRAW
-    b.log)`` is the proof.
+    Two run logs carry these lines, so ``diff <(grep PARAM_DRAW a.log) <(grep
+    PARAM_DRAW b.log)`` shows whether they used the same parameters.
     """
     lines = []
     columns = [parameters[name] for name in PARAMETER_NAMES]
@@ -225,38 +188,17 @@ def format_parameter_draws(parameters, num_iterations):
 def main(argv=None):
     args = parse_args(argv)
 
-    is_30as = args.resolution == "30as"
-    workers = (
-        args.workers
-        if args.workers is not None
-        else (MAX_WORKERS_30AS if is_30as else MAX_WORKERS)
-    )
+    workers = args.workers if args.workers is not None else MAX_WORKERS_30AS
     save_zone_parquet = (
-        args.save_zone_parquet if args.save_zone_parquet is not None else not is_30as
+        args.save_zone_parquet if args.save_zone_parquet is not None else False
     )
-    # Legacy pickles are optional; notebooks load per-draw country parquets.
-    # Keep pickles at 5 arc-minutes only, skip at 30 arc-seconds.
-    write_pickle = not is_30as
-    plot = args.plot if args.plot is not None else not is_30as
+    plot = args.plot if args.plot is not None else False
 
     if args.input is not None:
         gis.URB_DATA_FILE = args.input
-    print(f"Resolution: {args.resolution}")
     print(f"Zone frame: {gis.URB_DATA_FILE}")
-    print(
-        "Population split: "
-        + (
-            "pop_density x cos(latitude) (area weighted)"
-            if args.area_weighted_population
-            else "pop_density only (historical)"
-        )
-    )
 
-    chunk_rows = (
-        args.chunk_rows
-        if args.chunk_rows is not None
-        else (CHUNK_ROWS_30AS if is_30as else 0)
-    )
+    chunk_rows = args.chunk_rows if args.chunk_rows is not None else CHUNK_ROWS_30AS
     chunk_plan = None
     if chunk_rows:
         # Plan once, here, and hand the same plan to every draw: it depends only
@@ -268,7 +210,6 @@ def main(argv=None):
         chunk_plan = chunked.plan_chunks(
             gis.URB_DATA_FILE,
             max_rows_per_chunk=chunk_rows,
-            area_weighted_population=args.area_weighted_population,
         )
         print(f"  {chunk_plan.describe()}", flush=True)
         largest_district = chunk_plan.notes.get("largest_district_rows", 0)
@@ -279,12 +220,6 @@ def main(argv=None):
                 "unit this scheme can make, so that chunk will overrun.",
                 flush=True,
             )
-
-    if is_30as:
-        print(
-            "30as profile: persisting per-draw country/district aggregates only "
-            "(no per-cell Parquet, no simulation pickles)."
-        )
 
     output_dir = args.output_dir
     # Per-draw aggregates live beside the summary CSVs, so --output-dir moves the
@@ -359,7 +294,6 @@ def main(argv=None):
                 zone_columns=ZONE_RESULT_COLUMNS if save_zone_parquet else [],
                 chunk_rows=chunk_rows or None,
                 chunk_plan=chunk_plan,
-                area_weighted_population=args.area_weighted_population,
             )
             for (
                 crr_adjustment,
@@ -426,12 +360,10 @@ def main(argv=None):
         countries_simulation_results,
         plot=plot,
         output_dir=str(output_dir),
-        write_pickle=write_pickle,
     )
     mc.process_districts_results(
         districts_simulation_results,
         output_dir=str(output_dir),
-        write_pickle=write_pickle,
     )
 
     # Record the end time

@@ -613,7 +613,7 @@ class mobility_models:
             + (-0.05372 * G)
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
-            - (0.000320 * v_solve * G**3)  # this was previously 0.00320 - bug?
+            - (0.000320 * v_solve * G**3)
             - (met.budget_VO2 / m_load)
         )
         # add in rolling resistance stuff...
