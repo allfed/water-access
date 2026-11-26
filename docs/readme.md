@@ -34,7 +34,7 @@ For 30 arc-second runs, pass `--resolution 30as --input data/GIS/extracted/maste
 
 ## 3. Generate key results
 
-Run [`scripts/key_results.ipynb`](../scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](scripts/distribution_plots.ipynb) for country- and district-level tables and plots.
+Run [`scripts/key_results.ipynb`](../scripts/key_results.ipynb) and [`scripts/distribution_plots.ipynb`](../scripts/distribution_plots.ipynb) for country- and district-level tables and plots.
 
 ## 4. Post-process for QGIS maps
 
