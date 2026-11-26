@@ -1,0 +1,227 @@
+alpha3,Entity,origin,URBAN_handpump_low,URBAN_handpump_high,RURAL_handpump_low,RURAL_handpump_high,urban_evidence,urban_confidence,urban_source,urban_url,rural_evidence,rural_confidence,rural_source,rural_url,verification,urban_bh_pop,rural_bh_pop
+AFG,Afghanistan,researched,30,65,85,98,expert,low,"ALCS 2016-17 Table 10.7 (urban hand pump 45.1%) vs MICS 2022-23 Table WS.1.1 (urban tube well/borehole 28.7%), interpreted with Mercy Corps 'Kabul's Water Crisis' (April 2025)",https://www.mercycorps.org/sites/default/files/2025-05/crisis-analysis-team-kabul-water-april-2025.pdf,survey,med,ALCS 2016-17 Table 10.7 (population by residence and drinking water source) cross-walked against Afghanistan MICS 2022-23 Table WS.1.1,https://washdata.org/sites/default/files/documents/reports/2018-07/Afghanistan%20ALCS%202016-17%20Analysis%20report.pdf,,3083072,8566142
+ALB,Albania,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,4869,19467
+DZA,Algeria,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,457265,529510
+ASM,American Samoa,regional_default:se-asia,2,20,15,65,,,,,,,,,,240,36
+AGO,Angola,researched,15,50,50,85,expert,low,"IIMS 2015-16 urban source structure (tanker trucks 18%+ in sampled strata, chafarizes, neighbour taps); Luanda supply literature",https://andine.ine.gov.ao/nada/index.php/catalog/9/variable/F3/V483?name=QH102,survey,low,Angola IIMS (DHS) 2015-16 questionnaire category structure; Programa Agua para Todos technology mix,https://andine.ine.gov.ao/nada/index.php/catalog/9/variable/F3/V483?name=QH102,,2475447,3271526
+AIA,Anguilla,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,151,0
+ATG,Antigua and Barbuda,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+ARG,Argentina,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,413101
+ARM,Armenia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+ABW,Aruba,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+AUS,Australia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+AZE,Azerbaijan,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,88409
+BHS,Bahamas,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BHR,Bahrain,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BGD,Bangladesh,researched,35,65,88,98,expert,med,"Composite: JASBS Turag-Buriganga peri-urban Dhaka household survey (motorized vs hand tubewell); World Bank urban WSS factsheet (piped systems in only 151 of 329 pourashavas, core areas only); MICS urban tubewell ~65-70% of urban household members",https://www.banglajol.info/index.php/JASBS/article/view/70760,inventory,med,"National tubewell inventory literature (Banglapedia; Wikipedia water supply in Bangladesh citing sector data; Global Environmental Change 2020 self-supply study) + MICS 2012-13/2019 (rural tubewell ~95-96% of household members, category not split by pump type)",https://en.banglapedia.org/index.php/Tubewell,PLAUSIBLE,43404015,94708376
+BRB,Barbados,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BLR,Belarus,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BEL,Belgium,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,125397,2559
+BLZ,Belize,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BEN,Benin,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,1390089,1833595
+BMU,Bermuda,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BTN,Bhutan,regional_default:south-asia,25,60,50,95,,,,,,,,,,0,0
+BOL,"Bolivia, Plurinational State of",regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,163340,497877
+BES,"Bonaire, Sint Eustatius and Saba",regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BIH,Bosnia and Herzegovina,researched,5,12,5,12,census,high,"BiH Census of Population, Households and Dwellings 2013, dwelling water-supply table (seed evidence from prior phase, retained)",,census,high,"BiH Census of Population, Households and Dwellings 2013, dwelling water-supply table (seed evidence from prior phase, retained)",,,28183,98641
+BWA,Botswana,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,1968,57318
+BRA,Brazil,researched,0,8,0,8,analogue,med,IBGE Censo 2022 / PNAD water source categories ('poco profundo ou artesiano' vs 'poco raso') + Luz para Todos rural electrification (~99.8%),,analogue,med,IBGE Censo 2022 / PNAD water source categories ('poco profundo ou artesiano' vs 'poco raso') + Luz para Todos rural electrification (~99.8%),,,0,1542062
+BRN,Brunei Darussalam,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+BGR,Bulgaria,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+BFA,Burkina Faso,researched,60,90,90,100,expert,low,Inference from INO 2015 structure + ONEA urban monopoly (PN-AEP 2016-2030),https://bdd.pseau.org/outils/ouvrages/mea_PN_AEP_2016_2030.pdf,admin,high,"INO 2015 national inventory, cited in Programme National AEP 2016-2030 (Ministere de l'Eau et de l'Assainissement), Tableau 6 and section 2",https://bdd.pseau.org/outils/ouvrages/mea_PN_AEP_2016_2030.pdf,,800786,8394343
+BDI,Burundi,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,333,71227
+CPV,Cabo Verde,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,0,0
+KHM,Cambodia,researched,20,60,60,90,expert,low,MoE/UNDP Groundwater Management Strategy 2020 (urban mechanized pumping statement); CDHS 2021-22 context,https://www.adaptation-undp.org/sites/default/files/resources/groundwater_managment_in_cambodia_-_v.24.02.202027958.pdf,inventory,med,"MoE/UNDP 'Development of Groundwater Management Strategy in Cambodia' (2020), citing IDE 2005 tube-well survey and NIS 2008",https://www.adaptation-undp.org/sites/default/files/resources/groundwater_managment_in_cambodia_-_v.24.02.202027958.pdf,,177476,3855960
+CMR,Cameroon,researched,10,30,70,95,survey,med,"Douala 5th municipality household survey (Water supply, sanitation and health risks in Douala 5, 2015: 42.3% of households on forages vs 33.8% CDE network; PAMJ 2018: two-thirds of Douala 5 households drinking borehole water); Douala drilling-market documentation",https://www.researchgate.net/publication/275666817_Water_supply_sanitation_and_health_risks_in_Douala_5_municipality_Cameroon,inventory,med,"PNDP commune development plans 2011-15: 6,899 handpumps in 189 of 316 communes (Foster et al. 2019 Table 1); RWSN 2024 'Functionality of water supply handpumps in Cameroon: review of data from 310 councils'",https://rwsn.blog/2024/09/20/functionality-of-water-supply-handpumps-in-cameroon-central-africa-a-review-of-data-from-310-councils/,,3500605,4689614
+CAN,Canada,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+CYM,Cayman Islands,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+CAF,Central African Republic,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,845279,1120487
+TCD,Chad,researched,70,95,85,100,survey,med,"Universite Populaire 2017 household survey of N'Djamena 7th and 8th arrondissements, cited in 'Hydraulic bricolages: coexisting water supply and access regimes in N'Djamena, Chad' (EchoGeo, 2021)",https://journals.openedition.org/echogeo/22514,inventory,med,"Schema Directeur de l'Eau et de l'Assainissement du Tchad 2003-2020, volume Hydraulique Villageoise (HCNE/MEE/ONU-DAES/PNUD 2003); AfDB PAEPA-SU-MR program docs",https://bdd.pseau.org/outils/ouvrages/hcne_mee_onu_daes_tchad_sdea_2003_2020_hydraulique_villageoise_2003.pdf,,1644128,5206407
+CHL,Chile,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+CHN,China,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+HKG,Hong Kong,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+MAC,Macao,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+COL,Colombia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,167269,503167
+COM,Comoros,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,377,2012
+COG,Congo,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,334669,207717
+COK,Cook Islands,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+CRI,Costa Rica,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+CUB,Cuba,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+CUW,Curaçao,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+CYP,Cyprus,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+CZE,Czechia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,396808,139419
+CIV,Côte d'Ivoire,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,79937,2141291
+PRK,"Korea, Democratic People's Republic of",regional_default:se-asia,2,20,15,65,,,,,,,,,,1288398,2288674
+COD,"Congo, Democratic Republic of the",researched,15,50,80,100,expert,low,"Inference: Kinshasa REGIDESO piped dominance with private motorized boreholes among wealthier households/water resellers, vs UNICEF-supported manually drilled handpump boreholes in peri-urban Kinshasa and secondary cities",https://www.unicef.org/drcongo/media/4581/file/COD-report-manual-drilling.pdf,inventory,med,"STUDI International 2015 national sample (2,214 handpumps) via Foster et al. 2019 Table 1; USAID/FHI360 DRC WSS sector profile; UNICEF DRC manual drilling program",https://hip.fhi360.org/file/17629/DRCWSSSectorProfile1.pdf,,3907589,538564
+DNK,Denmark,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,204628,27904
+DJI,Djibouti,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,0,34288
+DMA,Dominica,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,24
+DOM,Dominican Republic,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,3460,6467
+ECU,Ecuador,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,321538
+EGY,Egypt,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,67964,91696
+SLV,El Salvador,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,82558,61867
+GNQ,Equatorial Guinea,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,50450,21343
+ERI,Eritrea,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,22473,274506
+EST,Estonia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+SWZ,Eswatini,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,1183,55014
+ETH,Ethiopia,researched,30,70,70,92,expert,low,Inference from NWI-2 and utility structure (urban supply = town utilities with motorized deep boreholes feeding networks),https://www.ircwash.org/sites/default/files/national_wash_invetory_2_and_mis_report.pdf,admin,med,Ethiopia National WASH Inventory 2 and MIS report (Water Development Commission),https://www.ircwash.org/sites/default/files/national_wash_invetory_2_and_mis_report.pdf,,169149,7982936
+FLK,Falkland Islands (Malvinas),regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+FRO,Faroe Islands,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+FJI,Fiji,regional_default:se-asia,2,20,15,65,,,,,,,,,,1583,8446
+FIN,Finland,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,477159,77677
+FRA,France,researched,0,2,0,2,expert,med,"French private well/forage declaration regime (puits et forages domestiques, >1M declared) + prior-phase high-income finding; French Guiana seed evidence (36 documented handpumps) retained",,expert,med,"French private well/forage declaration regime (puits et forages domestiques, >1M declared) + prior-phase high-income finding; French Guiana seed evidence (36 documented handpumps) retained",,,536495,117767
+GUF,French Guiana,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+PYF,French Polynesia,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+GAB,Gabon,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,29138,8114
+GMB,Gambia,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,101266,166727
+GEO,Georgia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+DEU,Germany,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,327212,92291
+GHA,Ghana,researched,15,40,75,95,expert,low,Inference from Ghana self-supply literature (mechanized boreholes with poly-tanks widespread in peri-urban Accra/Kumasi/Ashanti) + persistence of handpumps in small towns classified urban in the 2021 PHC,https://cwsawateratlas.org/map/type-of-handpumps/,inventory,med,"CWSA via Ghana News Agency (Dec 2022): cumulative facilities provided to rural communities and small towns; CWSA Water Atlas (20,365 handpumps mapped in 6/10 regions, 2014, via Foster et al. 2019)",https://gna.org.gh/2022/12/cwsa-provides-29785-boreholes-to-some-rural-communities/,,583844,3739943
+GIB,Gibraltar,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+GRC,Greece,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,82966,20741
+GRL,Greenland,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+GRD,Grenada,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+GLP,Guadeloupe,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+GUM,Guam,regional_default:se-asia,2,20,15,65,,,,,,,,,,129,7
+GTM,Guatemala,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,529807,1655488
+GIN,Guinea,researched,40,80,90,100,expert,low,Inference: SEG piped supply in Conakry is weak/intermittent; non-piped urban groundwater is mostly dug wells; borehole users split between public PMH (secondary towns) and private motorized (Conakry wealthy),https://www.waterpointdata.org/wp-content/uploads/2020/11/Functionality-of-handpump-water-supplies.pdf,inventory,med,"MEH/SNAPE national inventory 2012 (12,815 handpumps) via Foster et al. 2019 Table 1; RWSN Stop the Rot 2022 reliance estimate",https://www.waterpointdata.org/wp-content/uploads/2020/11/Functionality-of-handpump-water-supplies.pdf,,1583707,3629167
+GNB,Guinea-Bissau,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,91780,231208
+GUY,Guyana,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,132,821
+HTI,Haiti,researched,20,60,60,90,,,,,inventory,med,Haiti EMMUS-VI (DHS 2016-17) tubewell category + NGO borehole-handpump inventories (Afridev/India MkII standard; e.g. Leogane-Gressier borehole-handpump studies) + rural grid coverage ~0-5%,https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6164153/,,516426,487150
+HND,Honduras,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,109387,121219
+HUN,Hungary,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+ISL,Iceland,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+IND,India,researched,25,38,70,80,expert,med,"Adjusted estimate: extrapolation of Census 2011 (57.1%) -> NSS 2018 (39.2%) trend, constrained by MIS 2020-21 combined urban handpump+tubewell = 15% of urban HHs (vs 17.1% in 2018)",https://ceda.ashoka.edu.in/what-is-the-primary-source-of-drinking-water-for-indian-households/,expert,med,"Adjusted estimate: extrapolation of Census 2011 (84.1%) -> NSS 2018 (79.7%) trend, constrained by NSS MIS 78th round 2020-21 and CAMS 79th round 2022-23 combined-category trend and Jal Jeevan Mission rollout (CEDA/Ashoka analysis of MIS unit data; Data For India analysis of CAMS)",https://ceda.ashoka.edu.in/what-is-the-primary-source-of-drinking-water-for-indian-households/,CONFIRMED,68948164,450654789
+IDN,Indonesia,researched,2,10,10,35,survey,med,"SUSENAS/BPS 2023 (category definition); Genter et al. 2023 PLOS Water self-supply study (Bekasi & Metro); CLASP/Ipsos Indonesia Residential End-Use Survey 2020 (n=5,443 hh)",https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000070,analogue,low,CLASP/Ipsos 2020 appliance survey; Pamsimas technical manuals (sumur pompa tangan is a standard rural program technology); PU SIMANTU manual on hand-pump wells,https://www.clasp.ngo/wp-content/uploads/2021/01/Indonesia-Residential-End-Use-Survey.pdf,PLAUSIBLE,23709432,21206578
+IRN,"Iran, Islamic Republic of",researched,0,10,0,10,admin,med,"Iran Ministry of Energy/ABFAR rural water coverage; qanat inventories (~37,000-39,000 operational)",https://www.presstv.ir/Detail/2025/02/08/742448/Iran-drinking-water-access-rural-population,admin,med,"Iran Ministry of Energy/ABFAR rural water coverage; qanat inventories (~37,000-39,000 operational)",https://www.presstv.ir/Detail/2025/02/08/742448/Iran-drinking-water-access-rural-population,,0,0
+IRQ,Iraq,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,12806,89040
+IRL,Ireland,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+IMN,Isle of Man,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+ISR,Israel,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+ITA,Italy,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+JAM,Jamaica,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,990,0
+JPN,Japan,regional_default:se-asia,2,20,15,65,,,,,,,,,,2435301,211765
+JOR,Jordan,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+KAZ,Kazakhstan,researched,5,25,5,25,expert,low,"MICS 2015 (tubewell/borehole category, no split); rural water program (Ak Bulak) documentation",,expert,low,"MICS 2015 (tubewell/borehole category, no split); rural water program (Ak Bulak) documentation",,,0,0
+KEN,Kenya,researched,5,30,35,65,expert,med,Nairobi metropolitan borehole studies (KEWI assessment); WASREB; drilling-industry norms,https://kewi.go.ke/sites/default/files/gallery/research/Assessment%20of%20%20%20Quality%20of%20Borehole%20Water%20as%20Sources%20of%20Domestic%20Water%20in%20Nairobi%20Metropolitan%20Region.pdf,inventory,med,Kitui County Water Infrastructure Audit 2016-2018 (Oxford REACH); JICA groundwater development design reports for Kenya,https://reachwater.uk/wp-content/uploads/2024/01/16_09_05_Kitui-policy-brief.pdf,,2216474,7457392
+KIR,Kiribati,regional_default:se-asia,2,20,15,65,,,,,,,,,,275,1137
+KGZ,Kyrgyzstan,regional_default:central-asia,5,25,20,60,,,,,,,,,,0,117580
+LAO,Lao People's Democratic Republic,regional_default:se-asia,2,20,15,65,,,,,,,,,,31721,344041
+LVA,Latvia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+LBN,Lebanon,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,97435,12043
+LSO,Lesotho,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,12157,52628
+LBR,Liberia,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,679042,521807
+LBY,Libya,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,129638,30409
+LIE,Liechtenstein,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+LTU,Lithuania,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+LUX,Luxembourg,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+MDG,Madagascar,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,742829,858960
+MWI,Malawi,researched,60,90,92,99,census,med,Malawi 2018 Census WASH statistics (NSO/UNICEF factsheet),https://www.unicef.org/malawi/media/641/file/WASH%20Statistics%20Factsheet%202018.pdf,inventory,high,"Malawi 2018 Census (WASH factsheet, NSO/UNICEF); national water-point inventory as analysed in 'An analysis of hand pump boreholes functionality in Malawi' (Phys. Chem. Earth) and mWater MIS (121,161 assets)",https://www.sciencedirect.com/science/article/abs/pii/S1474706519301512,,497300,12163219
+MYS,Malaysia,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+MDV,Maldives,regional_default:south-asia,25,60,50,95,,,,,,,,,,0,0
+MLI,Mali,researched,40,80,85,100,expert,low,Inference: SOMAGEP piped Bamako + peri-urban PMH; growing private motorized borehole market among wealthier Bamako households,https://pemmali.org/map-types/pmh/,inventory,med,"DNH & SNV 2015-16 water point mapping (Akvo): 19,951 handpumps in 5 of 8 regions, via Foster et al. 2019 Table 1; PEM Mali database (pemmali.org)",https://www.waterpointdata.org/wp-content/uploads/2020/11/Functionality-of-handpump-water-supplies.pdf,,713378,3982001
+MLT,Malta,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+MHL,Marshall Islands,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+MTQ,Martinique,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+MRT,Mauritania,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,22953,172658
+MUS,Mauritius,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,0,0
+MYT,Mayotte,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,0,0
+MEX,Mexico,researched,0,10,0,10,,,,,analogue,med,INEGI Censo 2020 water source ('pozo' category) + ~99% national electrification,,,0,0
+FSM,"Micronesia, Federated States of",regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+MCO,Monaco,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+MNG,Mongolia,regional_default:se-asia,2,20,15,65,,,,,,,,,,237363,279591
+MNE,Montenegro,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,1414,12399
+MSR,Montserrat,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+MAR,Morocco,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,1167264
+MOZ,Mozambique,researched,80,100,90,100,survey,high,Mozambique DHS (IDS) 2022-23 via UNICEF National Water Profile,https://www.unicef.org/mozambique/media/8131/file/Mozambique_National%20Water%20Profile.pdf,survey,high,Mozambique DHS (IDS) 2022-23 as cited in UNICEF Mozambique National Water Profile 2024,https://www.unicef.org/mozambique/media/8131/file/Mozambique_National%20Water%20Profile.pdf,,817698,4534205
+MMR,Myanmar,researched,15,45,45,80,analogue,low,Myanmar DHS 2015-16 FR324 Table 2.1; 2014 Census urban electrification (~78%); Yangon water studies (private electric boreholes),https://dhsprogram.com/pubs/pdf/FR324/FR324.pdf,analogue,low,Myanmar DHS 2015-16 Final Report (FR324) Table 2.1 (denominator); 2014 Census (electrification); Dry Zone hydrogeology literature (ICEM/IWMI),https://dhsprogram.com/pubs/pdf/FR324/FR324.pdf,,5787515,12357390
+NAM,Namibia,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,3714,204095
+NRU,Nauru,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+NPL,Nepal,researched,60,90,90,98,inventory,med,Birgunj case studies (Sapien Knows 2023/2024) + census 2021 category structure; Nepal's 'urban' municipalities include most of the Terai towns,https://sapienknows.com/water-crisis-is-this-the-end-of-hand-pumps-in-birgunj-nepal/,inventory,med,"Nepal NPHC 2021 census (category 'tube well/hand pump', 29.8% of households nationally) + Terai handpump inventory (~1.2 million hand pumps installed; ~8 households per public tubewell)",https://microdata.nsonepal.gov.np/index.php/catalog/124,,2072425,8275445
+NLD,"Netherlands, Kingdom of the",regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+NCL,New Caledonia,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+NZL,New Zealand,researched,0,2,0,2,analogue,med,NZ self-supply (~10-13% of population on private bores/tanks); prior-phase high-income finding,,analogue,med,NZ self-supply (~10-13% of population on private bores/tanks); prior-phase high-income finding,,,346758,51814
+NIC,Nicaragua,researched,2,15,10,40,,,,,inventory,low,"RWSN 'History and current status of the rope pump in Nicaragua' (2022) + rope pump literature (13,000+ installed; SDC/BOMESA)",https://www.rural-water-supply.net/_ressources/documents/default/1-1071-4-1664225860.pdf,,0,0
+NER,Niger,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,177016,935465
+NGA,Nigeria,researched,10,25,35,60,inventory,med,"WASH-NORM 2021 (FMWR/NBS/UNICEF), Tables WF.B1 and WF.B2, national water-point census (2,313,566 points)",https://www.unicef.org/nigeria/media/5951/file/2021%20WASHNORM%20Report%20.pdf,inventory,med,"WASH-NORM 2021 (FMWR/NBS/UNICEF), Tables WF.B1, WF.B2 and functionality-by-type table",https://www.unicef.org/nigeria/media/5951/file/2021%20WASHNORM%20Report%20.pdf,PLAUSIBLE,51966838,29262567
+NIU,Niue,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+MKD,North Macedonia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,211,6858
+MNP,Northern Mariana Islands,regional_default:se-asia,2,20,15,65,,,,,,,,,,565,49
+NOR,Norway,researched,0,2,0,2,admin,high,"Geological Survey/geoenergy literature: ~80,000 bedrock boreholes for water supply, ~4,000 drilled/yr (Gehlin et al. 2016, Nordic borehole statistics)",https://media.geoenergicentrum.se/2016/02/Gehlin_et_al_2016.pdf,admin,high,"Geological Survey/geoenergy literature: ~80,000 bedrock boreholes for water supply, ~4,000 drilled/yr (Gehlin et al. 2016, Nordic borehole statistics)",https://media.geoenergicentrum.se/2016/02/Gehlin_et_al_2016.pdf,,459113,87450
+OMN,Oman,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+PAK,Pakistan,researched,21,26,46,53,survey,high,"PSLM District Level Survey 2019-20, Table 7.1 'Percentage distribution of household by source of drinking water by province & district', Pakistan Bureau of Statistics",https://www.pbs.gov.pk/wp-content/uploads/2020/07/Table-7.1-Percentage-distribution-of-household-by-source-of-drinking-water-by-province.pdf,survey,high,"PSLM District Level Survey 2019-20, Table 7.1, Pakistan Bureau of Statistics",https://www.pbs.gov.pk/wp-content/uploads/2020/07/Table-7.1-Percentage-distribution-of-household-by-source-of-drinking-water-by-province.pdf,CONFIRMED,33948074,69631863
+PLW,Palau,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+PAN,Panama,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+PNG,Papua New Guinea,regional_default:se-asia,2,20,15,65,,,,,,,,,,7527,108507
+PRY,Paraguay,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+PER,Peru,researched,0,15,0,15,,,,,expert,low,ENAPRES/Censo 2017 water categories + Amazon NGO handpump installs (small),,,0,0
+PHL,Philippines,researched,10,40,35,70,analogue,low,NDHS 2022 (PR146); Quezon City safely-managed-water study (poor households using hand pumps); urban poor WASH studies,https://www.sciencedirect.com/science/article/pii/S2666049021000955,analogue,low,NDHS 2022 (PR146) - tube well/borehole 7.7% of households; DOH Level I definitions (P.D. 856 IRR); provincial studies (Capiz jetmatic; Tuguegarao communal pump-wells),https://dhsprogram.com/pubs/pdf/PR146/PR146.pdf,,1039292,4445741
+POL,Poland,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+PRT,Portugal,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+PRI,Puerto Rico,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,3722,238
+QAT,Qatar,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+KOR,"Korea, Republic of",regional_default:se-asia,2,20,15,65,,,,,,,,,,0,380171
+MDA,"Moldova, Republic of",researched,0,15,0,15,expert,low,Moldova MICS 2012 WS1 (via World Bank Microdata) + APASAN village survey typology,https://microdata.worldbank.org/catalog/2208/variable/F6/V1059?name=WS1,expert,low,Moldova MICS 2012 WS1 (via World Bank Microdata) + APASAN village survey typology,https://microdata.worldbank.org/catalog/2208/variable/F6/V1059?name=WS1,,0,0
+ROU,Romania,researched,0,3,0,10,analogue,med,Same as rural; urban periphery self-supply is foraj+hidrofor by construction,,analogue,med,"INS Romania (74.1% of resident population connected to public water supply, 2021) + rural groundwater case studies (MDPI Sustainability 17:6530 Ceanu Mare; Water 17:2758) + market typology of 'foraj + hidrofor'",https://insse.ro/cms/ro/tags/comunicat-distributia-apei,,1032900,3255547
+RUS,Russian Federation,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+RWA,Rwanda,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,21735,414796
+REU,Réunion,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,0,0
+SHN,"Saint Helena, Ascension and Tristan da Cunha",regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,0,0
+KNA,Saint Kitts and Nevis,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+LCA,Saint Lucia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,16,94
+SPM,Saint Pierre and Miquelon,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+VCT,Saint Vincent and the Grenadines,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,7,36
+WSM,Samoa,regional_default:se-asia,2,20,15,65,,,,,,,,,,70,319
+SMR,San Marino,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+STP,Sao Tome and Principe,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,0,918
+SAU,Saudi Arabia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+SEN,Senegal,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,74968,386306
+SRB,Serbia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+SYC,Seychelles,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,0,0
+SLE,Sierra Leone,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,625189,839787
+SGP,Singapore,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+SXM,Sint Maarten (Dutch part),regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+SVK,Slovakia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,74310,263753
+SLB,Solomon Islands,regional_default:se-asia,2,20,15,65,,,,,,,,,,5887,10495
+SOM,Somalia,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,257365,984409
+ZAF,South Africa,regional_default:ssa-east-south,20,55,75,95,,,,,,,,,,189404,1501722
+SSD,South Sudan,researched,70,95,88,100,admin,low,"World Bank Water Security in South Sudan / PID P505316 (2024); Juba groundwater study (Sci. Total Environ. 2015, 95 boreholes)",https://documents1.worldbank.org/curated/en/099121924014041544/pdf/P505316176e9a30319a171f53f725d063a.pdf,inventory,med,"RWSN 'Stop the Rot' Report I (Danert 2022) reliance estimates; IOM 2009 water-point inventories (4,951 handpumps in 5/10 states) via Foster et al. 2019, Table 1",https://ask-for-water.ch/handpumps/,,1354710,5096289
+ESP,Spain,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+LKA,Sri Lanka,regional_default:south-asia,25,60,50,95,,,,,,,,,,129188,720194
+PSE,"Palestine, State of",regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,12165,4640
+SDN,Sudan,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,588233,1743431
+SUR,Suriname,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,2003
+SWE,Sweden,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,900567,273607
+CHE,Switzerland,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,38697,13596
+SYR,Syrian Arab Republic,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+TWN,"Taiwan, Province of China",regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+TJK,Tajikistan,regional_default:central-asia,5,25,20,60,,,,,,,,,,47547,122263
+THA,Thailand,regional_default:se-asia,2,20,15,65,,,,,,,,,,4486,56022
+TLS,Timor-Leste,regional_default:se-asia,2,20,15,65,,,,,,,,,,12799,40305
+TGO,Togo,regional_default:ssa-west-central,15,55,70,95,,,,,,,,,,1010696,1365833
+TKL,Tokelau,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+TON,Tonga,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+TTO,Trinidad and Tobago,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+TUN,Tunisia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,451,35743
+TKM,Turkmenistan,researched,5,25,20,60,,,,,analogue,low,"Analogue to Karakalpakstan (same Amu Darya lowland aquifer/settlement pattern, Dashoguz province); Turkmenistan MICS 2019 has tubewell category, no split",,,126302,577927
+TUV,Tuvalu,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+TUR,Türkiye,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+UGA,Uganda,researched,50,85,88,99,analogue,low,Kampala urban weathered-basement aquifer study (Hydrogeology Journal 2022); NWSC/small-towns structure,https://link.springer.com/article/10.1007/s10040-022-02474-9,inventory,high,"Uganda Ministry of Water and Environment database, cited in RWSN 'Stop the Rot: Uganda' (2024); Uganda Water Supply Atlas",https://rwsn.blog/2024/08/22/stop-the-rot-uganda/,PLAUSIBLE,2715400,17602288
+UKR,Ukraine,researched,0,5,5,20,analogue,med,Ukraine MICS 2012 + typology of urban private-sector housing boreholes,https://microdata.worldbank.org/catalog/2348/variable/F2/V305?name=WS1,analogue,med,"Ukraine MICS 2012 (WS1, State Statistics Service/UNICEF, via World Bank Microdata catalog 2348) + UNICEF/IOM war reporting 2022-2024 + Bosnia 2013 census analogue",https://microdata.worldbank.org/catalog/2348/variable/F2/V305?name=WS1,PLAUSIBLE,7302426,4172815
+ARE,United Arab Emirates,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+GBR,United Kingdom of Great Britain and Northern Ireland,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,229176,43653
+TZA,"Tanzania, United Republic of",researched,15,45,70,92,survey,med,Dar es Salaam groundwater studies (Sci. Total Environ. 2019; IWA WST 2021; The Citizen reporting),https://www.sciencedirect.com/science/article/abs/pii/S0048969719322417,inventory,med,"Tanzania Water Point Mapping System (Ministry of Water, mapped 2011-13; ~60-75k rural water points)",http://wpm.maji.go.tz/,,1303601,2485739
+USA,United States of America,researched,0,2,0,2,admin,high,US EPA Private Drinking Water Wells program; USGS domestic supply wells,https://www.epa.gov/privatewells,admin,high,US EPA Private Drinking Water Wells program; USGS domestic supply wells,https://www.epa.gov/privatewells,,0,0
+URY,Uruguay,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+UZB,Uzbekistan,researched,5,25,20,60,,,,,survey,low,"ADB Western Uzbekistan Water Supply System Development project surveys (RRP UZB 50259, PSA); Uzbekistan MICS 2021-22 (tubewell category exists, no pump split)",https://www.adb.org/sites/default/files/linked-documents/50259-002-sd-02.pdf,,181539,1450160
+VUT,Vanuatu,regional_default:se-asia,2,20,15,65,,,,,,,,,,173,4138
+VEN,"Venezuela, Bolivarian Republic of",regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+VNM,Viet Nam,researched,1,5,3,15,analogue,med,"GSO 2019 Population and Housing Census (electrification, water); MoH Institute of Occupational Health and Environment (>17.2M gieng khoan users) as cited in Vietnamese press",https://www.nso.gov.vn/en/data-and-statistics/2020/11/completed-results-of-the-2019-viet-nam-population-and-housing-census/,analogue,low,"GSO 2019 Census (rural electrification ~99%); UNICEF Viet Nam handpump-program history; MICS 2020-21 SDGCW (tubewell category, no pump split)",https://washdata.org/report/viet-nam-2020-21-sdgcw-snapshot,,2974504,16767236
+WLF,Wallis and Futuna,regional_default:se-asia,2,20,15,65,,,,,,,,,,0,0
+ESH,Western Sahara,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,0,0
+YEM,Yemen,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,33165,410896
+ZMB,Zambia,researched,25,60,85,97,expert,low,Lusaka peri-urban supply literature (water trusts/kiosks; private boreholes); DHS 2018 category structure,https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000127,admin,med,Zambia National Rural Water Supply and Sanitation Programme 2019-2030 (MWDSEP),https://www.mwds.gov.zm/wp-content/uploads/2023/02/MWDSEP_NRWSSP_Programme_Final-2019-2030.pdf,,829365,3652347
+ZWE,Zimbabwe,researched,40,75,88,98,survey,med,Harare water-crisis reporting and BGS/NERC Harare groundwater study; UNICEF urban solarized-scheme reports,https://www.newsday.co.zw/thestandard/news/article/200018419/inside-harares-worsening-water-crisis,inventory,med,RWSN Bush Pump technology profile; national handpump stock estimates,https://www.rural-water-supply.net/en/implementation/public-domain-handpumps/bush-pump,,429072,3988815
+AUT,Austria,researched,0,3,0,3,analogue,med,"Austrian Hausbrunnen (household well) literature; ~10% of population on private wells/springs, prior-phase high-income finding",,analogue,med,"Austrian Hausbrunnen (household well) literature; ~10% of population on private wells/springs, prior-phase high-income finding",,,373479,259536
+HRV,Croatia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,165715,120001
+SVN,Slovenia,regional_default:europe-cis-row,0,5,2,15,,,,,,,,,,62861,49390

@@ -1,224 +1,262 @@
-import multiprocessing
-import numpy as np
-from pathlib import Path
-import sys
-from tqdm import tqdm
-import time
+"""GCP Monte Carlo driver with checkpoint/resume for Spot VMs.
+
+Wraps the same simulation path as ``run_monte_carlo.py`` but:
+- uses ``multiprocessing.Pool`` with ``maxtasksperchild=1`` so worker memory
+  is released between draws;
+- writes each draw to Parquet immediately (parent never holds zone frames);
+- saves ``checkpoint.json`` for resume after preemption.
+
+For a 30 arc-second production run:
+
+    python scripts/run_monte_carlo_gcp.py \\
+        --input data/GIS/extracted/master_30as.parquet \\
+        --workers 1 \\
+        --seed 20260808
+"""
+
+import argparse
 import json
-import signal
+import multiprocessing
 import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
 
-# Resolve project root and update sys.path
-project_root = Path().resolve().parent
-sys.path.append(str(project_root))
-import src.gis_monte_carlo as mc  # noqa
+import numpy as np
+from tqdm import tqdm
 
-# Results path
-RESULTS_PATH = project_root / "water-access/results"
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+
+import src.gis_global_module as gis  # noqa: E402
+import src.gis_monte_carlo as mc  # noqa: E402
+from src.monte_carlo_parameters import sample_parameters  # noqa: E402
+from scripts.run_monte_carlo import (  # noqa: E402
+    CHUNK_ROWS_30AS,
+    MAX_WORKERS_30AS,
+    ZONE_RESULT_COLUMNS,
+    _init_worker,
+    format_parameter_draws,
+)
+
+RESULTS_PATH = project_root / "results"
 PARQUET_PATH = RESULTS_PATH / "parquet_files"
 CHECKPOINT_FILE = PARQUET_PATH / "checkpoint.json"
 
-# -------------------------------------------------------------------------------
-# DEFINE MONTE CARLO SIMULATION PARAMETERS
-# -------------------------------------------------------------------------------
-
-# Define the number of simulations to run
-# Expect ~15-20 minutes for one simulation,
-# but multiprocessing will speed up large batches signimficantly
-NUM_ITERATIONS = 1000
-
-# Define maximum simultaneous processes to run for multiprocessing
-# Each worker peaks at roughly 3 GB, so this is limited by RAM as well as
-# vCPUs: 24 for n2-standard-32 (32 vCPUs / 128 GB), 4 for n2-standard-8
-# (8 vCPUs / 32 GB). Reduce if the VM runs out of memory.
-MAX_WORKERS = 24
-
-# Give up on a single iteration if no result arrives within this many seconds
-# (protects the run from hanging if a worker process is killed, e.g. by the
-# kernel OOM killer). A normal iteration takes ~15-30 minutes.
+# Give up on a single iteration if no result arrives within this many seconds.
 ITERATION_TIMEOUT = 2 * 60 * 60
 
-# -------------------------------------------------------------------------------
-
-
-# -------------------------------------------------------------------------------
-# DEFINE WALKING AND CYCLING PARAMETERS FOR MONTE CARLO SIMULATIONS
-# -------------------------------------------------------------------------------
-
-# CRR adjustments.
-# 1 means one road type better, -1 means one road type worse
-CRR_LOWER_ESTIMATE = -1
-CRR_UPPER_ESTIMATE = 1
-
-# Time gathering water in hours
-TIME_GATHERING_LOWER_ESTIMATE = 2
-TIME_GATHERING_UPPER_ESTIMATE = 4
-
-# Practical load limits for cycling in kg
-PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE = 30
-PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE = 45
-
-# Practical load limits for walking with buckets in kg
-PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE = 15
-PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE = 25
-
-# Average METS available for walking with buckets to and from water source
-METS_LOWER_ESTIMATE = 3
-METS_UPPER_ESTIMATE = 5
-
-# Average watts available for cycling to and from water source
-WATTS_LOWER_ESTIMATE = 20
-WATTS_UPPER_ESTIMATE = 60
-
-# Polarity options (randomly chosen from list each simulation run)
-# The first word defines the trip to the water source
-# The second word defines the trip from the water source
-# Options to include: "uphill_downhill", "downhill_uphill", "uphill_flat",
-# "flat_uphill", "downhill_flat", "flat_downhill", "flat_flat"
-
-POLARITY_OPTIONS = [
-    "uphill_downhill",
-    "uphill_flat",
-    "flat_uphill",
-    "downhill_uphill",
-]
-
-# Adjustments for euclidean distance to account for paths taken to water
-# not being straight lines
-URBAN_ADJUSTMENT_LOWER_ESTIMATE = 1.2
-URBAN_ADJUSTMENT_UPPER_ESTIMATE = 1.5
-
-# Set the parameters for the GPD distribution for rural adjustments.
-# Shape, scale, and loc
-# These values were obtained from the scripts/create_pareto_distribution.py
-RURAL_PDR_PARETO_SHAPE = 0.20007812499999994
-RURAL_PDR_PARETO_SCALE = 0.19953125000000005
-RURAL_PDR_PARETO_LOC = 1.0
-
-# -------------------------------------------------------------------------------
-
-# Global flag for graceful shutdown
 shutdown_requested = False
 
 
 def handle_preemption(signum, frame):
-    """Handle Spot VM preemption signal (30 second warning)"""
+    """Handle Spot VM preemption signal (30 second warning)."""
     global shutdown_requested
     print("\n⚠️  Preemption signal received! Saving checkpoint...")
     shutdown_requested = True
 
 
-def save_checkpoint(completed_iterations, parameters):
-    """Save checkpoint with completed iterations and parameters"""
-    checkpoint = {
-        "completed_iterations": completed_iterations,
-        "total_iterations": NUM_ITERATIONS,
-        "parameters": parameters,
-        "timestamp": time.time(),
-    }
-    with open(CHECKPOINT_FILE, "w") as f:
-        json.dump(checkpoint, f, indent=2)
-    print(f"✅ Checkpoint saved: {len(completed_iterations)} iterations completed")
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=1000,
+        help="number of Monte Carlo draws (default 1000)",
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=None,
+        help="zone frame (CSV or Parquet; default the 30 arc-second master grid)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help=f"simultaneous worker processes (default {MAX_WORKERS_30AS})",
+    )
+    parser.add_argument(
+        "--chunk-rows",
+        type=int,
+        default=None,
+        help=f"chunk budget (default {CHUNK_ROWS_30AS:,}; 0 disables)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="fix the parameter draws (default: unseeded)",
+    )
+    parser.add_argument(
+        "--save-zone-parquet",
+        dest="save_zone_parquet",
+        action="store_true",
+        default=None,
+        help="force per-draw zone Parquet on",
+    )
+    parser.add_argument(
+        "--no-save-zone-parquet",
+        dest="save_zone_parquet",
+        action="store_false",
+        help="force zone Parquet off (default)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RESULTS_PATH,
+        help="directory for results/ and parquet_files/",
+    )
+    return parser.parse_args(argv)
 
 
-def load_checkpoint():
-    """Load checkpoint if it exists"""
-    if CHECKPOINT_FILE.exists():
-        with open(CHECKPOINT_FILE, "r") as f:
-            checkpoint = json.load(f)
-        print(
-            f"📂 Resuming from checkpoint: {len(checkpoint['completed_iterations'])} iterations already completed"
-        )
-        return checkpoint
+def _find_gsutil():
+    found = shutil.which("gsutil")
+    if found:
+        return found
+    for candidate in (
+        "/snap/bin/gsutil",
+        "/usr/lib/google-cloud-sdk/bin/gsutil",
+        "/root/google-cloud-sdk/bin/gsutil",
+        "/usr/bin/gsutil",
+    ):
+        if Path(candidate).is_file() and os.access(candidate, os.X_OK):
+            return candidate
     return None
 
 
-def get_completed_iterations():
-    """Check which iterations have been completed based on saved files"""
+def sync_results_to_gcs():
+    """Push ``results/`` to GCS when ``GCS_RESULTS_URI`` is set (Spot VMs).
+
+    Cron alone is unreliable: default cron PATH often omits ``gsutil``
+    (commonly under ``/snap/bin``), so syncs failed silently with ``-q``.
+    Calling this after each completed draw is the durable path; cron remains
+    a backup.
+    """
+    uri = os.environ.get("GCS_RESULTS_URI", "").strip().rstrip("/")
+    if not uri:
+        return
+    gsutil = _find_gsutil()
+    if gsutil is None:
+        print("⚠️  gsutil not found; skipping GCS sync")
+        return
+    result = subprocess.run(
+        [gsutil, "-m", "rsync", "-r", f"{RESULTS_PATH}/", f"{uri}/"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()[-500:]
+        print(f"⚠️  GCS sync failed: {err}")
+    else:
+        print(f"☁️  Synced results/ → {uri}/")
+
+
+def save_checkpoint(completed_iterations, parameters, run_config):
+    checkpoint = {
+        "completed_iterations": completed_iterations,
+        "total_iterations": run_config["iterations"],
+        "parameters": parameters,
+        "run_config": run_config,
+        "timestamp": time.time(),
+    }
+    PARQUET_PATH.mkdir(parents=True, exist_ok=True)
+    with open(CHECKPOINT_FILE, "w") as f:
+        json.dump(checkpoint, f, indent=2)
+    print(f"✅ Checkpoint saved: {len(completed_iterations)} iterations completed")
+    sync_results_to_gcs()
+
+
+def load_checkpoint():
+    if CHECKPOINT_FILE.exists():
+        with open(CHECKPOINT_FILE, "r") as f:
+            return json.load(f)
+    return None
+
+
+def get_completed_iterations(num_iterations, require_zone):
     completed = []
-    for i in range(NUM_ITERATIONS):
-        zone_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
+    for i in range(num_iterations):
         district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
         countries_file = PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
-
-        # Only consider iteration complete if all three files exist
-        if zone_file.exists() and district_file.exists() and countries_file.exists():
-            completed.append(i)
-
+        zone_file = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
+        if not district_file.exists() or not countries_file.exists():
+            continue
+        if require_zone and not zone_file.exists():
+            continue
+        completed.append(i)
     return completed
 
 
-def process_saved_results():
-    """Process all saved parquet files"""
+def process_saved_results(num_iterations, require_zone):
     print("\n📊 Processing saved results...")
+    import pandas as pd
 
-    # Load all saved district results
     districts_simulation_results = []
     countries_simulation_results = []
-
-    completed = get_completed_iterations()
+    completed = get_completed_iterations(
+        num_iterations=num_iterations, require_zone=require_zone
+    )
 
     for i in completed:
         district_file = PARQUET_PATH / f"district_simulation_result_{i}.parquet"
         countries_file = PARQUET_PATH / f"countries_simulation_result_{i}.parquet"
-
         if district_file.exists():
-            import pandas as pd
-
             districts_simulation_results.append(pd.read_parquet(district_file))
-
         if countries_file.exists():
-            import pandas as pd
-
             countries_simulation_results.append(pd.read_parquet(countries_file))
 
     if districts_simulation_results and countries_simulation_results:
-        # plot=False: plotting calls fig.show(), which needs a browser and
-        # crashes on the headless VM before the CSVs get written
-        mc.process_mc_results(countries_simulation_results, plot=False)
-        mc.process_districts_results(districts_simulation_results)
+        mc.process_mc_results(
+            countries_simulation_results,
+            plot=False,
+            output_dir=str(RESULTS_PATH),
+        )
+        mc.process_districts_results(
+            districts_simulation_results,
+            output_dir=str(RESULTS_PATH),
+        )
         print(f"✅ Processed {len(completed)} simulation results")
     else:
         print("⚠️  No results to process yet")
 
 
-def run_and_save_simulation(
-    i,
-    crr_adjustment,
-    time_gathering_water,
-    practical_limit_bicycle,
-    practical_limit_buckets,
-    met,
-    watts,
-    hill_polarity,
-    urban_adjustment,
-    rural_adjustment,
-):
-    """Run one simulation in a worker process and write its results to disk.
+def run_and_save_simulation(job):
+    """Worker entry point: one draw, write Parquet, return draw index."""
+    i = job["index"]
+    _init_worker(job["zone_file"])
 
-    The full zone result is ~2.2M rows (roughly 1 GB in memory). Writing it
-    here and returning only the iteration index keeps that DataFrame out of
-    the parent process. Previously each result was pickled back to the parent
-    and retained by its future object, growing the parent by ~1 GB per
-    completed iteration until the OOM killer terminated it mid-run.
-    """
+    zone_output_path = None
+    if job["save_zone_parquet"] and (
+        job["chunk_rows"] or job["chunk_plan"] is not None
+    ):
+        zone_output_path = PARQUET_PATH / f"zone_simulation_result_{i}.parquet"
+
     countries_result, district_result, zone_result = mc.run_simulation(
-        crr_adjustment,
-        time_gathering_water,
-        practical_limit_bicycle,
-        practical_limit_buckets,
-        met,
-        watts,
-        hill_polarity,
-        urban_adjustment,
-        rural_adjustment,
+        crr_adjustment=job["crr_adjustment"],
+        time_gathering_water=job["time_gathering_water"],
+        practical_limit_bicycle=job["practical_limit_bicycle"],
+        practical_limit_buckets=job["practical_limit_buckets"],
+        met=job["met"],
+        watts=job["watts"],
+        hill_polarity=job["hill_polarity"],
+        urban_adjustment=job["urban_adjustment"],
+        rural_adjustment=job["rural_adjustment"],
+        urban_borehole_lose_fraction=job["urban_borehole_lose_fraction"],
+        rural_borehole_lose_fraction=job["rural_borehole_lose_fraction"],
+        unallocated_vulnerable_fraction=job["unallocated_vulnerable_fraction"],
         use_sample_data=False,
+        zone_columns=ZONE_RESULT_COLUMNS if job["save_zone_parquet"] else [],
+        chunk_rows=job["chunk_rows"] or None,
+        chunk_plan=job["chunk_plan"],
+        zone_output_path=zone_output_path,
     )
-
-    # Keep only the columns needed for the zone results
-    filtered_zone_result = zone_result[
-        ["fid", "zone_pop_with_water", "zone_pop_without_water"]
-    ]
 
     district_result.to_parquet(
         PARQUET_PATH / f"district_simulation_result_{i}.parquet", index=False
@@ -226,203 +264,200 @@ def run_and_save_simulation(
     countries_result.to_parquet(
         PARQUET_PATH / f"countries_simulation_result_{i}.parquet", index=False
     )
-    filtered_zone_result.to_parquet(
-        PARQUET_PATH / f"zone_simulation_result_{i}.parquet", index=False
-    )
+    if job["save_zone_parquet"]:
+        if zone_output_path is not None:
+            if not zone_output_path.exists():
+                raise RuntimeError(
+                    f"chunked zone run finished but {zone_output_path} was not written"
+                )
+        elif not zone_result.empty:
+            zone_result[ZONE_RESULT_COLUMNS].to_parquet(
+                PARQUET_PATH / f"zone_simulation_result_{i}.parquet", index=False
+            )
 
     return i
 
 
-if __name__ == "__main__":
-    # Set up signal handler for Spot VM preemption
-    signal.signal(signal.SIGTERM, handle_preemption)
+def _require_borehole_params(params):
+    for key in (
+        "urban_borehole_lose_fractions",
+        "rural_borehole_lose_fractions",
+        "unallocated_vulnerable_fractions",
+    ):
+        if key not in params:
+            raise RuntimeError(
+                f"checkpoint.json predates {key}; delete the checkpoint and restart"
+            )
 
-    # Create parquet directory if it doesn't exist
+
+def main(argv=None):
+    global RESULTS_PATH, PARQUET_PATH, CHECKPOINT_FILE
+
+    args = parse_args(argv)
+    workers = args.workers if args.workers is not None else MAX_WORKERS_30AS
+    save_zone_parquet = (
+        args.save_zone_parquet if args.save_zone_parquet is not None else False
+    )
+
+    if args.input is not None:
+        gis.URB_DATA_FILE = args.input
+
+    RESULTS_PATH = args.output_dir
+    PARQUET_PATH = RESULTS_PATH / "parquet_files"
+    CHECKPOINT_FILE = PARQUET_PATH / "checkpoint.json"
     PARQUET_PATH.mkdir(parents=True, exist_ok=True)
 
-    # Check for existing completed iterations
-    completed_iterations = get_completed_iterations()
+    chunk_rows = args.chunk_rows if args.chunk_rows is not None else CHUNK_ROWS_30AS
+    chunk_plan = None
+    if chunk_rows:
+        import src.chunked_analysis as chunked
 
-    # Load checkpoint if it exists
+        print(f"Planning country chunks (budget {chunk_rows:,} cells) ...", flush=True)
+        chunk_plan = chunked.plan_chunks(
+            gis.URB_DATA_FILE,
+            max_rows_per_chunk=chunk_rows,
+        )
+        print(f"  {chunk_plan.describe()}", flush=True)
+
+    run_config = {
+        "iterations": args.iterations,
+        "zone_file": str(gis.URB_DATA_FILE),
+        "workers": workers,
+        "chunk_rows": chunk_rows,
+        "seed": args.seed,
+        "save_zone_parquet": save_zone_parquet,
+    }
+
+    print(f"Zone frame: {gis.URB_DATA_FILE}")
+    print(f"Workers: {workers}")
+
+    completed_iterations = get_completed_iterations(
+        args.iterations, require_zone=save_zone_parquet
+    )
     checkpoint = load_checkpoint()
 
-    if completed_iterations:
-        print(f"🔍 Found {len(completed_iterations)} completed iterations")
+    if completed_iterations and len(completed_iterations) >= args.iterations:
+        print("✅ All iterations complete! Processing results...")
+        process_saved_results(args.iterations, save_zone_parquet)
+        return 0
 
-        # If we've completed all iterations, just process and exit
-        if len(completed_iterations) >= NUM_ITERATIONS:
-            print("✅ All iterations complete! Processing results...")
-            process_saved_results()
-            sys.exit(0)
-
-    # Generate or restore parameters
     if checkpoint and "parameters" in checkpoint:
-        # Restore parameters from checkpoint
         params = checkpoint["parameters"]
-        crr_adjustments = np.array(params["crr_adjustments"])
-        time_gatherings = np.array(params["time_gatherings"])
-        practical_limits_bicycle = np.array(params["practical_limits_bicycle"])
-        practical_limits_buckets = np.array(params["practical_limits_buckets"])
-        mets = np.array(params["mets"])
-        watts_values = np.array(params["watts_values"])
-        hill_polarities = np.array(params["hill_polarities"])
-        urban_adjustments = np.array(params["urban_adjustments"])
-        rural_adjustments = np.array(params["rural_adjustments"])
+        _require_borehole_params(params)
+        parameters = params
         print("📂 Parameters restored from checkpoint")
     else:
-        # Generate new parameters
-        crr_adjustments = np.random.randint(
-            CRR_LOWER_ESTIMATE, CRR_UPPER_ESTIMATE + 1, size=NUM_ITERATIONS
-        )
-        time_gatherings = mc.sample_lognormal(
-            TIME_GATHERING_LOWER_ESTIMATE,
-            TIME_GATHERING_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        practical_limits_bicycle = mc.sample_normal(
-            PRACTICAL_LIMITS_BICYCLE_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BICYCLE_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        practical_limits_buckets = mc.sample_normal(
-            PRACTICAL_LIMITS_BUCKET_LOWER_ESTIMATE,
-            PRACTICAL_LIMITS_BUCKET_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        mets = mc.sample_normal(
-            METS_LOWER_ESTIMATE, METS_UPPER_ESTIMATE, NUM_ITERATIONS
-        )
-        watts_values = mc.sample_normal(
-            WATTS_LOWER_ESTIMATE, WATTS_UPPER_ESTIMATE, NUM_ITERATIONS
-        )
-        hill_polarities = np.random.choice(POLARITY_OPTIONS, NUM_ITERATIONS)
-        urban_adjustments = mc.sample_normal(
-            URBAN_ADJUSTMENT_LOWER_ESTIMATE,
-            URBAN_ADJUSTMENT_UPPER_ESTIMATE,
-            NUM_ITERATIONS,
-        )
-        rural_adjustments = mc.sample_gpd(
-            RURAL_PDR_PARETO_SHAPE,
-            RURAL_PDR_PARETO_SCALE,
-            RURAL_PDR_PARETO_LOC,
-            NUM_ITERATIONS,
-        )
+        if args.seed is not None:
+            np.random.seed(args.seed)
+            print(f"Parameter seed: {args.seed}")
+        else:
+            print("Parameter seed: none (unseeded draws)")
+        drawn = sample_parameters(args.iterations)
+        for line in format_parameter_draws(drawn, args.iterations):
+            print(line)
+        parameters = {key: value.tolist() for key, value in drawn.items()}
+        save_checkpoint(completed_iterations, parameters, run_config)
 
-        # Save parameters for potential resume
-        parameters = {
-            "crr_adjustments": crr_adjustments.tolist(),
-            "time_gatherings": time_gatherings.tolist(),
-            "practical_limits_bicycle": practical_limits_bicycle.tolist(),
-            "practical_limits_buckets": practical_limits_buckets.tolist(),
-            "mets": mets.tolist(),
-            "watts_values": watts_values.tolist(),
-            "hill_polarities": hill_polarities.tolist(),
-            "urban_adjustments": urban_adjustments.tolist(),
-            "rural_adjustments": rural_adjustments.tolist(),
-        }
-        save_checkpoint(completed_iterations, parameters)
+    def array(name):
+        return np.array(parameters[name])
 
-    # Determine which iterations to run
+    crr_adjustments = array("crr_adjustments")
+    time_gatherings = array("time_gatherings")
+    practical_limits_bicycle = array("practical_limits_bicycle")
+    practical_limits_buckets = array("practical_limits_buckets")
+    mets = array("mets")
+    watts_values = array("watts_values")
+    hill_polarities = array("hill_polarities")
+    urban_adjustments = array("urban_adjustments")
+    rural_adjustments = array("rural_adjustments")
+    urban_borehole_lose_fractions = array("urban_borehole_lose_fractions")
+    rural_borehole_lose_fractions = array("rural_borehole_lose_fractions")
+    unallocated_vulnerable_fractions = array("unallocated_vulnerable_fractions")
+
     iterations_to_run = [
-        i for i in range(NUM_ITERATIONS) if i not in completed_iterations
+        i for i in range(args.iterations) if i not in completed_iterations
     ]
-
     if not iterations_to_run:
-        print("✅ All iterations already complete! Processing results...")
-        process_saved_results()
-        sys.exit(0)
+        process_saved_results(args.iterations, save_zone_parquet)
+        return 0
 
-    # Record the start time
-    start_time = time.time()
+    signal.signal(signal.SIGTERM, handle_preemption)
+
+    started = time.time()
     print(f"\n🚀 Starting Monte Carlo simulations...")
     print(
-        f"📊 Running {len(iterations_to_run)} remaining iterations (out of {NUM_ITERATIONS} total)"
+        f"📊 Running {len(iterations_to_run)} remaining iterations "
+        f"(out of {args.iterations} total)"
     )
-    print(f"⚡ Running {MAX_WORKERS} simulations concurrently...")
-    print(f"🕐 Start time: {time.strftime('%H:%M:%S', time.localtime())}")
-    print("\n")
+    print(f"🕐 Start time: {time.strftime('%H:%M:%S', time.localtime())}\n")
 
-    # Workers write their own results to disk and return only the iteration
-    # index, so no large DataFrames are transferred to (or retained by) the
-    # parent process. maxtasksperchild=1 replaces each worker after a single
-    # iteration, so memory that pandas/numpy don't return to the OS can't
-    # accumulate across iterations inside long-lived workers.
-    pool = multiprocessing.Pool(processes=MAX_WORKERS, maxtasksperchild=1)
+    jobs = [
+        {
+            "index": idx,
+            "zone_file": str(gis.URB_DATA_FILE),
+            "crr_adjustment": crr_adjustments[idx],
+            "time_gathering_water": time_gatherings[idx],
+            "practical_limit_bicycle": practical_limits_bicycle[idx],
+            "practical_limit_buckets": practical_limits_buckets[idx],
+            "met": mets[idx],
+            "watts": watts_values[idx],
+            "hill_polarity": hill_polarities[idx],
+            "urban_adjustment": urban_adjustments[idx],
+            "rural_adjustment": rural_adjustments[idx],
+            "urban_borehole_lose_fraction": urban_borehole_lose_fractions[idx],
+            "rural_borehole_lose_fraction": rural_borehole_lose_fractions[idx],
+            "unallocated_vulnerable_fraction": unallocated_vulnerable_fractions[idx],
+            "save_zone_parquet": save_zone_parquet,
+            "chunk_rows": chunk_rows or None,
+            "chunk_plan": chunk_plan,
+        }
+        for idx in iterations_to_run
+    ]
 
-    pending = []
-    for idx in iterations_to_run:
-        async_result = pool.apply_async(
-            run_and_save_simulation,
-            (
-                idx,
-                crr_adjustments[idx],
-                time_gatherings[idx],
-                practical_limits_bicycle[idx],
-                practical_limits_buckets[idx],
-                mets[idx],
-                watts_values[idx],
-                hill_polarities[idx],
-                urban_adjustments[idx],
-                rural_adjustments[idx],
-            ),
-        )
-        pending.append((idx, async_result))
+    pool = multiprocessing.Pool(processes=workers, maxtasksperchild=1)
+    pending = [
+        (job["index"], pool.apply_async(run_and_save_simulation, (job,)))
+        for job in jobs
+    ]
     pool.close()
 
-    # Initialize tqdm progress bar
-    futures_progress = tqdm(
-        total=len(iterations_to_run),
-        initial=0,
-        desc="Simulating",
-    )
-
+    progress = tqdm(total=len(iterations_to_run), desc="Simulating")
     for idx, async_result in pending:
         if shutdown_requested:
-            print("\n⚠️  Shutting down gracefully...")
             pool.terminate()
             break
-
         try:
             completed_index = async_result.get(timeout=ITERATION_TIMEOUT)
-
-            # Update completed iterations
             completed_iterations.append(completed_index)
-
-            # Save checkpoint periodically (every 10 iterations)
             if len(completed_iterations) % 10 == 0:
-                save_checkpoint(completed_iterations, parameters)
-
-            futures_progress.update()
-
+                save_checkpoint(completed_iterations, parameters, run_config)
+            progress.update()
         except multiprocessing.TimeoutError:
             print(
                 f"\n❌ Iteration {idx}: no result within {ITERATION_TIMEOUT}s "
-                "(worker process may have been killed); continuing"
+                "(worker may have been killed); continuing"
             )
-        except Exception as e:
-            print(f"\n❌ Error in iteration {idx}: {e}")
+        except Exception as exc:
+            print(f"\n❌ Error in iteration {idx}: {exc}")
 
-    futures_progress.close()
+    progress.close()
     pool.terminate()
     pool.join()
 
-    # Save final checkpoint
     if not shutdown_requested:
-        save_checkpoint(completed_iterations, parameters)
+        save_checkpoint(completed_iterations, parameters, run_config)
+        process_saved_results(args.iterations, save_zone_parquet)
 
-    # Process all results (including previously saved ones)
-    process_saved_results()
-
-    # Record the end time
-    end_time = time.time()
-
-    # Calculate and print the time taken
-    time_taken = end_time - start_time
+    elapsed = time.time() - started
     print(
-        f"\n⏱️  Session time: {time_taken / 60:.2f} minutes ({time_taken / 3600:.2f} hours)"
+        f"\n⏱️  Session time: {elapsed / 60:.2f} minutes ({elapsed / 3600:.2f} hours)"
     )
     print(f"✅ Completed {len(completed_iterations)} total iterations")
-
     if shutdown_requested:
-        print("\n⚠️  Script interrupted but progress saved. Run again to continue.")
-        sys.exit(1)
+        print("\n⚠️  Interrupted but progress saved. Run again to continue.")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

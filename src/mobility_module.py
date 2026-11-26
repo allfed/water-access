@@ -236,6 +236,12 @@ class mobility_models:
         V_load = fsolve(model, V_guess, args=data_loaded, full_output=True)
         loaded_velocity = V_load[0][0] if V_load[2] == 1 else np.nan
 
+        # Limit velocity to a maximum of 7 km/h (~1.94 m/s)
+        if V_un[2] == 1:
+            unloaded_velocity = min(unloaded_velocity, 7 / 3.6)
+        if V_load[2] == 1:
+            loaded_velocity = min(loaded_velocity, 7 / 3.6)
+
         return loaded_velocity, unloaded_velocity, max_load_HPV
 
     def single_bike_run(mv, mo, hpv, slope, load_attempted):
@@ -607,7 +613,7 @@ class mobility_models:
             + (-0.05372 * G)
             + (0.652298 * v_solve * G)
             + (0.023761 * v_solve * G**2)
-            - (0.000320 * v_solve * G**3)  # this was previously 0.00320 - bug?
+            - (0.000320 * v_solve * G**3)
             - (met.budget_VO2 / m_load)
         )
         # add in rolling resistance stuff...
@@ -903,9 +909,15 @@ class model_results:
 
         self.model_name = mo.model_name
 
-        # Harmonic mean of leg velocities (round-trip distance is limited by both legs)
-        self.v_avg_matrix3d = 2 / (
-            1 / self.v_load_matrix3d + 1 / self.v_unload_matrix3d
+        # Harmonic mean of leg velocities (same distance each way). Use 2ab/(a+b)
+        # rather than 2/(1/a+1/b) so a zero/unreachable leg yields 0 without
+        # divide-by-zero warnings.
+        denom = self.v_load_matrix3d + self.v_unload_matrix3d
+        self.v_avg_matrix3d = np.divide(
+            2.0 * self.v_load_matrix3d * self.v_unload_matrix3d,
+            denom,
+            out=np.zeros_like(denom, dtype=float),
+            where=denom != 0,
         )
 
         self.velocitykgs = self.v_avg_matrix3d * self.load_matrix3d
@@ -1437,7 +1449,9 @@ class plotting_hpv:
             new_df = mr.create_dataframe_single_scenario(
                 hpv, mv, mo.load_scene, mo.slope_scene
             )
-            df = df.append(new_df)
+            # DataFrame.append was removed in pandas 2.0; pd.concat is the
+            # documented drop-in replacement (same rows, same index handling).
+            df = pd.concat([df, new_df])
 
         # Truncate the Viridis colormap to remove the last 20% of colors
         truncated_viridis = px.colors.sequential.Viridis[

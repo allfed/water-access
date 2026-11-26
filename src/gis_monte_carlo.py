@@ -3,7 +3,6 @@ from scipy.stats import norm, lognorm, genpareto
 import pandas as pd
 from pathlib import Path
 import sys
-import pickle
 import os
 
 # Resolve project root and update sys.path
@@ -103,8 +102,15 @@ def run_simulation(
     hill_polarity,
     urban_adjustment,
     rural_adjustment,
+    urban_borehole_lose_fraction=0.5,
+    rural_borehole_lose_fraction=0.25,
+    unallocated_vulnerable_fraction=0.0,
     calculate_distance=True,
     use_sample_data=False,
+    zone_columns=None,
+    chunk_rows=None,
+    chunk_plan=None,
+    zone_output_path=None,
 ):
     """Run a simulation to analyze global water access from walking or cycling
     based on sensitivity parameters.
@@ -119,11 +125,30 @@ def run_simulation(
     - practical_limit_buckets (int or float): The practical limit of water
                                               transportation using buckets.
     - met (int or float): The metabolic equivalent of task (MET) value.
+    - urban_borehole_lose_fraction (float): Share of urban borehole users who
+      lose access when motorised pumping fails.
+    - rural_borehole_lose_fraction (float): Share of rural borehole users who
+      lose access when motorised pumping fails.
+    - unallocated_vulnerable_fraction (float): Share of the population whose
+      source type is unallocated that is treated as grid-vulnerable (float in
+      [0, 1]).
     - calculate_distance (bool, optional): Whether to calculate the distance
                                            during the simulation.
     - use_sample_data (bool, optional): Whether to use sample data. Defaults
                                         to False, must be False to run a true
                                         simulation with the given parameters.
+    - zone_columns (list, optional): restrict the returned per-cell zone frame
+      to these columns. Defaults to None (every column). At 30 arc-seconds the
+      full frame is tens of GB and callers usually keep only a few columns.
+    - chunk_rows (int, optional): run the analysis one group of whole countries
+      at a time, at most this many modelled cells per group. Defaults to None
+      (whole grid in memory, small inputs only). The returned per-cell frame
+      is empty in chunked mode.
+    - chunk_plan (optional): a ``src.chunked_analysis.ChunkPlan`` to reuse. Build
+                             it once in the parent process rather than once per
+                             draw -- it depends only on the input file.
+    - zone_output_path (optional): in chunked mode, stream ``zone_columns`` to
+                             this Parquet file per chunk.
 
     Returns:
     - result: The result of the global analysis.
@@ -131,8 +156,6 @@ def run_simulation(
     Raises:
     - AssertionError: If any of the input parameters are of incorrect type.
     """
-    # print type of crr_adjustment
-    print(type(crr_adjustment))
     assert isinstance(
         crr_adjustment, (int, np.integer)
     ), "CRR adjustment must be an integer."
@@ -154,6 +177,24 @@ def run_simulation(
     assert isinstance(
         rural_adjustment, (int, float)
     ), "Rural adjustment must be a number."
+    assert isinstance(
+        urban_borehole_lose_fraction, (int, float)
+    ), "Urban borehole lose fraction must be a number."
+    assert (
+        0 <= urban_borehole_lose_fraction <= 1
+    ), "Urban borehole lose fraction must be between 0 and 1."
+    assert isinstance(
+        rural_borehole_lose_fraction, (int, float)
+    ), "Rural borehole lose fraction must be a number."
+    assert (
+        0 <= rural_borehole_lose_fraction <= 1
+    ), "Rural borehole lose fraction must be between 0 and 1."
+    assert isinstance(unallocated_vulnerable_fraction, (int, float)) and not isinstance(
+        unallocated_vulnerable_fraction, bool
+    ), "Unallocated vulnerable fraction must be a number."
+    assert (
+        0 <= unallocated_vulnerable_fraction <= 1
+    ), "Unallocated vulnerable fraction must be between 0 and 1."
 
     df_countries, df_districts, df_zones = gis.run_global_analysis(
         crr_adjustment=crr_adjustment,
@@ -165,9 +206,16 @@ def run_simulation(
         hill_polarity=hill_polarity,
         urban_adjustment=urban_adjustment,
         rural_adjustment=rural_adjustment,
+        urban_borehole_lose_fraction=urban_borehole_lose_fraction,
+        rural_borehole_lose_fraction=rural_borehole_lose_fraction,
+        unallocated_vulnerable_fraction=unallocated_vulnerable_fraction,
         calculate_distance=calculate_distance,
         plot=False,
         use_sample_data=use_sample_data,
+        zone_columns=zone_columns,
+        chunk_rows=chunk_rows,
+        chunk_plan=chunk_plan,
+        zone_output_path=zone_output_path,
     )
     return df_countries, df_districts, df_zones
 
@@ -203,17 +251,35 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
         .reset_index()[["ISOCODE", "Entity", "region", "subregion"]]
     )  # noqa
 
+    # numeric_only=True: pandas >= 2.0 raises on the non-numeric columns. They
+    # are merged back in below from `non_numeric_cols`.
     # Calculate the mean results for each country for all cols
-    all_means = pd.concat(ordered_results).groupby("ISOCODE").mean().reset_index()
+    all_means = (
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .mean(numeric_only=True)
+        .reset_index()
+    )
     # Calculate the median results for each country for all cols
-    all_medians = pd.concat(ordered_results).groupby("ISOCODE").median().reset_index()
+    all_medians = (
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .median(numeric_only=True)
+        .reset_index()
+    )
     # Calculate the 95th percentile results for each country for all cols
     all_percentile_95s = (
-        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.95).reset_index()
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .quantile(0.95, numeric_only=True)
+        .reset_index()
     )
     # Calculate the 5th percentile results for each country for all cols
     all_percentile_5s = (
-        pd.concat(ordered_results).groupby("ISOCODE").quantile(0.05).reset_index()
+        pd.concat(ordered_results)
+        .groupby("ISOCODE")
+        .quantile(0.05, numeric_only=True)
+        .reset_index()
     )
 
     # Merge with non-numeric
@@ -243,10 +309,6 @@ def process_mc_results(countries_simulation_results, plot=True, output_dir="resu
     all_percentile_5s.to_csv(
         os.path.join(output_dir, "country_5th_percentile_results.csv")
     )
-
-    # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "countries_simulation_results.pkl"), "wb") as f:
-        pickle.dump(countries_simulation_results, f)
 
     print(
         "Country simulation results have been processed and saved to the "
@@ -282,7 +344,9 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     # are taken from the data in sorted order, and observed=False is required
     # because observed=True yields groups in order of appearance rather than
     # sorted order.
-    unique_ids = combined["shapeID"].dropna().unique()
+    # np.asarray, not the raw .unique(): on a categorical column .unique()
+    # returns a Categorical, which has no .sort().
+    unique_ids = np.asarray(combined["shapeID"].dropna().unique())
     unique_ids.sort()
     shape_id = pd.Series(
         pd.Categorical(combined["shapeID"], categories=unique_ids),
@@ -343,10 +407,6 @@ def process_districts_results(districts_simulation_results, output_dir="results"
     all_percentile_5s.to_csv(
         os.path.join(output_dir, "districts_5th_percentile_results.csv")
     )
-
-    # Step 4: pickle the simulation results
-    with open(os.path.join(output_dir, "districts_simulation_results.pkl"), "wb") as f:
-        pickle.dump(districts_simulation_results, f)
 
     print(
         "Districts simulation results have been processed and saved to the "

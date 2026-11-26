@@ -19,32 +19,34 @@ gcloud compute ssh water-access-test --zone=us-central1-a --command='cat /test.l
 gcloud compute instances delete water-access-test --zone=us-central1-a
 ```
 
-### Option 2: Full Test with 2 Monte Carlo Iterations (~30 min, ~$0.03)
-Test the actual simulation pipeline with 2 iterations:
+### Option 2: Full Test with 2 Monte Carlo Iterations (~1 hour, ~$0.15)
+Test the actual simulation pipeline with 2 iterations on the sample grid
+(`data/GIS/GIS_data_zones_sample.csv`, a few thousand cells):
 
 ```bash
-# 1. Upload minimal test data first
-gsutil -m mkdir -p gs://water-access-data/test/
-gsutil -m cp scripts/run_monte_carlo_test.py gs://water-access-data/test/
+# 1. Upload code and data (also used by the production run)
+./gcp/deploy-spot.sh upload
 
-# 2. Create VM with simulation
+# 2. Create VM with simulation (most of the time goes on building the environment)
 gcloud compute instances create water-access-test \
     --zone=us-central1-a \
-    --machine-type=e2-small \
+    --machine-type=e2-standard-4 \
     --provisioning-model=SPOT \
-    --max-run-duration=1h \
+    --max-run-duration=2h \
     --boot-disk-size=30GB \
     --image-family=ubuntu-2204-lts \
     --image-project=ubuntu-os-cloud \
     --scopes=storage-rw \
     --metadata=startup-script='#!/bin/bash
-# Quick test setup
-apt-get update && apt-get install -y python3-pip
-pip3 install pandas numpy tqdm
-mkdir -p /home/test
-cd /home/test
-gsutil cp gs://water-access-data/test/run_monte_carlo_test.py .
-python3 run_monte_carlo_test.py | tee test_output.log
+mkdir -p /home/test && cd /home/test
+wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniforge.sh
+bash miniforge.sh -b -p /home/test/miniforge3
+source /home/test/miniforge3/etc/profile.d/conda.sh
+gsutil -m cp -r gs://water-access-james-data/code/* .
+gsutil -m cp -r gs://water-access-james-data/input/data .
+mamba env create -f environment.yml -y && conda activate water-access && pip install -e .
+python scripts/run_monte_carlo.py --input data/GIS/GIS_data_zones_sample.csv \
+    --iterations 2 --output-dir results/test 2>&1 | tee test_output.log
 '
 
 # 3. Monitor progress
@@ -68,15 +70,13 @@ TEST DEPLOYMENT - Completed at [timestamp]
 
 ### For Monte Carlo test:
 ```
-RUNNING TEST VERSION - ONLY 2 ITERATIONS
-This is for testing GCP setup, not production runs
+Zone frame: data/GIS/GIS_data_zones_sample.csv
 ...
-✅ Saved test results for iteration 0
-✅ Saved test results for iteration 1
-TEST COMPLETE!
+Simulating: 100%|██████████| 2/2
+...
 Time taken: X.XX minutes
-✅ Test simulation successful! GCP setup is working correctly.
 ```
+The summary CSVs are written to `results/test/`.
 
 ## If Something Goes Wrong
 
@@ -98,13 +98,13 @@ gcloud services enable storage-api.googleapis.com
 
 ## Cost Breakdown
 - **Option 1**: e2-micro for 2 minutes ≈ $0.008
-- **Option 2**: e2-small for 30 minutes ≈ $0.024
+- **Option 2**: e2-standard-4 Spot for about an hour ≈ $0.15
 - **Storage**: Negligible for test files
 
-**Total**: Less than $0.05 for complete testing
+**Total**: Less than $0.20 for complete testing
 
 ## Next Steps
 Once test works:
 1. Run the full production deployment: `./gcp/deploy-spot.sh deploy`
 2. Monitor with: `./gcp/monitor.sh --watch`
-3. Cost for full run: $12-20 instead of $200-400
+3. Cost for full run: $8-17 for 1000 draws on Spot VMs

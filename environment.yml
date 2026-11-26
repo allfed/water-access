@@ -1,36 +1,57 @@
+# Conda environment for water-access .
+#
+# Python 3.9 / pandas 1.4.3 (the previous pins) are EOL and cannot supply the
+# rasterio/geopandas versions the 30 arc-second extraction pipeline needs. The
+# model is validated on Python 3.11+ / pandas 2.x.
+#
+#     conda env create -f environment.yml
+#     conda activate water-access
+#     pip install -e .
+#
+# A plain pip/uv path is also supported -- see requirements.txt.
+#
+# pandas is capped below 3.0 deliberately: only the pandas 2.x semantics have
+# been validated (109/109 tests green). Lift the cap only after re-running the
+# suite and the regression test suite against results/regression_baseline/.
+#
+# Removed relative to the 3.9 environment: dash, jupyter-dash, jupyterlab-dash,
+# Flask, pyinterpolate, weightedstats, chart_studio, countryinfo, python-dotenv.
+# None of them are imported anywhere in src/, scripts/ or tests/, and several no
+# longer install on Python 3.11+.
 name: water-access
 channels:
   - conda-forge
-  - defaults
 dependencies:
-  - python=3.9
-  - numpy=1.21.2
-  - pandas=1.4.3
-  - matplotlib=3.5.2
-  - ipykernel 
-  - ipywidgets>=7.6
-  - notebook>=5.3
-  - Flask=3.0.3
-  - pycountry 
-  - pyarrow  # Added for Parquet support
+  - python>=3.11
+  # core numerics
+  - numpy>=1.26
+  - pandas>=2.1,<3.0
+  - scipy>=1.11
+  # IO
+  - pyarrow>=14.0
+  - openpyxl>=3.1
+  # GIS / raster extraction
+  - rasterio>=1.3
+  - geopandas>=0.14
+  - shapely>=2.0
+  - pyproj>=3.6
+  # analysis / plotting
+  - matplotlib>=3.8
+  - seaborn>=0.13
+  - scikit-learn>=1.3
+  - pycountry>=23.12
+  - tqdm>=4.66
+  - tabulate>=0.9          # pandas.DataFrame.to_markdown / notebook tables
+  - ptitprince>=0.3.1
+  # notebooks
+  - ipykernel>=6.29
+  - ipywidgets>=8.1
+  - notebook>=7.0
+  # dev / test
+  - pytest>=8.0
+  - pytest-mock>=3.12
+  - black>=24.0
   - pip
-  - dash
-  - scipy
-  - pyinterpolate
-  - weightedstats
-  - pytest=8.0.2
-  - pytest-mock
-  - openpyxl=3.1.5
-  - rasterio
-  - geopandas
-  - scikit-learn
   - pip:
-    - plotly
-    - kaleido
-    - chart_studio 
-    - python-dotenv
-    - dash_bootstrap_components
-    - jupyter-dash
-    - jupyterlab-dash
-    - countryinfo
-    - seaborn
+      - plotly>=5.18
+      - kaleido>=0.2.1

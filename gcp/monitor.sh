@@ -7,9 +7,10 @@ set -e
 
 # Configuration
 PROJECT_ID="water-access-james-2026"
-ZONE="us-central1-a"
+ZONE="us-east1-c"
 INSTANCE_NAME="water-access-compute-spot"
 BUCKET_NAME="water-access-james-data"
+# Overridden from checkpoint.json when present
 TOTAL_ITERATIONS=1000
 INSTANCE_STATE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.instance-zone"
 
@@ -110,7 +111,7 @@ get_instance_details() {
             echo -e "${BLUE}● Uptime:${NC} ${UPTIME_HOURS}h ${UPTIME_MINUTES}m"
             
             # Estimate cost
-            HOURLY_RATE=0.72  # Approximate for n2-highcpu-64 spot
+            HOURLY_RATE=1.20  # Approximate for n2-highmem-32 spot (Nov 2026)
             COST=$(echo "scale=2; $UPTIME_HOURS * $HOURLY_RATE" | bc)
             echo -e "${BLUE}● Estimated Cost:${NC} \$${COST} (at ~\$${HOURLY_RATE}/hour spot pricing)"
         fi
@@ -120,72 +121,87 @@ get_instance_details() {
 check_progress() {
     # Count completed iterations from GCS
     echo -e "\n${CYAN}Checking Progress...${NC}"
-    
-    # Get counts for each result type
-    ZONE_COUNT=$(gsutil ls gs://$BUCKET_NAME/results/parquet_files/zone_simulation_result_*.parquet 2>/dev/null | wc -l)
-    DISTRICT_COUNT=$(gsutil ls gs://$BUCKET_NAME/results/parquet_files/district_simulation_result_*.parquet 2>/dev/null | wc -l)
-    COUNTRIES_COUNT=$(gsutil ls gs://$BUCKET_NAME/results/parquet_files/countries_simulation_result_*.parquet 2>/dev/null | wc -l)
-    
-    # Use minimum count as the true completion count
-    COMPLETED=$ZONE_COUNT
-    if [ $DISTRICT_COUNT -lt $COMPLETED ]; then
-        COMPLETED=$DISTRICT_COUNT
+
+    # Prefer checkpoint's total_iterations when available
+    TEMP_CHECKPOINT="/tmp/checkpoint_check_progress.json"
+    if gsutil -q cp "gs://$BUCKET_NAME/results/parquet_files/checkpoint.json" "$TEMP_CHECKPOINT" 2>/dev/null; then
+        CKPT_TOTAL=$(python3 -c "import json; print(json.load(open('$TEMP_CHECKPOINT')).get('total_iterations', $TOTAL_ITERATIONS))" 2>/dev/null || echo "$TOTAL_ITERATIONS")
+        TOTAL_ITERATIONS=$CKPT_TOTAL
+        rm -f "$TEMP_CHECKPOINT"
     fi
-    if [ $COUNTRIES_COUNT -lt $COMPLETED ]; then
+
+    ZONE_COUNT=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/zone_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
+    DISTRICT_COUNT=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/district_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
+    COUNTRIES_COUNT=$(gsutil ls "gs://$BUCKET_NAME/results/parquet_files/countries_simulation_result_*.parquet" 2>/dev/null | wc -l | tr -d ' ')
+    ZONE_COUNT=${ZONE_COUNT:-0}
+    DISTRICT_COUNT=${DISTRICT_COUNT:-0}
+    COUNTRIES_COUNT=${COUNTRIES_COUNT:-0}
+
+    # Zone Parquet is off by default (country + district only), so only count
+    # zone files towards completion when the run writes them.
+    if [ "$ZONE_COUNT" -eq 0 ]; then
         COMPLETED=$COUNTRIES_COUNT
+        if [ "$DISTRICT_COUNT" -gt 0 ] && [ "$DISTRICT_COUNT" -lt "$COMPLETED" ]; then
+            COMPLETED=$DISTRICT_COUNT
+        fi
+    else
+        COMPLETED=$ZONE_COUNT
+        if [ "$DISTRICT_COUNT" -lt "$COMPLETED" ]; then
+            COMPLETED=$DISTRICT_COUNT
+        fi
+        if [ "$COUNTRIES_COUNT" -lt "$COMPLETED" ]; then
+            COMPLETED=$COUNTRIES_COUNT
+        fi
     fi
-    
+
+    if [ "$TOTAL_ITERATIONS" -le 0 ]; then
+        TOTAL_ITERATIONS=1
+    fi
     PERCENTAGE=$((COMPLETED * 100 / TOTAL_ITERATIONS))
     REMAINING=$((TOTAL_ITERATIONS - COMPLETED))
-    
+    if [ "$REMAINING" -lt 0 ]; then
+        REMAINING=0
+    fi
+
     # Progress bar
     BAR_LENGTH=40
     FILLED_LENGTH=$((COMPLETED * BAR_LENGTH / TOTAL_ITERATIONS))
+    if [ "$FILLED_LENGTH" -gt "$BAR_LENGTH" ]; then
+        FILLED_LENGTH=$BAR_LENGTH
+    fi
     EMPTY_LENGTH=$((BAR_LENGTH - FILLED_LENGTH))
-    
+
     echo -ne "${GREEN}Progress: ["
     for ((i=0; i<FILLED_LENGTH; i++)); do echo -n "█"; done
     for ((i=0; i<EMPTY_LENGTH; i++)); do echo -n "░"; done
     echo -e "] ${PERCENTAGE}%${NC}"
-    
+
     echo -e "${MAGENTA}● Completed:${NC} $COMPLETED / $TOTAL_ITERATIONS iterations"
     echo -e "${MAGENTA}● Remaining:${NC} $REMAINING iterations"
-    
-    # Show individual counts if they differ
-    if [ $ZONE_COUNT -ne $DISTRICT_COUNT ] || [ $ZONE_COUNT -ne $COUNTRIES_COUNT ]; then
-        echo -e "${YELLOW}  Note: Result files are uneven:${NC}"
-        echo -e "  - Zone results: $ZONE_COUNT"
-        echo -e "  - District results: $DISTRICT_COUNT"
-        echo -e "  - Countries results: $COUNTRIES_COUNT"
-    fi
-    
+    echo -e "  - Countries results: $COUNTRIES_COUNT"
+    echo -e "  - District results: $DISTRICT_COUNT"
+    echo -e "  - Zone results: $ZONE_COUNT (0 unless --save-zone-parquet)"
+
     # Estimate completion time
-    if [ $COMPLETED -gt 10 ] && [ -n "$RUN_SINCE" ]; then
+    if [ $COMPLETED -gt 0 ] && [ -n "$RUN_SINCE" ]; then
         START_EPOCH=$(date -d "$RUN_SINCE" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$RUN_SINCE" +%s)
         NOW_EPOCH=$(date +%s)
         ELAPSED=$((NOW_EPOCH - START_EPOCH))
-        
-        if [ $COMPLETED -gt 0 ]; then
+
+        if [ $COMPLETED -gt 0 ] && [ $REMAINING -gt 0 ]; then
             SECONDS_PER_ITERATION=$((ELAPSED / COMPLETED))
             REMAINING_SECONDS=$((SECONDS_PER_ITERATION * REMAINING))
             REMAINING_HOURS=$((REMAINING_SECONDS / 3600))
             REMAINING_MINUTES=$(((REMAINING_SECONDS % 3600) / 60))
-            
+
             echo -e "${CYAN}● Est. Time Remaining:${NC} ${REMAINING_HOURS}h ${REMAINING_MINUTES}m"
-            
-            # Estimate completion time
+
             COMPLETION_EPOCH=$((NOW_EPOCH + REMAINING_SECONDS))
             COMPLETION_TIME=$(date -d "@$COMPLETION_EPOCH" '+%Y-%m-%d %H:%M' 2>/dev/null || date -r $COMPLETION_EPOCH '+%Y-%m-%d %H:%M')
             echo -e "${CYAN}● Est. Completion:${NC} $COMPLETION_TIME"
-            
-            # Estimate total cost
-            TOTAL_HOURS=$((ELAPSED / 3600 + REMAINING_HOURS))
-            HOURLY_RATE=0.12
-            TOTAL_COST=$(echo "scale=2; $TOTAL_HOURS * $HOURLY_RATE" | bc)
-            echo -e "${CYAN}● Est. Total Cost:${NC} \$${TOTAL_COST}"
         fi
     fi
-    
+
     return $COMPLETED
 }
 

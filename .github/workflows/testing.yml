@@ -16,21 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9"]
+        python-version: ["3.11"]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           lfs: true
 
       # 1) Set up Conda environment
-      - name: Set up Miniconda ${{ matrix.python-version }}
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Set up Miniforge ${{ matrix.python-version }}
+        uses: conda-incubator/setup-miniconda@v3
         with:
+          miniforge-version: latest
           python-version: ${{ matrix.python-version }}
           environment-file: environment.yml
           auto-activate-base: false
           activate-environment: water-access
-          use-mamba: true
 
       # 2) Install dependencies (including local code in editable mode)
       - name: Install dependencies

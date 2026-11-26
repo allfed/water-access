@@ -1,187 +1,233 @@
+"""Pick MC draws closest to the median / 5th / 95th of global population
+without water.
+
+Selection uses the GLOBAL row of ``countries_simulation_result_*.parquet``
+(equivalent to summing ``zone_pop_*`` over a zone file).
+
+The Monte Carlo run only stores country and district aggregates, so by
+default those three draws are re-run locally (with the parameters stored in
+``checkpoint.json``) to write their per-cell zone Parquet, which is copied to
+the names expected by the export/rasterise scripts. Pass
+``--no-rerun-zones-locally`` to only identify the median, 5th, and 95th percentile runs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import sys
 from pathlib import Path
+
 import pandas as pd
 
-"""
-Output for the Feb 12th 1000 run (simulations used in paper):
-
-Run closest to median 'zone_pop_without_water':
-Name: 950,
-
-Run closest to 95th percentile of 'zone_pop_without_water':
-Name: 787,
-
-Run closest to 5th percentile of 'zone_pop_without_water':
-Name: 413,
-
-
-Output for the Feb 10th 1000 run:
-
-Run closest to median 'zone_pop_without_water':
-Name: 829,
-
-Run closest to 95th percentile of 'zone_pop_without_water':
-Name: 596,
-
-Run closest to 5th percentile of 'zone_pop_without_water':
-Name: 744,
-
-
-
-Output for the Septemeber 1000 run:
-
-Run closest to median 'zone_pop_without_water':
-Name: 85,
-
-Run closest to 95th percentile of 'zone_pop_without_water':
-Name: 54,
-
-Run closest to 95th percentile of 'zone_pop_without_water':
-Name: 211,
-
-
-"""
-
-# Define the root of the repository by going up one level from the script
-# directory
 data_script_dir = Path(__file__).resolve().parent
-script_dir = data_script_dir.parent
-repo_root = script_dir.parent
+repo_root = data_script_dir.parent.parent
+sys.path.insert(0, str(repo_root))
 
-# Define the data directory relative to the repo root
 parquet_data_dir = repo_root / "results" / "parquet_files"
+checkpoint_path = parquet_data_dir / "checkpoint.json"
 
-# Initialize an empty list to store the sums
-sums_list = []
+LABEL_MEDIAN = "median"
+LABEL_5TH = "5th_percentile"
+LABEL_95TH = "95th_percentile"
 
-# Number of files to process
-num_files = 1000
 
-# Loop over the files
-for i in range(num_files):
-    # Construct the filename
-    filename = f"zone_simulation_result_{i}.parquet"
-    parquet_file_path = parquet_data_dir / filename
-
-    # Check if file exists
-    if not parquet_file_path.exists():
-        print(f"File {parquet_file_path} does not exist. Skipping.")
-        continue
-
-    # Read the Parquet file into a DataFrame
-    df = pd.read_parquet(parquet_file_path)
-
-    # Compute the sums of the two columns
-    sum_with_water = df["zone_pop_with_water"].sum()
-    sum_without_water = df["zone_pop_without_water"].sum()
-
-    # Store the sums into the list
-    sums_list.append(
-        {
-            "run_id": i,
-            "sum_zone_pop_with_water": sum_with_water,
-            "sum_zone_pop_without_water": sum_without_water,
-        }
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--rerun-zones-locally",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="after selecting draws, re-run them locally with zone Parquet "
+        "(default: on; use --no-rerun-zones-locally for selection only)",
     )
-
-    # Remove df from memory
-    del df
-
-# Create a DataFrame from the list
-sums_df = pd.DataFrame(sums_list)
-
-# Save the sums DataFrame to a CSV file (optional)
-sums_df.to_csv(parquet_data_dir / "sums_of_zone_populations.csv", index=False)
-
-# Compute the median sums
-median_with_water = sums_df["sum_zone_pop_with_water"].median()
-median_without_water = sums_df["sum_zone_pop_without_water"].median()
-
-print(f"Median sum of 'zone_pop_with_water' across runs: {median_with_water}")
-print(f"Median sum of 'zone_pop_without_water' across runs: " f"{median_without_water}")
-
-# Identify the run closest to the median sum
-sums_df["diff_with_water"] = (
-    sums_df["sum_zone_pop_with_water"] - median_with_water
-).abs()
-sums_df["diff_without_water"] = (
-    sums_df["sum_zone_pop_without_water"] - median_without_water
-).abs()
-
-# Find the run with minimal difference to the median
-median_run_with_water = sums_df.loc[sums_df["diff_with_water"].idxmin()]
-median_run_without_water = sums_df.loc[sums_df["diff_without_water"].idxmin()]
-
-print("\nRun closest to median 'zone_pop_with_water':")
-print(median_run_with_water)
-
-print("\nRun closest to median 'zone_pop_without_water':")
-print(median_run_without_water)
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="with zone re-run, overwrite existing zone_simulation_result_<id>.parquet",
+    )
+    return p.parse_args(argv)
 
 
-# Compute the 5th and 95th percentiles for 'zone_pop_with_water' and
-# 'zone_pop_without_water'
-percentile_5_with_water = sums_df["sum_zone_pop_with_water"].quantile(0.05)
-percentile_95_with_water = sums_df["sum_zone_pop_with_water"].quantile(0.95)
+def select_percentile_runs() -> pd.DataFrame:
+    sums_list = []
+    for path in sorted(parquet_data_dir.glob("countries_simulation_result_*.parquet")):
+        run_id = int(path.stem.rsplit("_", 1)[-1])
+        df = pd.read_parquet(
+            path,
+            columns=["ISOCODE", "country_pop_with_water", "country_pop_without_water"],
+        )
+        global_row = df.loc[df["ISOCODE"] == "GLOBAL"]
+        if global_row.empty:
+            print(f"No GLOBAL row in {path.name}; skipping.")
+            continue
+        row = global_row.iloc[0]
+        sums_list.append(
+            {
+                "run_id": run_id,
+                "sum_zone_pop_with_water": float(row["country_pop_with_water"]),
+                "sum_zone_pop_without_water": float(row["country_pop_without_water"]),
+            }
+        )
 
-percentile_5_without_water = sums_df["sum_zone_pop_without_water"].quantile(0.05)
-percentile_95_without_water = sums_df["sum_zone_pop_without_water"].quantile(0.95)
+    if not sums_list:
+        raise SystemExit(
+            f"No countries_simulation_result_*.parquet files in {parquet_data_dir}"
+        )
 
-# Find the run closest to the 5th and 95th percentiles for
-# 'zone_pop_with_water'
-sums_df["diff_to_5_with_water"] = (
-    sums_df["sum_zone_pop_with_water"] - percentile_5_with_water
-).abs()
-sums_df["diff_to_95_with_water"] = (
-    sums_df["sum_zone_pop_with_water"] - percentile_95_with_water
-).abs()
+    sums_df = pd.DataFrame(sums_list).sort_values("run_id").reset_index(drop=True)
+    sums_df.to_csv(parquet_data_dir / "sums_of_zone_populations.csv", index=False)
 
-run_closest_to_5_with_water = sums_df.loc[sums_df["diff_to_5_with_water"].idxmin()]
-run_closest_to_95_with_water = sums_df.loc[sums_df["diff_to_95_with_water"].idxmin()]
+    median_without = sums_df["sum_zone_pop_without_water"].median()
+    p5 = sums_df["sum_zone_pop_without_water"].quantile(0.05)
+    p95 = sums_df["sum_zone_pop_without_water"].quantile(0.95)
 
-# Find the run closest to the 5th and 95th percentiles for
-# 'zone_pop_without_water'
-sums_df["diff_to_5_without_water"] = (
-    sums_df["sum_zone_pop_without_water"] - percentile_5_without_water
-).abs()
-sums_df["diff_to_95_without_water"] = (
-    sums_df["sum_zone_pop_without_water"] - percentile_95_without_water
-).abs()
+    sums_df["diff_median"] = (
+        sums_df["sum_zone_pop_without_water"] - median_without
+    ).abs()
+    sums_df["diff_5"] = (sums_df["sum_zone_pop_without_water"] - p5).abs()
+    sums_df["diff_95"] = (sums_df["sum_zone_pop_without_water"] - p95).abs()
 
-run_closest_to_5_without_water = sums_df.loc[
-    sums_df["diff_to_5_without_water"].idxmin()
-]
-run_closest_to_95_without_water = sums_df.loc[
-    sums_df["diff_to_95_without_water"].idxmin()
-]
+    median_run = int(sums_df.loc[sums_df["diff_median"].idxmin(), "run_id"])
+    run_5th = int(sums_df.loc[sums_df["diff_5"].idxmin(), "run_id"])
+    run_95th = int(sums_df.loc[sums_df["diff_95"].idxmin(), "run_id"])
 
-# Print the results
-print("Run closest to 5th percentile of 'zone_pop_with_water':")
-print(run_closest_to_5_with_water)
+    print(f"Runs found: {len(sums_df)}")
+    print(f"Median pop without water: {median_without:,.0f}")
+    print(f"  median draw: {median_run}")
+    print(f"  5th percentile draw: {run_5th}")
+    print(f"  95th percentile draw: {run_95th}")
 
-print("\nRun closest to 95th percentile of 'zone_pop_with_water':")
-print(run_closest_to_95_with_water)
+    selected = pd.DataFrame(
+        [
+            {
+                "run_median_without_water": median_run,
+                "run_5th_without_water": run_5th,
+                "run_95th_without_water": run_95th,
+            }
+        ]
+    )
+    out = parquet_data_dir / "percentile_runs_of_zone_populations.csv"
+    selected.to_csv(out, index=False)
+    print(f"Saved {out}")
+    return selected
 
-print("\nRun closest to 5th percentile of 'zone_pop_without_water':")
-print(run_closest_to_5_without_water)
 
-print("\nRun closest to 95th percentile of 'zone_pop_without_water':")
-print(run_closest_to_95_without_water)
+def _job_for_draw(run_id: int, parameters: dict, run_config: dict, chunk_plan):
+    return {
+        "index": run_id,
+        "zone_file": str(run_config["zone_file"]),
+        "crr_adjustment": parameters["crr_adjustments"][run_id],
+        "time_gathering_water": parameters["time_gatherings"][run_id],
+        "practical_limit_bicycle": parameters["practical_limits_bicycle"][run_id],
+        "practical_limit_buckets": parameters["practical_limits_buckets"][run_id],
+        "met": parameters["mets"][run_id],
+        "watts": parameters["watts_values"][run_id],
+        "hill_polarity": parameters["hill_polarities"][run_id],
+        "urban_adjustment": parameters["urban_adjustments"][run_id],
+        "rural_adjustment": parameters["rural_adjustments"][run_id],
+        "urban_borehole_lose_fraction": parameters["urban_borehole_lose_fractions"][
+            run_id
+        ],
+        "rural_borehole_lose_fraction": parameters["rural_borehole_lose_fractions"][
+            run_id
+        ],
+        "unallocated_vulnerable_fraction": parameters[
+            "unallocated_vulnerable_fractions"
+        ][run_id],
+        "save_zone_parquet": True,
+        "chunk_rows": run_config.get("chunk_rows") or None,
+        "chunk_plan": chunk_plan,
+    }
 
-# Optional: Save the runs closest to the 5th and 95th percentiles
-percentile_runs = {
-    "run_5th_with_water": run_closest_to_5_with_water["run_id"],
-    "run_95th_with_water": run_closest_to_95_with_water["run_id"],
-    "run_5th_without_water": run_closest_to_5_without_water["run_id"],
-    "run_95th_without_water": run_closest_to_95_without_water["run_id"],
-}
 
-# Convert to DataFrame and save
-percentile_runs_df = pd.DataFrame([percentile_runs])
-percentile_runs_df.to_csv(
-    parquet_data_dir / "percentile_runs_of_zone_populations.csv", index=False
-)
+def rerun_zone_draws_locally(selected: pd.DataFrame, *, force: bool = False) -> None:
+    if not checkpoint_path.exists():
+        raise SystemExit(
+            f"Missing {checkpoint_path}; need checkpoint parameters to re-run "
+            "the selected draws."
+        )
 
-print(
-    "\nPercentile run numbers have been saved to "
-    "'percentile_runs_of_zone_populations.csv'"
-)
+    checkpoint = json.loads(checkpoint_path.read_text())
+    parameters = checkpoint["parameters"]
+    run_config = checkpoint["run_config"]
+    zone_file = Path(run_config["zone_file"])
+    if not zone_file.is_absolute():
+        zone_file = repo_root / zone_file
+    if not zone_file.exists():
+        raise SystemExit(f"Zone input not found: {zone_file}")
+
+    import src.chunked_analysis as chunked
+    import src.gis_global_module as gis
+    import scripts.run_monte_carlo_gcp as gcp_mc
+
+    gis.URB_DATA_FILE = zone_file
+    gcp_mc.RESULTS_PATH = parquet_data_dir.parent
+    gcp_mc.PARQUET_PATH = parquet_data_dir
+    gcp_mc.CHECKPOINT_FILE = checkpoint_path
+
+    chunk_rows = int(run_config.get("chunk_rows") or 0)
+    chunk_plan = None
+    if chunk_rows:
+        print(f"Planning chunks (budget {chunk_rows:,}) ...", flush=True)
+        chunk_plan = chunked.plan_chunks(zone_file, max_rows_per_chunk=chunk_rows)
+        print(f"  {chunk_plan.describe()}", flush=True)
+
+    label_by_id = {}
+    for run_id, label in (
+        (int(selected.at[0, "run_median_without_water"]), LABEL_MEDIAN),
+        (int(selected.at[0, "run_5th_without_water"]), LABEL_5TH),
+        (int(selected.at[0, "run_95th_without_water"]), LABEL_95TH),
+    ):
+        label_by_id.setdefault(run_id, []).append(label)
+
+    for run_id, labels in label_by_id.items():
+        zone_out = parquet_data_dir / f"zone_simulation_result_{run_id}.parquet"
+        if zone_out.exists() and not force:
+            print(f"Zone file already exists for draw {run_id}; skipping re-run.")
+        else:
+            if zone_out.exists() and force:
+                zone_out.unlink()
+            print(
+                f"\nRe-running draw {run_id} with zone Parquet "
+                f"({', '.join(labels)}) ..."
+            )
+            job = _job_for_draw(
+                run_id,
+                parameters,
+                {**run_config, "zone_file": zone_file},
+                chunk_plan,
+            )
+            gcp_mc.run_and_save_simulation(job)
+            if not zone_out.exists():
+                raise SystemExit(
+                    f"Zone re-run finished but {zone_out} was not written."
+                )
+            print(f"  wrote {zone_out}")
+
+        for label in labels:
+            dest = parquet_data_dir / f"zone_simulation_result_{label}.parquet"
+            shutil.copy2(zone_out, dest)
+            print(f"  copied -> {dest.name}")
+
+
+def main(argv=None) -> None:
+    args = parse_args(argv)
+    selected = select_percentile_runs()
+    if args.rerun_zones_locally:
+        rerun_zone_draws_locally(selected, force=args.force)
+        print(
+            "\nDone. Next: "
+            "python scripts/Data_Manipulation_Scripts/export_results_with_centroids.py "
+            "&& python scripts/Data_Manipulation_Scripts/rasterise_results.py"
+        )
+    else:
+        print(
+            "\nSelection only (--no-rerun-zones-locally). To re-run zone maps:\n"
+            "  python scripts/Data_Manipulation_Scripts/parquet_process.py"
+        )
+
+
+if __name__ == "__main__":
+    main()

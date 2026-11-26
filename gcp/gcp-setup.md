@@ -22,14 +22,14 @@ git lfs pull  # Ensure all data files are downloaded
 
 ## Cost Estimates
 
-| Configuration | vCPUs | Memory | Spot Price | Est. Runtime | Total Cost |
-|--------------|-------|---------|------------|--------------|------------|
-| e2-highcpu-16 (Spot) | 16 | 16 GB | ~$0.12/hr | 4-5 days | $12-15 |
-| e2-highcpu-32 (Spot) | 32 | 32 GB | ~$0.24/hr | 2-3 days | $12-18 |
-| n2-highcpu-32 (Spot) | 32 | 32 GB | ~$0.36/hr | 2 days | $18-25 |
-| n2-highcpu-64 (Spot) | 64 | 64 GB | ~$0.72/hr | 1 day | $18-25 |
+Each Monte Carlo worker peaks at about 16.4 GB of memory, so the number of
+workers is set by memory rather than vCPUs.
 
-**Recommended**: `e2-highcpu-16` or `e2-highcpu-32` for best cost/performance ratio
+| Configuration | vCPUs | Memory | Workers | Spot Price | Total Cost (1000 draws) |
+|--------------|-------|---------|---------|------------|------------|
+| n2-highmem-32 (Spot) | 32 | 256 GB | 12 | ~$1.20/hr | $8-17 |
+
+**Recommended**: `n2-highmem-32`, the machine `deploy-spot.sh` uses.
 
 ## Step 1: Enable Required APIs
 
@@ -54,22 +54,51 @@ gsutil -m mkdir gs://water-access-data/checkpoints/
 
 ## Step 3: Upload Data to Cloud Storage
 
+Monte Carlo reads **`data/processed/merged_data.csv`** (country-level piped/unpiped
+breakdown, population, etc.) and the zone grid input. It does **not** read JMP
+country xlsx files at runtime — those are only for rebuilding `merged_data.csv`
+locally (`download_jmp_country_files.py` → `imputation_script.py`).
+
 ```bash
-# Upload data folder (3.5GB) - do this once
+# Upload data folder (~3.5GB) - do this once, or refresh merged_data after pipeline changes:
 cd /path/to/water-access
 gsutil -m -o GSUtil:parallel_composite_upload_threshold=150M cp -r data gs://water-access-data/input/
+
+# After changing merged_data.csv only (e.g. Venezuela ENCOVI fill):
+gsutil cp data/processed/merged_data.csv gs://water-access-data/input/data/processed/
 
 # Upload code
 gsutil -m cp -r src scripts environment.yml gs://water-access-data/code/
 ```
 
+### 30 arc-second zone input
+
+`master_30as.parquet` (~3.4 GB) is **not in git** (see `.gitignore`). Build it
+locally before a cloud run:
+
+```bash
+# Follow scripts/extraction/README.md (source rasters + extract_grid.py)
+python scripts/extraction/extract_grid.py \
+    --out data/GIS/extracted/master_30as.parquet
+```
+
+Upload the parquet to GCS (always, even if bulk `data/` was uploaded earlier):
+
+```bash
+gsutil -m cp data/GIS/extracted/master_30as.parquet \
+    gs://water-access-data/input/data/GIS/extracted/
+```
+
+Or use `./gcp/deploy-spot.sh upload`, which checks for the local parquet and
+uploads it automatically.
+
 ## Step 4: Create Spot VM Instance
 
-### Option A: Basic e2-highcpu-16 Spot VM (Recommended for cost)
+### Option A: Create the VM by hand
 ```bash
 gcloud compute instances create water-access-compute-spot \
     --zone=us-central1-a \
-    --machine-type=e2-highcpu-16 \
+    --machine-type=n2-highmem-32 \
     --provisioning-model=SPOT \
     --instance-termination-action=STOP \
     --max-run-duration=24h \
@@ -102,27 +131,22 @@ mkdir -p results/parquet_files
 gsutil -m cp gs://water-access-data/checkpoints/* results/parquet_files/ 2>/dev/null || true
 
 # Run simulation with checkpointing
-nohup python scripts/run_monte_carlo_gcp.py > simulation.log 2>&1 &
+nohup python scripts/run_monte_carlo_gcp.py \
+    --input data/GIS/extracted/master_30as.parquet \
+    --workers 12 \
+    > simulation.log 2>&1 &
 
 # Setup periodic checkpoint upload (every hour)
 (crontab -l 2>/dev/null; echo "0 * * * * gsutil -m rsync -r $HOME/water-access/results/ gs://water-access-data/results/") | crontab -
 '
 ```
 
-### Option B: More powerful e2-highcpu-32 Spot VM (Faster completion)
+### Option B: Use the deployment script
+`deploy-spot.sh` uploads code and data, writes the startup script, and creates
+the VM. Edit the configuration and `MC_*` variables at the top of the script,
+then run:
 ```bash
-gcloud compute instances create water-access-compute-spot \
-    --zone=us-central1-a \
-    --machine-type=e2-highcpu-32 \
-    --provisioning-model=SPOT \
-    --instance-termination-action=STOP \
-    --max-run-duration=24h \
-    --boot-disk-size=100GB \
-    --boot-disk-type=pd-standard \
-    --image-family=ubuntu-2204-lts \
-    --image-project=ubuntu-os-cloud \
-    --scopes=storage-rw \
-    --metadata-from-file=startup-script=gcp/startup-script.sh
+./gcp/deploy-spot.sh deploy
 ```
 
 ## Step 5: Connect to VM and Monitor Progress
@@ -214,7 +238,7 @@ gcloud alpha billing accounts budgets list --billing-account=YOUR_BILLING_ACCOUN
 ## Tips for Cost Optimization
 
 1. **Use Spot VMs**: 70-90% cheaper than regular VMs
-2. **Choose e2 machine types**: Better price/performance for this workload
+2. **Choose high-memory machine types**: Memory, not vCPUs, limits the number of workers
 3. **Use us-central1**: Generally cheapest region
 4. **Set max-run-duration**: Prevents runaway costs
 5. **Delete instances promptly**: Stop paying as soon as job completes
@@ -233,7 +257,9 @@ gcloud compute ssh water-access-compute-spot --zone=us-central1-a
 cd ~/water-access
 source ~/miniconda3/bin/activate
 mamba activate water-access
-python scripts/run_monte_carlo_gcp.py
+python scripts/run_monte_carlo_gcp.py \
+    --input data/GIS/extracted/master_30as.parquet \
+    --workers 1
 ```
 
 ### If preempted frequently:

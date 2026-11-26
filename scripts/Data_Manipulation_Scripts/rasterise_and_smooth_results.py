@@ -1,184 +1,141 @@
-import pandas as pd
+"""Rasterise zone population results to a smoothed 30 arc-second GeoTIFF."""
+
+from __future__ import annotations
+
+import argparse
+import time
+from pathlib import Path
+
 import geopandas as gpd
+import numpy as np
+import pandas as pd
 import rasterio
 from rasterio.features import rasterize
 from rasterio.transform import from_origin
-import numpy as np
-import time
 from scipy.ndimage import uniform_filter
 
-# Start timing the script
-start_time = time.time()
+repo_root = Path(__file__).resolve().parent.parent.parent
+results_dir = repo_root / "results"
+tif_dir = results_dir / "TIFs"
 
-# Load your data into a DataFrame
-filename = "./results/GIS_merged_output_processed_with_centroids_right.csv"
-df = pd.read_csv(filename)
-output_filename = "./results/TIFs/output_raster_5_arcmin_smoothed.tif"
+# Output grid spacing: 30 arc-seconds, in degrees.
+RESOLUTION_DEGREES = 30 / 3600
 
-# Create a GeoDataFrame with the coordinates and specify the initial CRS
-# (WGS84)
-gdf = gpd.GeoDataFrame(
-    df,
-    geometry=gpd.points_from_xy(df.longitude_centroid, df.latitude_centroid),
-    crs="EPSG:4326",
-)
 
-# Define the resolution: 5 arc-minutes is 5/60 degrees, which equals
-# approximately 0.08333 degrees
-resolution = 5 / 60  # 0.08333 degrees
+def parse_args():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--label",
+        default="median",
+        choices=("median", "5th_percentile", "95th_percentile"),
+    )
+    p.add_argument(
+        "--filled",
+        action="store_true",
+        help="use the *_no_nans.parquet export",
+    )
+    return p.parse_args()
 
-# Calculate the raster bounds based on the extent of the data (minx, miny,
-# maxx, maxy)
-# (min_longitude, min_latitude, max_longitude, max_latitude)
-bounds = gdf.total_bounds
 
-# Ensure the bounds are aligned to the 5 arc-minute grid
-x_min = bounds[0] - (bounds[0] % resolution)
-x_max = bounds[2] + (resolution - bounds[2] % resolution)
-y_min = bounds[1] - (bounds[1] % resolution)
-y_max = bounds[3] + (resolution - bounds[3] % resolution)
+def main() -> None:
+    args = parse_args()
+    start_time = time.time()
+    suffix = "_no_nans" if args.filled else ""
+    input_path = (
+        results_dir
+        / f"GIS_merged_output_processed_with_centroids_{args.label}{suffix}.parquet"
+    )
+    if not input_path.exists():
+        raise SystemExit(f"Missing {input_path}")
 
-# Calculate the number of rows and columns for the raster grid
-width = int(np.ceil((x_max - x_min) / resolution))
-height = int(np.ceil((y_max - y_min) / resolution))
+    df = pd.read_parquet(input_path)
+    resolution = RESOLUTION_DEGREES
+    tif_dir.mkdir(parents=True, exist_ok=True)
+    output_filename = tif_dir / f"output_raster_30as_{args.label}_smoothed.tif"
 
-# Define the transform for the raster (top-left corner and resolution)
-transform = from_origin(x_min, y_max, resolution, resolution)
+    gdf = gpd.GeoDataFrame(
+        df,
+        geometry=gpd.points_from_xy(df.longitude_centroid, df.latitude_centroid),
+        crs="EPSG:4326",
+    )
+    bounds = gdf.total_bounds
+    x_min = bounds[0] - (bounds[0] % resolution)
+    x_max = bounds[2] + (resolution - bounds[2] % resolution)
+    y_min = bounds[1] - (bounds[1] % resolution)
+    y_max = bounds[3] + (resolution - bounds[3] % resolution)
+    width = int(np.ceil((x_max - x_min) / resolution))
+    height = int(np.ceil((y_max - y_min) / resolution))
+    transform = from_origin(x_min, y_max, resolution, resolution)
 
-# Create percentage of people with water access
-gdf["percentage_with_water"] = gdf["zone_pop_with_water"] / (
-    gdf["zone_pop_without_water"] + gdf["zone_pop_with_water"]
-)
-
-# Define the variables to rasterize
-variables_to_rasterize = [
-    "zone_pop_with_water",
-    "zone_pop_without_water",
-    "percentage_with_water",
-]
-num_bands = len(variables_to_rasterize)
-
-# Create an empty array to hold raster data
-raster_data = np.empty((num_bands, height, width), dtype=np.float32)
-
-# Rasterize each variable
-for i, variable in enumerate(variables_to_rasterize):
-    print(f"Rasterizing variable: {variable}")
-
-    # Create a generator that yields the (geometry, value) pairs for
-    # rasterization
-    def geometry_value_pairs():
-        for geom, value in zip(gdf.geometry, gdf[variable]):
-            yield geom, value
-
-    # Rasterize the GeoDataFrame, filling cells that don't have data with
-    # np.nan
-    raster = rasterize(
-        geometry_value_pairs(),
-        out_shape=(height, width),
-        transform=transform,
-        fill=np.nan,
-        dtype="float32",
+    denom = gdf["zone_pop_without_water"] + gdf["zone_pop_with_water"]
+    gdf["percentage_with_water"] = np.where(
+        denom > 0, gdf["zone_pop_with_water"] / denom, np.nan
+    )
+    variables_to_rasterize = [
+        "zone_pop_with_water",
+        "zone_pop_without_water",
+        "percentage_with_water",
+    ]
+    raster_data = np.empty(
+        (len(variables_to_rasterize), height, width), dtype=np.float32
     )
 
-    # Store the raster in the raster_data array
-    raster_data[i, :, :] = raster
+    for i, variable in enumerate(variables_to_rasterize):
+        print(f"Rasterizing {variable} ...")
+        values = gdf[variable].to_numpy()
+        pairs = (
+            (geom, float(val) if np.isfinite(val) else np.nan)
+            for geom, val in zip(gdf.geometry, values)
+        )
+        raster_data[i] = rasterize(
+            pairs,
+            out_shape=(height, width),
+            transform=transform,
+            fill=np.nan,
+            dtype="float32",
+        )
 
-# Smoothing parameters
-apply_second_smoothing = False  # Set to True to apply the second smoothing pass
-first_window_size = 3  # Window size for the first smoothing pass
-second_window_size = 5  # Window size for the second smoothing pass
-
-# Apply the smoothing filter to each band
-print("Applying first smoothing filter...")
-for i in range(num_bands):
-    print(f"First smoothing band {i + 1}: {variables_to_rasterize[i]}")
-    band_data = raster_data[i, :, :]
-
-    # Create a mask of valid data (True where data is not NaN)
-    valid_mask = ~np.isnan(band_data)
-
-    # Replace NaNs with zeros for computation
-    data_filled = np.nan_to_num(band_data, nan=0.0)
-
-    # Apply uniform filter to the data and the mask
-    smoothed_data = uniform_filter(
-        data_filled, size=first_window_size, mode="constant", cval=0.0
-    )
-    smoothed_mask = uniform_filter(
-        valid_mask.astype(float),
-        size=first_window_size,
-        mode="constant",
-        cval=0.0,
-    )
-
-    # Avoid division by zero
-    with np.errstate(invalid="ignore", divide="ignore"):
-        smoothed_band = smoothed_data / smoothed_mask
-        smoothed_band[smoothed_mask == 0] = np.nan
-
-    # Restore original NaN values
-    smoothed_band[~valid_mask] = np.nan
-
-    # Store the smoothed band back
-    raster_data[i, :, :] = smoothed_band
-
-# Apply second smoothing pass if enabled
-if apply_second_smoothing:
-    print("Applying second smoothing filter...")
-    for i in range(num_bands):
-        print(f"Second smoothing band {i + 1}: {variables_to_rasterize[i]}")
-        band_data = raster_data[i, :, :]
-
-        # Create a mask of valid data (True where data is not NaN)
+    first_window_size = 3
+    print("Smoothing ...")
+    for i in range(len(variables_to_rasterize)):
+        band_data = raster_data[i]
         valid_mask = ~np.isnan(band_data)
-
-        # Replace NaNs with zeros for computation
         data_filled = np.nan_to_num(band_data, nan=0.0)
-
-        # Apply uniform filter to the data and the mask
         smoothed_data = uniform_filter(
-            data_filled, size=second_window_size, mode="constant", cval=0.0
+            data_filled, size=first_window_size, mode="constant", cval=0.0
         )
         smoothed_mask = uniform_filter(
             valid_mask.astype(float),
-            size=second_window_size,
+            size=first_window_size,
             mode="constant",
             cval=0.0,
         )
-
-        # Avoid division by zero
         with np.errstate(invalid="ignore", divide="ignore"):
             smoothed_band = smoothed_data / smoothed_mask
             smoothed_band[smoothed_mask == 0] = np.nan
-
-        # Restore original NaN values
         smoothed_band[~valid_mask] = np.nan
+        raster_data[i] = smoothed_band
 
-        # Store the smoothed band back
-        raster_data[i, :, :] = smoothed_band
+    with rasterio.open(
+        output_filename,
+        "w",
+        driver="GTiff",
+        height=height,
+        width=width,
+        count=len(variables_to_rasterize),
+        dtype="float32",
+        crs=gdf.crs.to_string(),
+        transform=transform,
+        compress="deflate",
+        nodata=np.nan,
+    ) as dst:
+        for i in range(len(variables_to_rasterize)):
+            dst.write(raster_data[i], i + 1)
+        dst.descriptions = tuple(variables_to_rasterize)
 
-# Save the raster to a GeoTIFF file
-with rasterio.open(
-    output_filename,
-    "w",
-    driver="GTiff",
-    height=height,
-    width=width,
-    count=num_bands,
-    dtype="float32",
-    crs=gdf.crs.to_string(),
-    transform=transform,
-    compress="deflate",
-    nodata=np.nan,  # Set nodata value to NaN
-) as dst:
-    for i in range(num_bands):
-        dst.write(raster_data[i, :, :], i + 1)  # Bands are 1-indexed
-    # Set band descriptions
-    dst.descriptions = tuple(variables_to_rasterize)
+    print(f"Wrote {output_filename}")
+    print(f"Time taken: {time.time() - start_time:.1f}s")
 
-print(f"Raster file '{output_filename}' created successfully.")
 
-# End timing the script
-end_time = time.time()
-print(f"Time taken: {end_time - start_time} seconds")
+if __name__ == "__main__":
+    main()

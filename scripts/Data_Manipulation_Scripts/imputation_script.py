@@ -77,6 +77,19 @@ height_file_path = data_dir / "Human Height by Birth Year.csv"
 population_file_path = data_dir / "population.csv"  # OWID
 household_size_file_path = data_dir / "undesa_pd_2022_hh-size-composition.xlsx"
 country_regions_file_path = data_dir / "ISO-3166 Countries.csv"
+# Unified breakdown = JMP-parsed values plus researched fills for the 76
+# countries whose JMP files are blank (see researched_source_breakdown_README).
+# Built by build_unified_source_breakdown.py. Best source wins: an informative
+# JMP row (positive packaged / delivered / borehole) beats research; a JMP row
+# that is blank or catch-all-only is demoted to the research fill.
+jmp_source_breakdown_path = (
+    repo_root
+    / "data"
+    / "processed"
+    / "semi-processed"
+    / "jmp_source_breakdown_unified.csv"
+)
+jmp_country_files_dir = data_dir / "jmp_country_files"
 
 
 # http://download.geonames.org/export/dump/countryInfo.txt
@@ -544,6 +557,296 @@ def process_water_data(df):
     return df
 
 
+def load_jmp_source_breakdown(file_path):
+    """Load parsed JMP source-type percentages, if available."""
+    if not file_path.exists():
+        print(
+            f"JMP source breakdown not found at {file_path}; run extract_jmp_source_breakdown.py"
+        )
+        return pd.DataFrame(columns=["alpha3"])
+
+    breakdown = pd.read_csv(file_path)
+    keep_cols = [
+        "alpha3",
+        "URBANPackaged",
+        "RURALPackaged",
+        "URBANDelivered",
+        "RURALDelivered",
+        "URBANBorehole",
+        "RURALBorehole",
+        "URBANUnpipedUnaffected",
+        "RURALUnpipedUnaffected",
+        "URBANUnpipedUnknown",
+        "RURALUnpipedUnknown",
+        "data_origin",
+    ]
+    existing = [col for col in keep_cols if col in breakdown.columns]
+    return breakdown[existing].drop_duplicates(subset=["alpha3"], keep="first")
+
+
+def reconcile_research_breakdown_with_piped(df):
+    """Reconcile source breakdowns against the piped shares this script uses.
+
+    Runs before spatial piped imputation. Same scale-down rule as the build
+    script (trust_categories_over_piped=False) for research and JMP rows.
+    """
+    from jmp_source_parser import reconcile_categories_over_100_pct
+
+    if "data_origin" not in df.columns:
+        return df
+    categories = (
+        "Packaged",
+        "Delivered",
+        "Borehole",
+        "UnpipedUnaffected",
+        "UnpipedUnknown",
+    )
+    for idx in df.index[df["data_origin"].isin(("research", "jmp"))]:
+        for stratum in ("URBAN", "RURAL"):
+            piped = df.at[idx, f"{stratum}Piped"]
+            piped_pct = piped if pd.notna(piped) else None
+            category_values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
+            packaged, delivered, borehole, unaffected, unknown, piped_effective, _ = (
+                reconcile_categories_over_100_pct(
+                    piped_pct=piped_pct,
+                    packaged_pct=(
+                        category_values["Packaged"]
+                        if pd.notna(category_values["Packaged"])
+                        else None
+                    ),
+                    delivered_pct=(
+                        category_values["Delivered"]
+                        if pd.notna(category_values["Delivered"])
+                        else None
+                    ),
+                    borehole_pct=(
+                        category_values["Borehole"]
+                        if pd.notna(category_values["Borehole"])
+                        else None
+                    ),
+                    unpiped_unaffected_pct=(
+                        category_values["UnpipedUnaffected"]
+                        if pd.notna(category_values["UnpipedUnaffected"])
+                        else None
+                    ),
+                    unpiped_unknown_pct=(
+                        category_values["UnpipedUnknown"]
+                        if pd.notna(category_values["UnpipedUnknown"])
+                        else None
+                    ),
+                    trust_categories_over_piped=False,
+                )
+            )
+            for cat, value in zip(
+                categories, (packaged, delivered, borehole, unaffected, unknown)
+            ):
+                if value is not None:
+                    df.at[idx, f"{stratum}{cat}"] = value
+            if piped_effective is not None:
+                df.at[idx, f"{stratum}Piped"] = piped_effective
+    return df
+
+
+def reconcile_research_rows_with_final_piped(df, spatial_track):
+    """Final consistency pass after spatial piped imputation.
+
+    Rows whose piped share was spatially interpolated (neighbour / continent)
+    keep their measured categories and lower piped when they conflict,
+    whatever the row's data_origin: interpolation is the bottom of the source
+    hierarchy and must never scale real survey data down. Rows with measured
+    piped use the scale-down rule (piped protected).
+    """
+    from jmp_source_parser import reconcile_categories_over_100_pct
+
+    if "data_origin" not in df.columns:
+        return df
+    categories = (
+        "Packaged",
+        "Delivered",
+        "Borehole",
+        "UnpipedUnaffected",
+        "UnpipedUnknown",
+    )
+    track = spatial_track.drop_duplicates("alpha3").set_index("alpha3")
+    for idx in df.index[df["data_origin"].isin(("research", "jmp"))]:
+        alpha3 = df.at[idx, "alpha3"]
+        for stratum in ("URBAN", "RURAL"):
+            piped_col = f"{stratum}Piped"
+            piped = df.at[idx, piped_col]
+            if pd.isna(piped):
+                continue
+            category_values = {cat: df.at[idx, f"{stratum}{cat}"] for cat in categories}
+            piped_was_imputed = alpha3 in track.index and pd.notna(
+                track.at[alpha3, piped_col]
+            )
+            packaged, delivered, borehole, unaffected, unknown, piped_effective, _ = (
+                reconcile_categories_over_100_pct(
+                    piped_pct=piped,
+                    packaged_pct=(
+                        category_values["Packaged"]
+                        if pd.notna(category_values["Packaged"])
+                        else None
+                    ),
+                    delivered_pct=(
+                        category_values["Delivered"]
+                        if pd.notna(category_values["Delivered"])
+                        else None
+                    ),
+                    borehole_pct=(
+                        category_values["Borehole"]
+                        if pd.notna(category_values["Borehole"])
+                        else None
+                    ),
+                    unpiped_unaffected_pct=(
+                        category_values["UnpipedUnaffected"]
+                        if pd.notna(category_values["UnpipedUnaffected"])
+                        else None
+                    ),
+                    unpiped_unknown_pct=(
+                        category_values["UnpipedUnknown"]
+                        if pd.notna(category_values["UnpipedUnknown"])
+                        else None
+                    ),
+                    trust_categories_over_piped=piped_was_imputed,
+                )
+            )
+            if not piped_was_imputed:
+                for cat, value in zip(
+                    categories, (packaged, delivered, borehole, unaffected, unknown)
+                ):
+                    if value is not None:
+                        df.at[idx, f"{stratum}{cat}"] = value
+            if piped_effective is not None:
+                df.at[idx, piped_col] = piped_effective
+    return df
+
+
+def prepare_source_breakdown_columns(df):
+    """Fill missing source-type columns; default missing values to zero."""
+    source_cols = [
+        "URBANPackaged",
+        "RURALPackaged",
+        "URBANDelivered",
+        "RURALDelivered",
+        "URBANBorehole",
+        "RURALBorehole",
+        "URBANUnpipedUnaffected",
+        "RURALUnpipedUnaffected",
+        "URBANUnpipedUnknown",
+        "RURALUnpipedUnknown",
+    ]
+    for col in source_cols:
+        if col not in df.columns:
+            df[col] = pd.NA
+
+    for col in source_cols:
+        df[col] = df[col].fillna(0)
+
+    for col in source_cols:
+        df[col] = df[col].clip(lower=0, upper=100)
+
+    return df
+
+
+SOURCE_CATEGORIES = (
+    "Piped",
+    "Packaged",
+    "Delivered",
+    "Borehole",
+    "UnpipedUnaffected",
+    "UnpipedUnknown",
+)
+# Sum of the six source shares plus Unallocated may exceed 100 by at most this
+# much (rounding only) before the Unallocated step refuses to write its output.
+SHARE_SUM_TOLERANCE = 0.5
+
+
+def apply_unallocated_from_source_gap(df, report_path=None):
+    """Write the residual gap after six source shares as Unallocated.
+
+    Country-survey categories plus WHO piped routinely sum to less than 100.
+    That leftover is recorded as URBANUnallocated / RURALUnallocated (after
+    UnpipedUnknown from JMP is already counted in the six source shares).
+
+    Writes a per-stratum audit CSV and raises if the resulting six shares are
+    out of range, contain NaN, or sum past 100 by more than rounding.
+    """
+    for stratum in ("URBAN", "RURAL"):
+        for col in [f"{stratum}{cat}" for cat in SOURCE_CATEGORIES]:
+            if col not in df.columns:
+                raise ValueError(f"missing source column {col}")
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    report_rows = []
+    nan_piped = []
+    for idx in df.index:
+        alpha3 = df.at[idx, "alpha3"]
+        for stratum in ("URBAN", "RURAL"):
+            values = {}
+            for cat in SOURCE_CATEGORIES:
+                value = df.at[idx, f"{stratum}{cat}"]
+                if pd.isna(value):
+                    if cat == "Piped":
+                        nan_piped.append((alpha3, stratum))
+                    value = 0.0
+                values[cat] = float(value)
+            gap = max(0.0, 100.0 - sum(values.values()))
+            unallocated = round(gap, 6)
+            df.at[idx, f"{stratum}Unallocated"] = unallocated
+            report_rows.append(
+                {
+                    "alpha3": alpha3,
+                    "stratum": stratum,
+                    "gap": round(gap, 4),
+                    "unallocated": round(unallocated, 4),
+                }
+            )
+
+    if nan_piped:
+        print(
+            f"WARNING: {len(nan_piped)} strata had a missing piped share and were "
+            f"treated as 0 in the Unallocated gap step: "
+            f"{sorted(set(nan_piped))[:10]}"
+        )
+
+    checked_cols = [
+        f"{stratum}{cat}"
+        for stratum in ("URBAN", "RURAL")
+        for cat in SOURCE_CATEGORIES + ("Unallocated",)
+    ]
+    for col in checked_cols:
+        if df[col].isna().any():
+            bad = df.loc[df[col].isna(), "alpha3"].tolist()
+            raise ValueError(f"{col} contains NaN after Unallocated gap step: {bad}")
+        out_of_range = df.loc[(df[col] < 0) | (df[col] > 100), ["alpha3", col]]
+        if not out_of_range.empty:
+            raise ValueError(
+                f"{col} outside [0, 100] after Unallocated gap step:\n"
+                f"{out_of_range}"
+            )
+    for stratum in ("URBAN", "RURAL"):
+        total = sum(
+            df[f"{stratum}{cat}"] for cat in SOURCE_CATEGORIES + ("Unallocated",)
+        )
+        over = df.loc[total > 100.0 + SHARE_SUM_TOLERANCE, ["alpha3"]].copy()
+        if not over.empty:
+            over["sum"] = total[total > 100.0 + SHARE_SUM_TOLERANCE].round(2)
+            raise ValueError(
+                f"{stratum} source shares + Unallocated sum past "
+                f"{100.0 + SHARE_SUM_TOLERANCE}:\n{over.to_string(index=False)}"
+            )
+
+    report = pd.DataFrame(report_rows)
+    if report_path is not None:
+        Path(report_path).parent.mkdir(parents=True, exist_ok=True)
+        report.to_csv(report_path, index=False)
+    print(
+        f"Unallocated gap: mean {report['unallocated'].mean():.2f}pp, "
+        f"max {report['unallocated'].max():.2f}pp"
+    )
+    return df
+
+
 def add_back_percentage_urban_data(df, df_water):
     """Adds percentage urban data for countries where it is was dropped in
     process_water_data."""
@@ -978,10 +1281,30 @@ def main(
     # merge weight df with df_cleaned_merge
     df_cleaned_merge = df_cleaned_merge.merge(df_weight, on="alpha3", how="left")
 
-    # List of variables to impute
+    df_source_breakdown = load_jmp_source_breakdown(jmp_source_breakdown_path)
+    if not df_source_breakdown.empty:
+        df_cleaned_merge = df_cleaned_merge.merge(
+            df_source_breakdown, on="alpha3", how="left"
+        )
+        df_cleaned_merge = reconcile_research_breakdown_with_piped(df_cleaned_merge)
+    df_cleaned_merge = prepare_source_breakdown_columns(df_cleaned_merge)
+
+    # List of variables to impute (UnpipedUnaffected is zero-filled above, so
+    # imputation never fires on it; it is listed so it survives into the
+    # output column selection instead of being re-added as all zeros)
     list_of_vars = [
         "RURALPiped",
         "URBANPiped",
+        "RURALPackaged",
+        "URBANPackaged",
+        "RURALDelivered",
+        "URBANDelivered",
+        "RURALBorehole",
+        "URBANBorehole",
+        "RURALUnpipedUnaffected",
+        "URBANUnpipedUnaffected",
+        "RURALUnpipedUnknown",
+        "URBANUnpipedUnknown",
         "PBO",
         "Average Weight",
         "Household_Size",
@@ -1045,6 +1368,23 @@ def main(
 
     # Add back % urban data
     df_output = add_back_percentage_urban_data(df_output, df_water)
+    df_output = prepare_source_breakdown_columns(df_output)
+
+    # Final consistency pass: research- and JMP-filled breakdowns vs the piped
+    # values that actually ship (some piped shares only exist after imputation)
+    if not df_source_breakdown.empty and "data_origin" in df_source_breakdown.columns:
+        df_output = df_output.merge(
+            df_source_breakdown[["alpha3", "data_origin"]], on="alpha3", how="left"
+        )
+        df_output = reconcile_research_rows_with_final_piped(
+            df_output, df_spatial_imputation_track
+        )
+
+    # Name the leftover gap Unallocated. Runs last so it sees the values that ship.
+    df_output = apply_unallocated_from_source_gap(
+        df_output,
+        report_path=semi_processed_dir / "unallocated_gap_report.csv",
+    )
 
     # Save dataframes as CSV
     try:
@@ -1061,19 +1401,23 @@ def main(
         )
 
 
-preprocess_country_info_file(country_info_csv_path, country_info_output_file_path)
-main(
-    water_JMP_file_path,
-    bicycle_file_path,
-    gdp_per_capita_file_path,
-    bmi_women_file_path,
-    bmi_men_file_path,
-    height_file_path,
-    population_file_path,
-    country_info_output_file_path,
-    household_size_file_path,
-    country_regions_file_path,
-)
+# Guarded so the helper functions above can be imported (by tests, or by other
+# scripts) without re-running the whole pipeline as an import side effect.
+# Running the file as a script is unchanged.
+if __name__ == "__main__":
+    preprocess_country_info_file(country_info_csv_path, country_info_output_file_path)
+    main(
+        water_JMP_file_path,
+        bicycle_file_path,
+        gdp_per_capita_file_path,
+        bmi_women_file_path,
+        bmi_men_file_path,
+        height_file_path,
+        population_file_path,
+        country_info_output_file_path,
+        household_size_file_path,
+        country_regions_file_path,
+    )
 
 
 # # Assuming you have an existing DataFrame `df_existing`
